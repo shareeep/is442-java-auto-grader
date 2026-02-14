@@ -104,7 +104,7 @@ public class ConsoleUI {
                 }
                 case 3 -> {
                     Path result = promptForPath(
-                            "  Enter scoresheet CSV path (or press Enter to skip): ",
+                            "  Enter input scoresheet CSV template (or press Enter to skip): ",
                             false, false);
                     if (result == null && lastInputWasBack) {
                         step--;

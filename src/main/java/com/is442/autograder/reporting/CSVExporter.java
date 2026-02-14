@@ -95,7 +95,7 @@ public class CSVExporter {
 
         try (PrintWriter writer = new PrintWriter(Files.newBufferedWriter(outputPath))) {
             // Header
-            StringBuilder header = new StringBuilder("Username,Name");
+            StringBuilder header = new StringBuilder("OrgDefinedId,Username,Name");
             for (QuestionConfig qc : questionConfigs) {
                 header.append(",").append(qc.getQuestionId());
             }
@@ -105,7 +105,9 @@ public class CSVExporter {
             // Data rows
             for (StudentSubmission sub : submissions) {
                 StringBuilder row = new StringBuilder();
-                row.append(sub.getDisplayName());
+                // OrgDefinedId: only populated if scoresheet was provided
+                row.append(sub.getOrgDefinedId() != null ? sub.getOrgDefinedId() : "");
+                row.append(",").append(sub.getDisplayName());
                 row.append(",").append(sub.getName() != null ? sub.getName() : "");
 
                 for (QuestionConfig qc : questionConfigs) {

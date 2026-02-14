@@ -65,7 +65,7 @@ public class IdentityResolver {
         Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
 
         if (nameMatcher.find() && emailMatcher.find()) {
-            String name = nameMatcher.group(1).trim();
+            String name = toTitleCase(nameMatcher.group(1).trim());
             String email = emailMatcher.group(1).trim();
 
             // Only return if both fields are non-empty
@@ -75,5 +75,64 @@ public class IdentityResolver {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Derive a display name from a username like "ping.lee.2023".
+     * Convention: firstname.lastname.year → "Firstname Lastname" (Title Case).
+     *
+     * @param username e.g. "ping.lee.2023"
+     * @return derived name, or the username itself if it can't be parsed
+     */
+    public String deriveNameFromUsername(String username) {
+        if (username == null || username.isEmpty()) {
+            return "";
+        }
+
+        String[] parts = username.split("\\.");
+        if (parts.length < 2) {
+            return toTitleCase(username);
+        }
+
+        // Remove the year suffix if the last part is all digits
+        int namePartCount = parts.length;
+        if (parts[namePartCount - 1].matches("\\d+")) {
+            namePartCount--;
+        }
+
+        if (namePartCount == 0) {
+            return username;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < namePartCount; i++) {
+            if (i > 0)
+                sb.append(" ");
+            sb.append(toTitleCase(parts[i]));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Convert a string to Title Case (first letter uppercase, rest lowercase).
+     */
+    public static String toTitleCase(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        String[] words = input.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0)
+                sb.append(" ");
+            String word = words[i];
+            if (word.length() == 1) {
+                sb.append(word.toUpperCase());
+            } else {
+                sb.append(Character.toUpperCase(word.charAt(0)))
+                        .append(word.substring(1).toLowerCase());
+            }
+        }
+        return sb.toString();
     }
 }

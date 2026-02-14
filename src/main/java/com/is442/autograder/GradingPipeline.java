@@ -15,8 +15,7 @@ import com.is442.autograder.util.FileUtils;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -27,7 +26,8 @@ import java.util.stream.Stream;
  * 3. Resolve identity + normalize structure
  * 4. Validate submission
  * 5. Grade all questions
- * 6. Export results
+ * 6. Enrich from scoresheet (if provided)
+ * 7. Export results
  */
 public class GradingPipeline {
 
@@ -58,7 +58,7 @@ public class GradingPipeline {
      *
      * @param submissionsDir directory containing student ZIP files
      * @param testerFilesDir directory containing tester .java files
-     * @param scoresheetPath path to the template CSV scoresheet
+     * @param scoresheetPath path to the template CSV scoresheet (optional)
      * @param outputDir      directory for output files
      * @return list of graded submissions
      */
@@ -115,22 +115,85 @@ public class GradingPipeline {
 
         System.out.println();
 
-        // 3. Print summary
+        // 3. Fill missing names using username-derived fallback
+        for (StudentSubmission sub : submissions) {
+            if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
+                sub.setName(identityResolver.deriveNameFromUsername(sub.getUsername()));
+            }
+        }
+
+        // 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
+        if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+            enrichFromScoresheet(scoresheetPath, submissions);
+        }
+
+        // 5. Print summary
         consoleReporter.printSummary(submissions, questionConfigs);
 
-        // 4. Export results
+        // 6. Export scoresheet (if template provided)
         if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
             Path outputCsv = outputDir.resolve("IS442-ScoreSheet-Graded.csv");
             csvExporter.export(scoresheetPath, outputCsv, submissions);
             System.out.println("\nScoresheet exported to: " + outputCsv);
         }
 
-        // 5. Export detailed report
+        // 7. Export detailed report
         Path detailedCsv = outputDir.resolve("detailed-report.csv");
         csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
         System.out.println("Detailed report exported to: " + detailedCsv);
 
         return submissions;
+    }
+
+    /**
+     * Parse the scoresheet CSV and enrich submissions with official names and
+     * OrgDefinedId.
+     * Scoresheet format:
+     * OrgDefinedId,Username,Last Name,First Name,Email,...
+     * Values may be prefixed with '#' (e.g. "#01400001", "#ping.lee.2023").
+     */
+    private void enrichFromScoresheet(Path scoresheetPath,
+            List<StudentSubmission> submissions) throws IOException {
+
+        // Build lookup: username -> submission
+        Map<String, StudentSubmission> subMap = new HashMap<>();
+        for (StudentSubmission sub : submissions) {
+            if (sub.getUsername() != null) {
+                subMap.put(sub.getUsername().toLowerCase(), sub);
+            }
+        }
+
+        List<String> lines = Files.readAllLines(scoresheetPath);
+        for (int i = 1; i < lines.size(); i++) { // skip header
+            String line = lines.get(i).trim();
+            if (line.isEmpty())
+                continue;
+
+            String[] parts = line.split(",", -1);
+            if (parts.length < 5)
+                continue;
+
+            String orgId = parts[0].trim(); // e.g. "#01400001"
+            String rawUsername = parts[1].trim(); // e.g. "#ping.lee.2023"
+            String firstName = parts[3].trim(); // e.g. "PING LEE"
+
+            // Strip '#' prefix from username
+            String username = rawUsername.startsWith("#") ? rawUsername.substring(1) : rawUsername;
+
+            StudentSubmission sub = subMap.get(username.toLowerCase());
+            if (sub == null)
+                continue;
+
+            // Set OrgDefinedId (keep the '#' prefix as-is from the source)
+            if (!orgId.isEmpty()) {
+                sub.setOrgDefinedId(orgId);
+            }
+
+            // Official name from scoresheet takes priority (Title Case)
+            if (!firstName.isEmpty()) {
+                sub.setName(IdentityResolver.toTitleCase(firstName));
+            }
+        }
     }
 
     /**

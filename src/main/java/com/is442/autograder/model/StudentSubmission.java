@@ -13,6 +13,7 @@ public class StudentSubmission {
 
     private String username; // resolved email ID (e.g. "ping.lee.2023")
     private String name; // resolved name (e.g. "Ping Lee")
+    private String orgDefinedId; // from scoresheet CSV (e.g. "#01400001"), null otherwise
     private Path rootPath; // path to the extracted submission root
     private String zipFileName; // original ZIP file name
     private final List<QuestionResult> results = new ArrayList<>();
@@ -38,6 +39,14 @@ public class StudentSubmission {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getOrgDefinedId() {
+        return orgDefinedId;
+    }
+
+    public void setOrgDefinedId(String orgDefinedId) {
+        this.orgDefinedId = orgDefinedId;
     }
 
     // --- Paths ---
