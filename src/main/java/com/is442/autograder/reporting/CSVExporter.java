@@ -107,7 +107,23 @@ public class CSVExporter {
 			writer.println(header);
 
 			// Data rows
-			for (StudentSubmission sub : submissions) {
+			List<StudentSubmission> sortedSubs = submissions.stream().sorted((a, b) -> {
+				String aId = normalizeOrgId(a.getOrgDefinedId());
+				String bId = normalizeOrgId(b.getOrgDefinedId());
+				if (aId.isEmpty() && bId.isEmpty()) {
+					return a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
+				}
+				if (aId.isEmpty()) {
+					return 1;
+				}
+				if (bId.isEmpty()) {
+					return -1;
+				}
+				int idCompare = aId.compareToIgnoreCase(bId);
+				return idCompare != 0 ? idCompare : a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
+			}).toList();
+
+			for (StudentSubmission sub : sortedSubs) {
 				StringBuilder row = new StringBuilder();
 				// OrgDefinedId: only populated if scoresheet was provided
 				row.append(sub.getOrgDefinedId() != null ? sub.getOrgDefinedId() : "");
@@ -128,5 +144,16 @@ public class CSVExporter {
 				writer.println(row);
 			}
 		}
+	}
+
+	private String normalizeOrgId(String orgId) {
+		if (orgId == null) {
+			return "";
+		}
+		String trimmed = orgId.trim();
+		if (trimmed.startsWith("#")) {
+			return trimmed.substring(1);
+		}
+		return trimmed;
 	}
 }

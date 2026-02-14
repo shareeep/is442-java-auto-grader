@@ -41,6 +41,7 @@ public class ProcessRunner {
 		// Build javac command: javac *.java
 		List<String> command = new java.util.ArrayList<>();
 		command.add("javac");
+		command.add("-Xlint:none");
 		for (File f : javaFiles) {
 			command.add(f.getName());
 		}

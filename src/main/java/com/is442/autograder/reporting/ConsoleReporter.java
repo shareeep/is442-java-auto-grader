@@ -5,6 +5,9 @@ import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -19,6 +22,17 @@ public class ConsoleReporter {
 	private static final String GREEN = "\u001B[32m";
 	private static final String YELLOW = "\u001B[33m";
 	private static final String CYAN = "\u001B[36m";
+	private static final String ANSI_SAVE = "\u001B[s";
+	private static final String ANSI_RESTORE = "\u001B[u";
+	private static final String ANSI_CLEAR_LINE = "\u001B[2K";
+	private static final String ANSI_MOVE_DOWN_FMT = "\u001B[%dB";
+	private static final String ANSI_MOVE_DOWN_ONE = "\u001B[1B";
+	private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss")
+			.withZone(ZoneId.systemDefault());
+
+	private boolean progressActive = false;
+	private int progressTotal = 0;
+	private int logLines = 0;
 
 	/**
 	 * Print the complete grading summary including scores table and anomalies.
@@ -28,6 +42,43 @@ public class ConsoleReporter {
 		printAnomalies(submissions);
 		System.out.println();
 		printScoreTable(submissions, questionConfigs);
+	}
+
+	public void startProgress(int total) {
+		progressActive = true;
+		progressTotal = total;
+		logLines = 0;
+		System.out.print(ANSI_SAVE);
+		System.out.print(renderProgress(0, total));
+		System.out.println();
+		System.out.println("  Current: (starting...)");
+	}
+
+	public void updateCurrentStudent(String studentName) {
+		if (!progressActive) {
+			startProgress(progressTotal > 0 ? progressTotal : 1);
+		}
+		System.out.print(ANSI_RESTORE);
+		System.out.print(ANSI_MOVE_DOWN_ONE);
+		System.out.print(ANSI_CLEAR_LINE);
+		System.out.print("  Current: " + studentName);
+		System.out.print(String.format(ANSI_MOVE_DOWN_FMT, Math.max(0, logLines)));
+	}
+
+	public void logInfo(String message) {
+		printLogLine(message);
+	}
+
+	public void logWarning(String message) {
+		printLogLine("WARNING: " + message);
+	}
+
+	public void logError(String message) {
+		printLogLine("ERROR: " + message);
+	}
+
+	public void logRaw(String message) {
+		printLogLine(message);
 	}
 
 	/**
@@ -97,17 +148,44 @@ public class ConsoleReporter {
 	 * Print a progress update during grading.
 	 */
 	public void printProgress(int current, int total, String studentName) {
-		int barWidth = 30;
-		int filled = (int) ((double) current / total * barWidth);
-		int empty = barWidth - filled;
-
-		String bar = "█".repeat(filled) + "░".repeat(empty);
-		int percent = (int) ((double) current / total * 100);
-
-		System.out.printf("\r  [%s] %3d%% │ Grading %s...", bar, percent, studentName);
-
-		if (current == total) {
-			System.out.println(); // newline after 100%
+		if (!progressActive) {
+			startProgress(total);
 		}
+		progressTotal = total;
+		System.out.print(ANSI_RESTORE);
+		System.out.print(ANSI_CLEAR_LINE);
+		System.out.print(renderProgress(current, total));
+		System.out.print(String.format(ANSI_MOVE_DOWN_FMT, 1 + Math.max(0, logLines)));
+	}
+
+	public void endProgress() {
+		if (!progressActive) {
+			return;
+		}
+		System.out.print(ANSI_RESTORE);
+		System.out.print(String.format(ANSI_MOVE_DOWN_FMT, 2 + Math.max(0, logLines)));
+		System.out.println();
+		progressActive = false;
+	}
+
+	private String renderProgress(int current, int total) {
+		int barWidth = 30;
+		int filled = total > 0 ? (int) ((double) current / total * barWidth) : 0;
+		int empty = barWidth - filled;
+		String bar = "█".repeat(filled) + "░".repeat(empty);
+		int percent = total > 0 ? (int) ((double) current / total * 100) : 0;
+		return String.format("  [%s] %3d%%", bar, percent);
+	}
+
+	private void printLogLine(String message) {
+		if (!progressActive) {
+			System.out.println("[" + TS_FORMATTER.format(Instant.now()) + "] " + message);
+			return;
+		}
+		System.out.print(ANSI_RESTORE);
+		System.out.print(String.format(ANSI_MOVE_DOWN_FMT, 2 + Math.max(0, logLines)));
+		System.out.print(ANSI_CLEAR_LINE);
+		System.out.println("[" + TS_FORMATTER.format(Instant.now()) + "] " + message);
+		logLines++;
 	}
 }

@@ -9,7 +9,9 @@ import com.is442.autograder.extraction.ZipExtractor;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.CSVExporter;
+import com.is442.autograder.reporting.ConsoleLogCapture;
 import com.is442.autograder.reporting.ConsoleReporter;
+import com.is442.autograder.reporting.QuestionLogWriter;
 import com.is442.autograder.validation.SubmissionValidator;
 import com.is442.autograder.util.FileUtils;
 
@@ -37,7 +39,6 @@ public class GradingPipeline {
 	private final IdentityResolver identityResolver;
 	private final StructureNormalizer structureNormalizer;
 	private final SubmissionValidator submissionValidator;
-	private final GradingEngine gradingEngine;
 	private final CSVExporter csvExporter;
 	private final ConsoleReporter consoleReporter;
 
@@ -47,7 +48,6 @@ public class GradingPipeline {
 		this.identityResolver = new IdentityResolver();
 		this.structureNormalizer = new StructureNormalizer(identityResolver);
 		this.submissionValidator = new SubmissionValidator();
-		this.gradingEngine = new GradingEngine(new ProcessRunner(config.getTimeoutSeconds()));
 		this.csvExporter = new CSVExporter();
 		this.consoleReporter = new ConsoleReporter();
 	}
@@ -68,84 +68,104 @@ public class GradingPipeline {
 	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir)
 			throws IOException {
 
-		// 1. Find all ZIP files
-		List<Path> zipFiles = findZipFiles(submissionsDir);
-		if (zipFiles.isEmpty()) {
-			System.out.println("No ZIP files found in " + submissionsDir);
-			return List.of();
+		ConsoleLogCapture logCapture = null;
+		Path runOutputDir = outputDir;
+		if (outputDir != null) {
+			runOutputDir = createRunOutputDir(outputDir);
+			logCapture = ConsoleLogCapture.start(runOutputDir);
 		}
 
-		System.out.println("\nFound " + zipFiles.size() + " submission(s) to grade.\n");
+		QuestionLogWriter logWriter = runOutputDir != null ? new QuestionLogWriter(runOutputDir) : null;
+		GradingEngine gradingEngine = new GradingEngine(new ProcessRunner(config.getTimeoutSeconds()), logWriter,
+				consoleReporter);
 
-		List<QuestionConfig> questionConfigs = config.getQuestionConfigs();
-		List<StudentSubmission> submissions = new ArrayList<>();
+		try {
+			// 1. Find all ZIP files
+			List<Path> zipFiles = findZipFiles(submissionsDir);
+			if (zipFiles.isEmpty()) {
+				System.out.println("No ZIP files found in " + submissionsDir);
+				return List.of();
+			}
 
-		// 2. Process each ZIP
-		for (int i = 0; i < zipFiles.size(); i++) {
-			Path zipFile = zipFiles.get(i);
-			String zipName = zipFile.getFileName().toString();
+			System.out.println("\nFound " + zipFiles.size() + " submission(s) to grade.\n");
+			java.util.logging.LogManager.getLogManager().reset();
+			consoleReporter.startProgress(zipFiles.size());
 
-			StudentSubmission submission = new StudentSubmission(zipName);
+			List<QuestionConfig> questionConfigs = config.getQuestionConfigs();
+			List<StudentSubmission> submissions = new ArrayList<>();
 
-			try {
-				// Extract to temp directory
-				Path tempDir = FileUtils.createTempDir("autograder-" + zipName.replace(".zip", ""));
-				Path extractedRoot = zipExtractor.extract(zipFile, tempDir);
+			// 2. Process each ZIP
+			for (int i = 0; i < zipFiles.size(); i++) {
+				Path zipFile = zipFiles.get(i);
+				String zipName = zipFile.getFileName().toString();
 
-				// Normalize structure + resolve identity
-				Path submissionRoot = structureNormalizer.normalize(extractedRoot, submission);
-				submission.setRootPath(submissionRoot);
+				StudentSubmission submission = new StudentSubmission(zipName);
+				consoleReporter.updateCurrentStudent(submission.getDisplayName());
 
-				// Show progress
+				try {
+					// Extract to temp directory
+					Path tempDir = FileUtils.createTempDir("autograder-" + zipName.replace(".zip", ""));
+					Path extractedRoot = zipExtractor.extract(zipFile, tempDir);
+					// Normalize structure + resolve identity
+					Path submissionRoot = structureNormalizer.normalize(extractedRoot, submission);
+					submission.setRootPath(submissionRoot);
+
+					// Validate
+					submissionValidator.validate(submissionRoot, questionConfigs, submission);
+
+					// Grade
+					gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
+
+				} catch (SecurityException e) {
+					LOGGER.warning("Security issue with " + zipName + ": " + e.getMessage());
+					System.err.println("  ⚠ Skipping " + zipName + " (security issue): " + e.getMessage());
+				} catch (Exception e) {
+					LOGGER.warning("Error processing " + zipName + ": " + e.getMessage());
+					System.err.println("  ✖ Error processing " + zipName + ": " + e.getMessage());
+				}
+
 				consoleReporter.printProgress(i + 1, zipFiles.size(), submission.getDisplayName());
-
-				// Validate
-				submissionValidator.validate(submissionRoot, questionConfigs, submission);
-
-				// Grade
-				gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
-
-			} catch (SecurityException e) {
-				LOGGER.warning("Security issue with " + zipName + ": " + e.getMessage());
-				System.err.println("  ⚠ Skipping " + zipName + " (security issue): " + e.getMessage());
-			} catch (Exception e) {
-				LOGGER.warning("Error processing " + zipName + ": " + e.getMessage());
-				System.err.println("  ✖ Error processing " + zipName + ": " + e.getMessage());
+				submissions.add(submission);
 			}
 
-			submissions.add(submission);
-		}
+			consoleReporter.endProgress();
+			System.out.println();
 
-		System.out.println();
+			// 3. Fill missing names using username-derived fallback
+			for (StudentSubmission sub : submissions) {
+				if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
+					sub.setName(identityResolver.deriveNameFromUsername(sub.getUsername()));
+				}
+			}
 
-		// 3. Fill missing names using username-derived fallback
-		for (StudentSubmission sub : submissions) {
-			if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
-				sub.setName(identityResolver.deriveNameFromUsername(sub.getUsername()));
+			// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
+			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+				enrichFromScoresheet(scoresheetPath, submissions);
+			}
+
+			// 5. Print summary
+			consoleReporter.printSummary(submissions, questionConfigs);
+
+			// 6. Export scoresheet (if template provided)
+			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
+				csvExporter.export(scoresheetPath, outputCsv, submissions);
+				System.out.println("\nScoresheet exported to: " + outputCsv);
+			}
+
+			// 7. Export detailed report
+			Path detailedCsv = runOutputDir.resolve("detailed-report.csv");
+			csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
+			System.out.println("Detailed report exported to: " + detailedCsv);
+			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
+			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
+
+			return submissions;
+		} finally {
+			if (logCapture != null) {
+				logCapture.close();
 			}
 		}
-
-		// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
-		if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
-			enrichFromScoresheet(scoresheetPath, submissions);
-		}
-
-		// 5. Print summary
-		consoleReporter.printSummary(submissions, questionConfigs);
-
-		// 6. Export scoresheet (if template provided)
-		if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
-			Path outputCsv = outputDir.resolve("IS442-ScoreSheet-Graded.csv");
-			csvExporter.export(scoresheetPath, outputCsv, submissions);
-			System.out.println("\nScoresheet exported to: " + outputCsv);
-		}
-
-		// 7. Export detailed report
-		Path detailedCsv = outputDir.resolve("detailed-report.csv");
-		csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
-		System.out.println("Detailed report exported to: " + detailedCsv);
-
-		return submissions;
 	}
 
 	/**
@@ -198,6 +218,17 @@ public class GradingPipeline {
 				sub.setName(IdentityResolver.toTitleCase(firstName));
 			}
 		}
+	}
+
+	private Path createRunOutputDir(Path baseOutputDir) throws IOException {
+		if (baseOutputDir == null) {
+			return null;
+		}
+		String runId = java.time.LocalDateTime.now()
+				.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+		Path runDir = baseOutputDir.resolve(runId);
+		Files.createDirectories(runDir);
+		return runDir;
 	}
 
 	/**

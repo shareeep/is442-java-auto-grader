@@ -5,6 +5,8 @@ import com.is442.autograder.model.ProcessResult;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
+import com.is442.autograder.reporting.ConsoleReporter;
+import com.is442.autograder.reporting.QuestionLogWriter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,9 +24,14 @@ public class GradingEngine {
 	private static final Logger LOGGER = Logger.getLogger(GradingEngine.class.getName());
 
 	private final ProcessRunner processRunner;
+	private final QuestionLogWriter questionLogWriter;
+	private final ConsoleReporter consoleReporter;
 
-	public GradingEngine(ProcessRunner processRunner) {
+	public GradingEngine(ProcessRunner processRunner, QuestionLogWriter questionLogWriter,
+			ConsoleReporter consoleReporter) {
 		this.processRunner = processRunner;
+		this.questionLogWriter = questionLogWriter;
+		this.consoleReporter = consoleReporter;
 	}
 
 	/**
@@ -60,6 +67,7 @@ public class GradingEngine {
 		// 1. Check if question folder exists
 		if (!Files.isDirectory(questionFolder)) {
 			LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": question folder not found");
+			logRaw(submission.getDisplayName() + " - " + questionId + ": question folder not found");
 			return QuestionResult.missing(questionId, qc.getMaxScore());
 		}
 
@@ -70,6 +78,7 @@ public class GradingEngine {
 		try {
 			if (!Files.isRegularFile(testerSource)) {
 				LOGGER.warning("Tester file not found: " + testerSource);
+				logRaw("Tester file not found: " + testerSource.getFileName());
 				return QuestionResult.compilationFailure(questionId, qc.getMaxScore(),
 						"Tester file not found: " + testerSource.getFileName());
 			}
@@ -82,12 +91,20 @@ public class GradingEngine {
 		try {
 			// 3. Compile all .java files
 			ProcessResult compileResult = processRunner.compile(questionFolder);
+			writeLogIfAvailable(submission, questionId, "compile", compileResult.getStdout(),
+					compileResult.getStderr());
 
 			if (!compileResult.isSuccess()) {
 				String error = compileResult.getStderr().isEmpty()
 						? compileResult.getStdout()
 						: compileResult.getStderr();
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": compilation failed");
+				String singleLineError = firstRelevantLine(error);
+				String summaryLine = submission.getDisplayName() + " - " + questionId + ": " + singleLineError;
+				logRaw(summaryLine);
+				appendErrorSummary(summaryLine);
+				String filteredError = filterNoteLines(error);
+				writeLogIfAvailable(submission, questionId, "compile-error", filteredError, "");
 				submission.addAnomaly(new Anomaly(Anomaly.Type.COMPILATION_ERROR,
 						"Compilation error in " + questionId + ": " + truncate(error, 200), Anomaly.Severity.ERROR,
 						questionId));
@@ -96,12 +113,17 @@ public class GradingEngine {
 
 			// 4. Run tester
 			ProcessResult runResult = processRunner.run(questionFolder, qc.getTesterClassName());
+			writeLogIfAvailable(submission, questionId, "run", runResult.getStdout(), runResult.getStderr());
 
 			if (runResult.isTimedOut()) {
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": execution timed out");
+				String summaryLine = submission.getDisplayName() + " - " + questionId + ": execution timed out";
+				logRaw(summaryLine);
+				appendErrorSummary(summaryLine);
 				// Parse partial score from stdout before the hang
 				// Each tester prints "Passed" per successful test (score += 1 each)
 				double partialScore = parsePartialScore(runResult.getStdout());
+				writeLogIfAvailable(submission, questionId, "timeout", runResult.getStdout(), runResult.getStderr());
 				submission.addAnomaly(new Anomaly(Anomaly.Type.EXECUTION_TIMEOUT,
 						"Execution timed out for " + questionId
 								+ (partialScore > 0 ? " (partial score: " + partialScore + ")" : ""),
@@ -112,6 +134,12 @@ public class GradingEngine {
 
 			if (!runResult.isSuccess()) {
 				String error = runResult.getStderr().isEmpty() ? runResult.getStdout() : runResult.getStderr();
+				String singleLineError = firstRelevantLine(error);
+				String summaryLine = submission.getDisplayName() + " - " + questionId + ": " + singleLineError;
+				logRaw(summaryLine);
+				appendErrorSummary(summaryLine);
+				String filteredError = filterNoteLines(error);
+				writeLogIfAvailable(submission, questionId, "runtime-error", filteredError, "");
 				submission.addAnomaly(new Anomaly(Anomaly.Type.RUNTIME_ERROR,
 						"Runtime error in " + questionId + ": " + truncate(error, 200), Anomaly.Severity.ERROR,
 						questionId));
@@ -126,6 +154,81 @@ public class GradingEngine {
 		} finally {
 			// 6. Clean up: remove tester file and compiled classes
 			cleanupTester(questionFolder, qc.getTesterClassName());
+		}
+	}
+
+	private void writeLogIfAvailable(StudentSubmission submission, String questionId, String phase, String stdout,
+			String stderr) {
+		if (questionLogWriter == null) {
+			return;
+		}
+		try {
+			questionLogWriter.write(submission, questionId, phase, stdout, stderr);
+		} catch (IOException e) {
+			LOGGER.warning("Failed to write log for " + submission.getDisplayName() + " " + questionId + ": "
+					+ e.getMessage());
+		}
+	}
+
+	private void logWarning(String message) {
+		if (consoleReporter == null) {
+			return;
+		}
+		consoleReporter.logWarning(message);
+	}
+
+	private void logRaw(String message) {
+		if (consoleReporter == null) {
+			return;
+		}
+		consoleReporter.logRaw(message);
+	}
+
+	private String firstRelevantLine(String text) {
+		if (text == null || text.isBlank()) {
+			return "Compilation failed";
+		}
+		String[] lines = text.split("\n");
+		for (String line : lines) {
+			String trimmed = line.trim();
+			if (trimmed.isEmpty()) {
+				continue;
+			}
+			if (trimmed.contains("com.is442.autograder.")) {
+				continue;
+			}
+			if (trimmed.startsWith("Note:")) {
+				continue;
+			}
+			return trimmed;
+		}
+		return "Compilation failed";
+	}
+
+	private String filterNoteLines(String text) {
+		if (text == null || text.isBlank()) {
+			return text;
+		}
+		StringBuilder filtered = new StringBuilder();
+		String[] lines = text.split("\n");
+		for (String line : lines) {
+			String trimmed = line.trim();
+			if (trimmed.startsWith("Note:")) {
+				continue;
+			}
+			filtered.append(line).append("\n");
+		}
+		return filtered.toString().trim();
+	}
+
+	private void appendErrorSummary(String summaryLine) {
+		if (questionLogWriter == null) {
+			return;
+		}
+		try {
+			questionLogWriter.appendSummaryLine(summaryLine);
+		} catch (IOException e) {
+			LOGGER.warning("Failed to write error summary: " + e.getMessage());
 		}
 	}
 

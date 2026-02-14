@@ -3,10 +3,14 @@
 Automated grading system for IS442 Java programming assignments. Extracts student submissions from ZIP files, compiles and runs tester files against student code, and generates grading reports.
 
 ## Quick Start
+Run the gradle clean build after making changes, then use the one-shot command to quickly test that the program works.
 
 ```bash
 # Build
 ./gradlew clean build
+
+# Fix lint/formatting
+./gradlew spotlessApply
 
 # Run (interactive mode)
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar
@@ -18,7 +22,7 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --scoresheet ./is442-project-materials/IS442-ScoreSheet.csv \
   --output ./output
 
-# Test
+# Test (no unit tests for now)
 ./gradlew test
 ```
 
