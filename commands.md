@@ -37,8 +37,10 @@ java -version
 ```bash
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar
 ```
+The interactive CLI guides you through entering paths step-by-step. Type `back` at any prompt to return to the previous step.
 
-### CLI Mode
+### CLI Mode (One-Shot)
+Skip the interactive prompts by passing all paths as arguments:
 ```bash
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --submissions ./is442-project-materials/student-submission \
@@ -47,10 +49,29 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --output ./output
 ```
 
-### Run via Gradle directly (interactive mode)
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--submissions` | Yes | Folder containing student ZIP files |
+| `--testers` | Yes | Folder containing tester `.java` files (e.g. `Q1aTester.java`) |
+| `--scoresheet` | No | Input scoresheet CSV template (LMS format). If provided, the graded scoresheet and official names/IDs are used in the output |
+| `--output` | No | Output directory for results (default: `./output`) |
+
+### Build + Run (One-Liner)
+```bash
+./gradlew fatJar -q && java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar
+```
+
+### Run via Gradle (interactive mode)
 ```bash
 ./gradlew run --console=plain
 ```
+
+## Output Files
+
+| File | Description |
+|------|-------------|
+| `IS442-ScoreSheet-Graded.csv` | LMS-compatible scoresheet with total scores filled in (only if `--scoresheet` was provided) |
+| `detailed-report.csv` | Per-question breakdown with OrgDefinedId, names, scores, and anomaly counts |
 
 ## Test
 
@@ -72,3 +93,19 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 1. Install **Language Support for Java™ by Red Hat**
 2. Use `Shift+Option+F` (Mac) to format documents
 3. Checkstyle violations will also appear in `./gradlew checkstyleMain` output
+
+## Project Structure
+
+```
+src/main/java/com/is442/autograder/
+├── App.java               # Entry point (CLI arg parsing)
+├── GradingPipeline.java   # Orchestrates the full grading flow
+├── config/                # AppConfig (reads config.properties)
+├── extraction/            # ZipExtractor, StructureNormalizer, IdentityResolver
+├── validation/            # SubmissionValidator (header checks, anomalies)
+├── execution/             # GradingEngine + ProcessRunner (compile & run)
+├── reporting/             # ConsoleReporter + CSVExporter
+├── model/                 # StudentSubmission, QuestionResult, Anomaly, etc.
+├── ui/                    # ConsoleUI (interactive mode)
+└── util/                  # FileUtils
+```
