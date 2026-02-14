@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'checkstyle'
+    id 'com.diffplug.spotless' version '7.0.2'
 }
 
 group = 'com.is442'
@@ -59,6 +60,16 @@ tasks.withType(Checkstyle).configureEach {
     }
 }
 
+// Spotless — auto-format code with Google Java Format
+spotless {
+    java {
+        googleJavaFormat('1.19.2')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 17
@@ -68,3 +79,4 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('build') {
     dependsOn 'fatJar'
 }
+

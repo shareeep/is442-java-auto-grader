@@ -1,9 +1,15 @@
 package com.is442.autograder.execution;
 
-import com.is442.autograder.model.*;
+import com.is442.autograder.model.Anomaly;
+import com.is442.autograder.model.ProcessResult;
+import com.is442.autograder.model.QuestionConfig;
+import com.is442.autograder.model.QuestionResult;
+import com.is442.autograder.model.StudentSubmission;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -204,8 +210,9 @@ public class GradingEngine {
     }
 
     private String truncate(String text, int maxLen) {
-        if (text == null)
+        if (text == null) {
             return "";
+        }
         text = text.trim();
         return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
     }

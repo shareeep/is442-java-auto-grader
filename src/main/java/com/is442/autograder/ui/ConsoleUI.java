@@ -216,8 +216,9 @@ public class ConsoleUI {
     private boolean containsDangerousChars(String input) {
         String[] dangerous = { ";", "|", "&", "$", "`", "(", ")", "{", "}" };
         for (String c : dangerous) {
-            if (input.contains(c))
+            if (input.contains(c)) {
                 return true;
+            }
         }
         return false;
     }

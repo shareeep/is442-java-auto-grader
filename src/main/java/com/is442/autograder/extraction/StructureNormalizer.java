@@ -3,10 +3,10 @@ package com.is442.autograder.extraction;
 import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.StudentIdentity;
 import com.is442.autograder.model.StudentSubmission;
-import com.is442.autograder.util.FileUtils;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -159,8 +159,9 @@ public class StructureNormalizer {
      * Strategy: remove year prefix and .zip suffix.
      */
     private String extractUsernameFromZipName(String zipFileName) {
-        if (zipFileName == null)
+        if (zipFileName == null) {
             return null;
+        }
 
         String name = zipFileName;
         if (name.endsWith(".zip")) {

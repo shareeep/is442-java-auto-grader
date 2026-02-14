@@ -4,10 +4,14 @@ import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
 
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Exports grading results to CSV in the format matching IS442-ScoreSheet.csv.

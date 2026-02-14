@@ -14,8 +14,12 @@ import com.is442.autograder.validation.SubmissionValidator;
 import com.is442.autograder.util.FileUtils;
 
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -166,12 +170,14 @@ public class GradingPipeline {
         List<String> lines = Files.readAllLines(scoresheetPath);
         for (int i = 1; i < lines.size(); i++) { // skip header
             String line = lines.get(i).trim();
-            if (line.isEmpty())
+            if (line.isEmpty()) {
                 continue;
+            }
 
             String[] parts = line.split(",", -1);
-            if (parts.length < 5)
+            if (parts.length < 5) {
                 continue;
+            }
 
             String orgId = parts[0].trim(); // e.g. "#01400001"
             String rawUsername = parts[1].trim(); // e.g. "#ping.lee.2023"
@@ -181,8 +187,9 @@ public class GradingPipeline {
             String username = rawUsername.startsWith("#") ? rawUsername.substring(1) : rawUsername;
 
             StudentSubmission sub = subMap.get(username.toLowerCase());
-            if (sub == null)
+            if (sub == null) {
                 continue;
+            }
 
             // Set OrgDefinedId (keep the '#' prefix as-is from the source)
             if (!orgId.isEmpty()) {

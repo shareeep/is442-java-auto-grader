@@ -1,8 +1,13 @@
 package com.is442.autograder.util;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -39,8 +44,9 @@ public class FileUtils {
      * Recursively delete a directory and all its contents.
      */
     public static void deleteDirectory(Path dir) throws IOException {
-        if (!Files.exists(dir))
+        if (!Files.exists(dir)) {
             return;
+        }
         Files.walkFileTree(dir, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -61,8 +67,9 @@ public class FileUtils {
      */
     public static List<Path> findFilesByExtension(Path dir, String extension) throws IOException {
         List<Path> result = new ArrayList<>();
-        if (!Files.isDirectory(dir))
+        if (!Files.isDirectory(dir)) {
             return result;
+        }
         try (Stream<Path> stream = Files.list(dir)) {
             stream.filter(p -> Files.isRegularFile(p) && p.toString().endsWith("." + extension))
                     .forEach(result::add);

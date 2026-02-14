@@ -83,10 +83,16 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 ## Lint / Code Style
 
 ```bash
-# Run Checkstyle
+# Auto-fix formatting, imports, and whitespace
+./gradlew spotlessApply
+
+# Check for issues without fixing (useful in CI)
+./gradlew spotlessCheck
+
+# Run Checkstyle (reports only, no auto-fix)
 ./gradlew checkstyleMain
 
-# View report at: build/reports/checkstyle/main.html
+# View Checkstyle report at: build/reports/checkstyle/main.html
 ```
 
 ### VSCode Setup

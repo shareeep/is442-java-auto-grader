@@ -92,8 +92,9 @@ public class ConsoleReporter {
         System.out.println(BOLD + YELLOW + "ANOMALIES DETECTED: " + totalAnomalies + RESET);
 
         for (StudentSubmission sub : submissions) {
-            if (!sub.hasAnomalies())
+            if (!sub.hasAnomalies()) {
                 continue;
+            }
 
             for (Anomaly anomaly : sub.getAnomalies()) {
                 String icon = anomaly.getSeverity() == Anomaly.Severity.ERROR ? RED + "  ✖ " : YELLOW + "  ⚠ ";

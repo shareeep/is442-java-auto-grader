@@ -3,7 +3,8 @@ package com.is442.autograder.extraction;
 import com.is442.autograder.model.StudentIdentity;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,7 +14,7 @@ import java.util.stream.Stream;
  * Resolves student identity by parsing Java file header comments.
  *
  * Expected header format:
- * 
+ *
  * <pre>
  * /*
  *  * Name: Ping Lee
@@ -106,8 +107,9 @@ public class IdentityResolver {
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < namePartCount; i++) {
-            if (i > 0)
+            if (i > 0) {
                 sb.append(" ");
+            }
             sb.append(toTitleCase(parts[i]));
         }
         return sb.toString();
@@ -123,8 +125,9 @@ public class IdentityResolver {
         String[] words = input.trim().split("\\s+");
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < words.length; i++) {
-            if (i > 0)
+            if (i > 0) {
                 sb.append(" ");
+            }
             String word = words[i];
             if (word.length() == 1) {
                 sb.append(word.toUpperCase());
