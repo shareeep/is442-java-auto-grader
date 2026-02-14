@@ -5,111 +5,110 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Represents a student's submission bundle.
- * Holds the resolved identity, extracted path, per-question results, and
- * anomalies.
+ * Represents a student's submission bundle. Holds the resolved identity,
+ * extracted path, per-question results, and anomalies.
  */
 public class StudentSubmission {
 
-    private String username; // resolved email ID (e.g. "ping.lee.2023")
-    private String name; // resolved name (e.g. "Ping Lee")
-    private String orgDefinedId; // from scoresheet CSV (e.g. "#01400001"), null otherwise
-    private Path rootPath; // path to the extracted submission root
-    private String zipFileName; // original ZIP file name
-    private final List<QuestionResult> results = new ArrayList<>();
-    private final List<Anomaly> anomalies = new ArrayList<>();
+	private String username; // resolved email ID (e.g. "ping.lee.2023")
+	private String name; // resolved name (e.g. "Ping Lee")
+	private String orgDefinedId; // from scoresheet CSV (e.g. "#01400001"), null otherwise
+	private Path rootPath; // path to the extracted submission root
+	private String zipFileName; // original ZIP file name
+	private final List<QuestionResult> results = new ArrayList<>();
+	private final List<Anomaly> anomalies = new ArrayList<>();
 
-    public StudentSubmission(String zipFileName) {
-        this.zipFileName = zipFileName;
-    }
+	public StudentSubmission(String zipFileName) {
+		this.zipFileName = zipFileName;
+	}
 
-    // --- Identity ---
+	// --- Identity ---
 
-    public String getUsername() {
-        return username;
-    }
+	public String getUsername() {
+		return username;
+	}
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+	public void setUsername(String username) {
+		this.username = username;
+	}
 
-    public String getName() {
-        return name;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public void setName(String name) {
-        this.name = name;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
-    public String getOrgDefinedId() {
-        return orgDefinedId;
-    }
+	public String getOrgDefinedId() {
+		return orgDefinedId;
+	}
 
-    public void setOrgDefinedId(String orgDefinedId) {
-        this.orgDefinedId = orgDefinedId;
-    }
+	public void setOrgDefinedId(String orgDefinedId) {
+		this.orgDefinedId = orgDefinedId;
+	}
 
-    // --- Paths ---
+	// --- Paths ---
 
-    public Path getRootPath() {
-        return rootPath;
-    }
+	public Path getRootPath() {
+		return rootPath;
+	}
 
-    public void setRootPath(Path rootPath) {
-        this.rootPath = rootPath;
-    }
+	public void setRootPath(Path rootPath) {
+		this.rootPath = rootPath;
+	}
 
-    public String getZipFileName() {
-        return zipFileName;
-    }
+	public String getZipFileName() {
+		return zipFileName;
+	}
 
-    public void setZipFileName(String zipFileName) {
-        this.zipFileName = zipFileName;
-    }
+	public void setZipFileName(String zipFileName) {
+		this.zipFileName = zipFileName;
+	}
 
-    // --- Results ---
+	// --- Results ---
 
-    public List<QuestionResult> getResults() {
-        return results;
-    }
+	public List<QuestionResult> getResults() {
+		return results;
+	}
 
-    public void addResult(QuestionResult result) {
-        results.add(result);
-    }
+	public void addResult(QuestionResult result) {
+		results.add(result);
+	}
 
-    public double getTotalScore() {
-        return results.stream().mapToDouble(QuestionResult::getScore).sum();
-    }
+	public double getTotalScore() {
+		return results.stream().mapToDouble(QuestionResult::getScore).sum();
+	}
 
-    public double getMaxPossibleScore() {
-        return results.stream().mapToDouble(QuestionResult::getMaxScore).sum();
-    }
+	public double getMaxPossibleScore() {
+		return results.stream().mapToDouble(QuestionResult::getMaxScore).sum();
+	}
 
-    // --- Anomalies ---
+	// --- Anomalies ---
 
-    public List<Anomaly> getAnomalies() {
-        return anomalies;
-    }
+	public List<Anomaly> getAnomalies() {
+		return anomalies;
+	}
 
-    public void addAnomaly(Anomaly anomaly) {
-        anomalies.add(anomaly);
-    }
+	public void addAnomaly(Anomaly anomaly) {
+		anomalies.add(anomaly);
+	}
 
-    public boolean hasAnomalies() {
-        return !anomalies.isEmpty();
-    }
+	public boolean hasAnomalies() {
+		return !anomalies.isEmpty();
+	}
 
-    // --- Display ---
+	// --- Display ---
 
-    public String getDisplayName() {
-        if (username != null && !username.isEmpty()) {
-            return username;
-        }
-        return zipFileName != null ? zipFileName.replace(".zip", "") : "(unknown)";
-    }
+	public String getDisplayName() {
+		if (username != null && !username.isEmpty()) {
+			return username;
+		}
+		return zipFileName != null ? zipFileName.replace(".zip", "") : "(unknown)";
+	}
 
-    @Override
-    public String toString() {
-        return "StudentSubmission{" + getDisplayName() + ", score=" + getTotalScore() + "}";
-    }
+	@Override
+	public String toString() {
+		return "StudentSubmission{" + getDisplayName() + ", score=" + getTotalScore() + "}";
+	}
 }

@@ -78,5 +78,5 @@ src/test/java/com/is442/autograder/   # Unit tests (see tests README)
 - **Java 17** — source and target compatibility
 - **Gradle 9.3** — build system (wrapper included, config cache enabled)
 - **JUnit 5** — testing framework
-- **Spotless** — auto-formatting (Google Java Format)
+- **Spotless** — auto-formatting (Eclipse JDT) + cleanup (unused imports, trailing whitespace)
 - **Checkstyle** — code style enforcement (Google Java Style)

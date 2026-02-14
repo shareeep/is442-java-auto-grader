@@ -60,10 +60,10 @@ tasks.withType(Checkstyle).configureEach {
     }
 }
 
-// Spotless — auto-format code with Google Java Format
+// Spotless — auto-format + cleanup (Eclipse JDT, JDK-independent)
 spotless {
     java {
-        googleJavaFormat('1.19.2')
+        eclipse('4.33')
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

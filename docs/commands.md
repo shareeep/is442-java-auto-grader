@@ -96,10 +96,10 @@ Tests cover: `IdentityResolver` (name derivation, title case, header parsing), `
 ## Lint / Code Style
 
 ```bash
-# Auto-fix formatting, imports, and whitespace
+# Auto-fix formatting, imports, and trailing whitespace
 ./gradlew spotlessApply
 
-# Check for issues without fixing (useful in CI)
+# Check for issues without fixing (used by pre-push hook)
 ./gradlew spotlessCheck
 
 # Run Checkstyle (reports only, no auto-fix)
