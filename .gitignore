@@ -47,3 +47,6 @@ is442-project-materials/
 
 # Mac Os files
 .DS_Store
+
+# Output files
+output*/
