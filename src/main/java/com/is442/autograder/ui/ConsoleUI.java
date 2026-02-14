@@ -61,37 +61,74 @@ public class ConsoleUI {
         System.out.print("\n  Select option: ");
     }
 
+    private static final String BACK_CMD = "back";
+
     /**
-     * Interactive grading flow: prompt for paths and run pipeline.
+     * Interactive grading flow with step-based navigation.
+     * Typing 'back' at any prompt returns to the previous step.
      */
     private void gradeSubmissions() {
         System.out.println();
+        System.out.println("  (Type 'back' at any prompt to go to the previous step)\n");
 
-        // Get submissions folder
-        Path submissionsDir = promptForPath(
-                "  Enter submissions folder path: ",
-                true, true);
-        if (submissionsDir == null)
-            return;
+        Path submissionsDir = null;
+        Path testerFilesDir = null;
+        Path scoresheetPath = null;
+        Path outputDir = null;
 
-        // Get tester files folder
-        Path testerFilesDir = promptForPath(
-                "  Enter tester files folder path: ",
-                true, true);
-        if (testerFilesDir == null)
-            return;
+        int step = 1;
+        while (step >= 1 && step <= 4) {
+            switch (step) {
+                case 1 -> {
+                    Path result = promptForPath(
+                            "  Enter submissions folder path: ",
+                            true, true);
+                    if (result == null && lastInputWasBack) {
+                        return; // Can't go back from step 1, return to menu
+                    } else if (result != null) {
+                        submissionsDir = result;
+                        step++;
+                    }
+                    // else: invalid input, stay on same step
+                }
+                case 2 -> {
+                    Path result = promptForPath(
+                            "  Enter tester files folder path: ",
+                            true, true);
+                    if (result == null && lastInputWasBack) {
+                        step--;
+                    } else if (result != null) {
+                        testerFilesDir = result;
+                        step++;
+                    }
+                }
+                case 3 -> {
+                    Path result = promptForPath(
+                            "  Enter scoresheet CSV path (or press Enter to skip): ",
+                            false, false);
+                    if (result == null && lastInputWasBack) {
+                        step--;
+                    } else {
+                        scoresheetPath = result;
+                        step++;
+                    }
+                }
+                case 4 -> {
+                    Path result = promptForPath(
+                            "  Enter output directory path [./output]: ",
+                            false, true);
+                    if (result == null && lastInputWasBack) {
+                        step--;
+                    } else {
+                        outputDir = result != null ? result : Paths.get("output");
+                        step++;
+                    }
+                }
+            }
+        }
 
-        // Get scoresheet CSV (optional)
-        Path scoresheetPath = promptForPath(
-                "  Enter scoresheet CSV path (or press Enter to skip): ",
-                false, false);
-
-        // Get output directory
-        Path outputDir = promptForPath(
-                "  Enter output directory path [./output]: ",
-                false, true);
-        if (outputDir == null) {
-            outputDir = Paths.get("output");
+        if (step < 1) {
+            return; // user fully backed out
         }
 
         // Run grading
@@ -105,6 +142,9 @@ public class ConsoleUI {
 
         System.out.println();
     }
+
+    /** Tracks whether the last promptForPath input was the 'back' command. */
+    private boolean lastInputWasBack = false;
 
     /**
      * Display current configuration settings.
@@ -127,40 +167,46 @@ public class ConsoleUI {
     }
 
     /**
-     * Prompt for a file system path with validation.
+     * Prompt for a file system path with validation. Supports 'back' command.
      *
      * @param prompt      message to display
      * @param required    whether a non-empty input is required
      * @param isDirectory if true, validate as directory; if false, validate as file
-     * @return validated Path, or null if skipped/cancelled
+     * @return validated Path, or null if skipped/cancelled/back
      */
     private Path promptForPath(String prompt, boolean required, boolean isDirectory) {
+        lastInputWasBack = false;
         System.out.print(prompt);
         String input = scanner.nextLine().trim();
 
+        // Handle 'back' command
+        if (input.equalsIgnoreCase(BACK_CMD)) {
+            lastInputWasBack = true;
+            return null;
+        }
+
         if (input.isEmpty()) {
             if (required) {
-                System.out.println("  ✖ This field is required.\n");
-                return null;
+                System.out.println("  ✖ This field is required.");
             }
             return null;
         }
 
         // Basic input sanitization
         if (containsDangerousChars(input)) {
-            System.out.println("  ✖ Path contains invalid characters.\n");
+            System.out.println("  ✖ Path contains invalid characters.");
             return null;
         }
 
         Path path = Paths.get(input).normalize();
 
         if (required && isDirectory && !Files.isDirectory(path)) {
-            System.out.println("  ✖ Directory does not exist: " + path + "\n");
+            System.out.println("  ✖ Directory does not exist: " + path);
             return null;
         }
 
         if (required && !isDirectory && !Files.isRegularFile(path)) {
-            System.out.println("  ✖ File does not exist: " + path + "\n");
+            System.out.println("  ✖ File does not exist: " + path);
             return null;
         }
 

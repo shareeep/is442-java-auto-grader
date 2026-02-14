@@ -26,9 +26,9 @@ public class ConsoleReporter {
     public void printSummary(List<StudentSubmission> submissions,
             List<QuestionConfig> questionConfigs) {
         System.out.println();
-        printScoreTable(submissions, questionConfigs);
-        System.out.println();
         printAnomalies(submissions);
+        System.out.println();
+        printScoreTable(submissions, questionConfigs);
     }
 
     /**
