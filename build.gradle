@@ -75,8 +75,31 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 17
 }
 
-// Make 'build' also produce the fat JAR
+// Make 'build' also produce the fat JAR and install Git hooks
 tasks.named('build') {
-    dependsOn 'fatJar'
+    dependsOn 'fatJar', 'installGitHook'
+}
+
+// Install Git pre-push hook for lint checks
+tasks.register('installGitHook', Copy) {
+    description = 'Installs the pre-push Git hook for lint checks'
+    group = 'setup'
+    from "${rootDir}/config/git-hooks/pre-push"
+    into "${rootDir}/.git/hooks"
+    filePermissions {
+        user {
+            read = true
+            write = true
+            execute = true
+        }
+        group {
+            read = true
+            execute = true
+        }
+        other {
+            read = true
+            execute = true
+        }
+    }
 }
 

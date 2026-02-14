@@ -5,7 +5,7 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 ## Quick Start
 
 ```bash
-# Build
+# Build (also installs pre-push lint hook automatically)
 ./gradlew clean build
 
 # Run (interactive mode)
@@ -21,6 +21,20 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 
 > **Note**: No Gradle installation needed — the Gradle Wrapper (`gradlew`) is included.
 > Requires **Java 17+**.
+
+## Pre-Push Hook
+
+A Git pre-push hook is **auto-installed** on `./gradlew build`. It runs `spotlessCheck` + `checkstyleMain` before each push — if linting fails, the push is blocked.
+
+To fix lint issues:
+```bash
+./gradlew spotlessApply   # auto-fix formatting + imports
+```
+
+To reinstall manually (if needed):
+```bash
+./gradlew installGitHook
+```
 
 ## Features
 
@@ -45,6 +59,8 @@ src/main/java/com/is442/autograder/
 ├── model/                 # StudentSubmission, QuestionResult, Anomaly, etc.
 ├── ui/                    # ConsoleUI (interactive mode)
 └── util/                  # FileUtils
+
+src/test/java/com/is442/autograder/   # Unit tests (see tests README)
 ```
 
 ## Documentation
@@ -53,12 +69,14 @@ src/main/java/com/is442/autograder/
 |----------|-------------|
 | [commands.md](docs/commands.md) | Build, run, test, and lint commands |
 | [design_overview.md](docs/design_overview.md) | Architecture and class diagrams |
+| [tests README](src/test/java/com/is442/autograder/README.md) | Test guide |
 | [new_test_case_generation.md](docs/new_test_case_generation.md) | Guide for creating test submissions |
 | [orig_full_plan.md](docs/orig_full_plan.md) | Original project plan and requirements |
 
 ## Tech Stack
 
 - **Java 17** — source and target compatibility
-- **Gradle 9.3** — build system (wrapper included)
+- **Gradle 9.3** — build system (wrapper included, config cache enabled)
 - **JUnit 5** — testing framework
+- **Spotless** — auto-formatting (Google Java Format)
 - **Checkstyle** — code style enforcement (Google Java Style)

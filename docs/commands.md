@@ -31,6 +31,15 @@ java -version
 ./gradlew fatJar
 ```
 
+## Setup
+
+```bash
+# Install pre-push hook (runs lint checks before push)
+./gradlew installGitHook
+```
+
+Run this once after cloning. The hook runs `spotlessCheck` + `checkstyleMain` before each `git push` — if linting fails, the push is blocked.
+
 ## Run
 
 ### Interactive Mode
@@ -78,7 +87,11 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 ```bash
 # Run all unit tests
 ./gradlew test
+
+# View test report at: build/reports/tests/test/index.html
 ```
+
+Tests cover: `IdentityResolver` (name derivation, title case, header parsing), `AppConfig` (config loading), `StudentSubmission` (scoring, anomalies, display name).
 
 ## Lint / Code Style
 

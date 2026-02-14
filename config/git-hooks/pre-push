@@ -1,0 +1,30 @@
+#!/bin/sh
+# Pre-push hook: runs lint checks before pushing.
+# Install with: ./gradlew installGitHook
+
+echo "Running pre-push checks..."
+
+# Run Spotless check (formatting + imports)
+./gradlew spotlessCheck --quiet 2>&1
+SPOTLESS_EXIT=$?
+
+if [ $SPOTLESS_EXIT -ne 0 ]; then
+    echo ""
+    echo "Spotless formatting check failed."
+    echo "Run './gradlew spotlessApply' to auto-fix, then commit and push again."
+    exit 1
+fi
+
+# Run Checkstyle
+./gradlew checkstyleMain --quiet 2>&1
+CHECKSTYLE_EXIT=$?
+
+if [ $CHECKSTYLE_EXIT -ne 0 ]; then
+    echo ""
+    echo "Checkstyle check failed."
+    echo "See build/reports/checkstyle/main.html for details."
+    exit 1
+fi
+
+echo "All checks passed."
+exit 0
