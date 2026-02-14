@@ -22,14 +22,12 @@ repositories {
 }
 
 dependencies {
-    // JUnit 5 for testing
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 }
+
 
 // Build a fat/uber JAR so the app can be run as a single JAR
 tasks.register('fatJar', Jar) {
@@ -102,4 +100,3 @@ tasks.register('installGitHook', Copy) {
         }
     }
 }
-

@@ -58,12 +58,16 @@ public class ZipExtractor {
 				}
 
 				// 2. Validate entry name
-				validateEntryName(entryName);
+				if (!isSafeEntryName(entryName)) {
+					zis.closeEntry();
+					continue;
+				}
 
 				// 3. Resolve and verify target path
 				Path destPath = targetDir.resolve(entryName).normalize();
 				if (!destPath.startsWith(targetDir)) {
-					throw new SecurityException("Path traversal detected: " + entryName);
+					zis.closeEntry();
+					continue;
 				}
 
 				// 4. Check cumulative size
@@ -93,18 +97,19 @@ public class ZipExtractor {
 		return targetDir;
 	}
 
-	private void validateEntryName(String name) throws SecurityException {
+	private boolean isSafeEntryName(String name) {
 		if (name.contains("..")) {
-			throw new SecurityException("Path traversal in entry name: " + name);
+			return false;
 		}
 		if (name.startsWith("/") || name.startsWith("\\")) {
-			throw new SecurityException("Absolute path in entry name: " + name);
+			return false;
 		}
 		if (name.length() > MAX_PATH_LENGTH) {
-			throw new SecurityException("Entry name too long: " + name);
+			return false;
 		}
 		if (name.contains("\0")) {
-			throw new SecurityException("Null byte in entry name: " + name);
+			return false;
 		}
+		return true;
 	}
 }

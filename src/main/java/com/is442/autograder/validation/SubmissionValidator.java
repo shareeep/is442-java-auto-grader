@@ -78,26 +78,22 @@ public class SubmissionValidator {
 			String content = Files.readString(javaFile);
 			String header = content.substring(0, Math.min(content.length(), 500));
 
-			boolean hasName = NAME_PATTERN.matcher(header).find();
-			boolean hasEmail = EMAIL_PATTERN.matcher(header).find();
+			Matcher nameMatcher = NAME_PATTERN.matcher(header);
+			Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
+			boolean hasName = nameMatcher.find();
+			boolean hasEmail = emailMatcher.find();
+			String nameVal = hasName ? nameMatcher.group(1).trim() : "";
+			String emailVal = hasEmail ? emailMatcher.group(1).trim() : "";
 
 			if (!hasName && !hasEmail) {
 				submission.addAnomaly(new Anomaly(Anomaly.Type.MISSING_HEADER,
 						"No Name/Email header in " + javaFile.getFileName(), Anomaly.Severity.WARNING, questionId));
-			} else if (!hasName || !hasEmail) {
-				Matcher nameMatcher = NAME_PATTERN.matcher(header);
-				Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
-				String nameVal = nameMatcher.find() ? nameMatcher.group(1).trim() : "(missing)";
-				String emailVal = emailMatcher.find() ? emailMatcher.group(1).trim() : "(missing)";
-
-				if (nameVal.isEmpty() || emailVal.isEmpty() || nameVal.equals("(missing)")
-						|| emailVal.equals("(missing)")) {
-					submission
-							.addAnomaly(new Anomaly(
-									Anomaly.Type.INCOMPLETE_HEADER, "Incomplete header in " + javaFile.getFileName()
-											+ " (Name=" + nameVal + ", Email=" + emailVal + ")",
-									Anomaly.Severity.WARNING, questionId));
-				}
+			} else if (nameVal.isEmpty() || emailVal.isEmpty()) {
+				submission.addAnomaly(new Anomaly(Anomaly.Type.INCOMPLETE_HEADER,
+						"Incomplete header in " + javaFile.getFileName() + " (Name="
+								+ (nameVal.isEmpty() ? "(missing)" : nameVal) + ", Email="
+								+ (emailVal.isEmpty() ? "(missing)" : emailVal) + ")",
+						Anomaly.Severity.WARNING, questionId));
 			}
 		} catch (IOException e) {
 			submission.addAnomaly(new Anomaly(Anomaly.Type.MISSING_JAVA_FILE,

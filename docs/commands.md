@@ -31,6 +31,20 @@ java -version
 ./gradlew fatJar
 ```
 
+## Pre-Push Hook
+
+A Git pre-push hook is auto-installed on `./gradlew build`. It runs `spotlessCheck` + `checkstyleMain` before each push — if linting fails, the push is blocked.
+
+To fix lint issues:
+```bash
+./gradlew spotlessApply   # auto-fix formatting + imports
+```
+
+To reinstall manually (if needed):
+```bash
+./gradlew installGitHook
+```
+
 ## Setup
 
 ```bash
@@ -90,6 +104,37 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 
 # View test report at: build/reports/tests/test/index.html
 ```
+
+## Coverage (recommended setup)
+
+If you want coverage reporting, the recommended setup is the JaCoCo plugin with HTML/XML reports. This repo does not currently enable it, but the following is a good baseline to add in `build.gradle`:
+
+```gradle
+plugins {
+  id 'jacoco'
+}
+
+jacoco {
+  toolVersion = '0.8.12'
+}
+
+tasks.named('jacocoTestReport') {
+  dependsOn tasks.named('test')
+  reports {
+    xml.required = true
+    html.required = true
+  }
+}
+```
+
+Then run:
+
+```bash
+./gradlew test jacocoTestReport --no-configuration-cache
+```
+
+Report: `build/reports/jacoco/test/html/index.html`
+
 
 Tests cover: `IdentityResolver` (name derivation, title case, header parsing), `AppConfig` (config loading), `StudentSubmission` (scoring, anomalies, display name).
 

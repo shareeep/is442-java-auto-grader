@@ -5,7 +5,7 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 ## Quick Start
 
 ```bash
-# Build (also installs pre-push lint hook automatically)
+# Build
 ./gradlew clean build
 
 # Run (interactive mode)
@@ -17,24 +17,13 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --testers ./is442-project-materials/Tester-Files \
   --scoresheet ./is442-project-materials/IS442-ScoreSheet.csv \
   --output ./output
+
+# Test
+./gradlew test
 ```
 
 > **Note**: No Gradle installation needed — the Gradle Wrapper (`gradlew`) is included.
 > Requires **Java 17+**.
-
-## Pre-Push Hook
-
-A Git pre-push hook is **auto-installed** on `./gradlew build`. It runs `spotlessCheck` + `checkstyleMain` before each push — if linting fails, the push is blocked.
-
-To fix lint issues:
-```bash
-./gradlew spotlessApply   # auto-fix formatting + imports
-```
-
-To reinstall manually (if needed):
-```bash
-./gradlew installGitHook
-```
 
 ## Features
 
