@@ -28,8 +28,6 @@ replay_pid*
 
 # Build output
 build/
-target/
-output/
 
 # Gradle
 .gradle/
