@@ -53,6 +53,14 @@ public class StructureNormalizer {
 			return extractedRoot;
 		}
 
+		// Check for extra nesting (more than 1 level deep)
+		int depth = extractedRoot.relativize(questionParent).getNameCount();
+		if (depth > 1) {
+			String relativePath = extractedRoot.relativize(questionParent).toString();
+			submission.addAnomaly(new Anomaly(Anomaly.Type.EXTRA_NESTING,
+					"Student folder found at depth " + depth + ": " + relativePath, Anomaly.Severity.WARNING));
+		}
+
 		// Resolve identity from Java file headers
 		Optional<StudentIdentity> identity = identityResolver.resolve(questionParent);
 		if (identity.isPresent()) {
@@ -91,6 +99,7 @@ public class StructureNormalizer {
 
 	/**
 	 * Recursively search for the directory that directly contains Q1, Q2, or Q3.
+	 * Searches at unlimited depth to handle deeply nested submissions.
 	 */
 	private Path findQuestionParent(Path root) throws IOException {
 		// Check if Q folders are directly under root
@@ -98,26 +107,16 @@ public class StructureNormalizer {
 			return root;
 		}
 
-		// Check one level down
+		// Recursively search subdirectories
 		try (Stream<Path> stream = Files.list(root)) {
 			var dirs = stream.filter(Files::isDirectory).filter(p -> !p.getFileName().toString().startsWith("__MACOSX"))
 					.filter(p -> !p.getFileName().toString().startsWith(".")).toList();
 
 			for (Path dir : dirs) {
-				if (hasQuestionFolders(dir)) {
-					return dir;
-				}
-			}
-
-			// Check two levels down (extra nesting)
-			for (Path dir : dirs) {
-				try (Stream<Path> subStream = Files.list(dir)) {
-					var subDirs = subStream.filter(Files::isDirectory).toList();
-					for (Path subDir : subDirs) {
-						if (hasQuestionFolders(subDir)) {
-							return subDir;
-						}
-					}
+				// Recursively search this directory
+				Path found = findQuestionParent(dir);
+				if (found != null) {
+					return found;
 				}
 			}
 		}

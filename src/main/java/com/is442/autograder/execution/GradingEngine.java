@@ -1,5 +1,12 @@
 package com.is442.autograder.execution;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.logging.Logger;
+
 import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.ProcessResult;
 import com.is442.autograder.model.QuestionConfig;
@@ -7,13 +14,6 @@ import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.ConsoleReporter;
 import com.is442.autograder.reporting.QuestionLogWriter;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Orchestrates the grading flow for a single submission: For each question:
@@ -86,6 +86,16 @@ public class GradingEngine {
 		} catch (IOException e) {
 			return QuestionResult.compilationFailure(questionId, qc.getMaxScore(),
 					"Failed to copy tester: " + e.getMessage());
+		}
+
+		// 2.5. For Q3, auto-provide Shape/Circle/Rectangle class files
+		if ("Q3".equals(questionId)) {
+			copyQ3Dependencies(questionFolder, testerFilesDir);
+		}
+
+		// 2.6. For Q2, auto-provide DataException class file and data .txt files
+		if ("Q2a".equals(questionId) || "Q2b".equals(questionId)) {
+			copyQ2Dependencies(questionFolder, testerFilesDir);
 		}
 
 		try {
@@ -276,6 +286,73 @@ public class GradingEngine {
 		long passedCount = stdout.lines().map(String::trim).filter(line -> line.equals("Passed")).count();
 
 		return (double) passedCount;
+	}
+
+	/**
+	 * Copy required class files for Q2 (DataException) from the template folder.
+	 */
+	private void copyQ2Dependencies(Path questionFolder, Path testerFilesDir) {
+		try {
+			// Template folder is at: is442-project-materials/RenameToYourUsername/Q2/
+			Path templateFolder = testerFilesDir.getParent().resolve("RenameToYourUsername").resolve("Q2");
+
+			if (!Files.isDirectory(templateFolder)) {
+				LOGGER.fine("Template Q2 folder not found at: " + templateFolder);
+				return;
+			}
+
+			// Copy DataException.class
+			Path source = templateFolder.resolve("DataException.class");
+			Path dest = questionFolder.resolve("DataException.class");
+			if (Files.isRegularFile(source)) {
+				Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
+				LOGGER.fine("Copied DataException.class to Q2 folder");
+			}
+
+			// Copy data files (persons.txt, students.txt)
+			String[] dataFiles = {"persons.txt", "students.txt"};
+			for (String fileName : dataFiles) {
+				Path dataSource = templateFolder.resolve(fileName);
+				Path dataDest = questionFolder.resolve(fileName);
+				if (Files.isRegularFile(dataSource)) {
+					Files.copy(dataSource, dataDest, StandardCopyOption.REPLACE_EXISTING);
+					LOGGER.fine("Copied " + fileName + " to Q2 folder");
+				}
+			}
+		} catch (IOException e) {
+			LOGGER.warning("Failed to copy Q2 dependencies: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Copy required class files for Q3 (Shape, Circle, Rectangle) from the template
+	 * folder. Since the exam question states "Only Q3.java and ShapeComparator.java
+	 * will be marked", students don't need to submit these dependency classes. The
+	 * autograder provides them automatically.
+	 */
+	private void copyQ3Dependencies(Path questionFolder, Path testerFilesDir) {
+		try {
+			// Template folder is at: is442-project-materials/RenameToYourUsername/Q3/
+			Path templateFolder = testerFilesDir.getParent().resolve("RenameToYourUsername").resolve("Q3");
+
+			if (!Files.isDirectory(templateFolder)) {
+				LOGGER.fine("Template Q3 folder not found at: " + templateFolder);
+				return;
+			}
+
+			// Copy Shape.class, Circle.class, Rectangle.class
+			String[] requiredClasses = {"Shape.class", "Circle.class", "Rectangle.class"};
+			for (String className : requiredClasses) {
+				Path source = templateFolder.resolve(className);
+				Path dest = questionFolder.resolve(className);
+				if (Files.isRegularFile(source)) {
+					Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
+					LOGGER.fine("Copied " + className + " to Q3 folder");
+				}
+			}
+		} catch (IOException e) {
+			LOGGER.warning("Failed to copy Q3 dependencies: " + e.getMessage());
+		}
 	}
 
 	/**
