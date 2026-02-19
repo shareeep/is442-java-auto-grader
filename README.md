@@ -31,7 +31,7 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 
 ## Regenerating Test Submissions
 
-If you're starting from the original `student-submission` folder provided, use below commands to get the new test cases for student submissions
+use below commands to get the new test cases for student submissions
 
 ```bash
 # macOS/Linux
