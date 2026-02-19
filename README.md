@@ -29,6 +29,20 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 > **Note**: No Gradle installation needed — the Gradle Wrapper (`gradlew`) is included.
 > Requires **Java 17+**.
 
+## Regenerating Test Submissions
+
+If you're starting from the original `student-submission` folder provided, use below commands to get the new test cases for student submissions
+
+```bash
+# macOS/Linux
+./setup-test-submissions.sh
+
+# Windows
+setup-test-submissions.bat
+```
+
+The final submissions will be under `is442-project-materials/student-submission/`.
+
 ## Features
 
 - **ZIP extraction** — automatically unpacks and normalises student submissions
