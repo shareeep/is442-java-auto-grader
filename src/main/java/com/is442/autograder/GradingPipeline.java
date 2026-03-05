@@ -21,7 +21,7 @@ import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.CSVExporter;
 import com.is442.autograder.reporting.ConsoleLogCapture;
 import com.is442.autograder.reporting.ConsoleReporter;
-import com.is442.autograder.reporting.InstructorReportGenerator;
+import com.is442.autograder.reporting.PdfReportGenerator;
 import com.is442.autograder.reporting.QuestionLogWriter;
 import com.is442.autograder.util.FileUtils;
 import com.is442.autograder.validation.SubmissionValidator;
@@ -161,11 +161,10 @@ public class GradingPipeline {
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
-			// 8. Export instructor report
-			Path instructorReport = runOutputDir.resolve("instructor-report.txt");
-			new InstructorReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs,
-					instructorReport);
-			System.out.println("Instructor report exported to: " + instructorReport);
+			// 8. Export PDF report
+			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
+			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
+			System.out.println("PDF report exported to: " + pdfReport);
 
 			return submissions;
 		} finally {
