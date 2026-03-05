@@ -1,12 +1,12 @@
 package com.is442.autograder.config;
 
-import com.is442.autograder.model.QuestionConfig;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+
+import com.is442.autograder.model.QuestionConfig;
 
 /**
  * Loads and exposes externalized configuration from config.properties.
@@ -43,6 +43,11 @@ public class AppConfig {
 	/** Whether to include anomalies in output reports. */
 	public boolean includeAnomalies() {
 		return Boolean.parseBoolean(properties.getProperty("output.include.anomalies", "true"));
+	}
+
+	/** The assessment name shown in the instructor report header. */
+	public String getAssessmentName() {
+		return properties.getProperty("assessment.name", "Assessment");
 	}
 
 	/**

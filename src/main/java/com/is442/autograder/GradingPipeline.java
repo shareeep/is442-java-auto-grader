@@ -1,5 +1,15 @@
 package com.is442.autograder;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
+
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.execution.GradingEngine;
 import com.is442.autograder.execution.ProcessRunner;
@@ -11,19 +21,10 @@ import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.CSVExporter;
 import com.is442.autograder.reporting.ConsoleLogCapture;
 import com.is442.autograder.reporting.ConsoleReporter;
+import com.is442.autograder.reporting.InstructorReportGenerator;
 import com.is442.autograder.reporting.QuestionLogWriter;
-import com.is442.autograder.validation.SubmissionValidator;
 import com.is442.autograder.util.FileUtils;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.Logger;
-import java.util.stream.Stream;
+import com.is442.autograder.validation.SubmissionValidator;
 
 /**
  * Orchestrates the full grading pipeline: 1. Scan for ZIP files 2. Extract each
@@ -159,6 +160,12 @@ public class GradingPipeline {
 			System.out.println("Detailed report exported to: " + detailedCsv);
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
+
+			// 8. Export instructor report
+			Path instructorReport = runOutputDir.resolve("instructor-report.txt");
+			new InstructorReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs,
+					instructorReport);
+			System.out.println("Instructor report exported to: " + instructorReport);
 
 			return submissions;
 		} finally {
