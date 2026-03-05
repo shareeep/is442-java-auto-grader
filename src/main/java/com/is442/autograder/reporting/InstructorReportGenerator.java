@@ -441,7 +441,11 @@ public class InstructorReportGenerator {
 					w.println(SECTION_PAD + "  Student : " + sub.getDisplayName());
 					w.println(SECTION_PAD + "  Question: " + qId);
 					w.println(SECTION_PAD + "  Action  : Process terminated after time limit exceeded");
-					w.println(SECTION_PAD + "  Score   : " + fmt(partial) + " / " + fmt(max) + " (partial credit)");
+					String testsMsg = partial > 0
+							? (int) partial + " test(s) completed before termination"
+							: "No tests completed before termination";
+					w.println(SECTION_PAD + "  Tests   : " + testsMsg);
+					w.println(SECTION_PAD + "  Score   : " + fmt(partial) + " / " + fmt(max));
 					w.println();
 				}
 			}
