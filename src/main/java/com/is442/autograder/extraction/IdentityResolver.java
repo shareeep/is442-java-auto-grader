@@ -79,6 +79,45 @@ public class IdentityResolver {
 	}
 
 	/**
+	 * Structured result of parsing the Name/Email header from a Java file.
+	 */
+	public record HeaderParseResult(String name, String emailId) {
+
+		/** True if at least one field is non-empty. */
+		public boolean hasAnyField() {
+			return !name.isEmpty() || !emailId.isEmpty();
+		}
+
+		/** True if both fields are non-empty. */
+		public boolean isComplete() {
+			return !name.isEmpty() && !emailId.isEmpty();
+		}
+	}
+
+	/**
+	 * Parse the Name and Email ID header of a Java file without requiring both
+	 * fields to be present. Useful for validation that distinguishes "header
+	 * missing entirely" from "header present but incomplete".
+	 *
+	 * @param javaFile
+	 *            path to the .java file to inspect
+	 * @return a {@link HeaderParseResult} whose fields are empty strings when not
+	 *         found
+	 */
+	public HeaderParseResult parseHeader(Path javaFile) throws IOException {
+		String content = Files.readString(javaFile);
+		String header = content.substring(0, Math.min(content.length(), 500));
+
+		Matcher nameMatcher = NAME_PATTERN.matcher(header);
+		Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
+
+		String name = nameMatcher.find() ? toTitleCase(nameMatcher.group(1).trim()) : "";
+		String emailId = emailMatcher.find() ? emailMatcher.group(1).trim() : "";
+
+		return new HeaderParseResult(name, emailId);
+	}
+
+	/**
 	 * Derive a display name from a username like "ping.lee.2023". Convention:
 	 * firstname.lastname.year → "Firstname Lastname" (Title Case).
 	 *
