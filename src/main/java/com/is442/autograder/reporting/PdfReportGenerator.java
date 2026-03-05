@@ -20,6 +20,7 @@ import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
+import com.is442.autograder.util.StringUtils;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
@@ -414,7 +415,7 @@ public class PdfReportGenerator {
 		for (StudentSubmission sub : subs) {
 			Color rowBg = alt ? ROW_ALT : Color.WHITE;
 			Font nf = FontFactory.getFont(FontFactory.HELVETICA, 8f);
-			addRawCell(tbl, truncate(sub.getDisplayName(), 26), rowBg, nf, Element.ALIGN_LEFT);
+			addRawCell(tbl, StringUtils.truncate(sub.getDisplayName(), 26), rowBg, nf, Element.ALIGN_LEFT);
 
 			for (QuestionConfig qc : qcs) {
 				Optional<QuestionResult> rOpt = sub.getResults().stream()
@@ -1236,21 +1237,6 @@ public class PdfReportGenerator {
 		}
 		int n = scores.size();
 		return n % 2 == 0 ? (scores.get(n / 2 - 1) + scores.get(n / 2)) / 2.0 : scores.get(n / 2);
-	}
-
-	private String normalizeOrgId(String orgId) {
-		if (orgId == null) {
-			return "zzz";
-		}
-		String stripped = orgId.replaceAll("[^0-9a-zA-Z]", "");
-		return stripped.isEmpty() ? "zzz" : stripped;
-	}
-
-	private String truncate(String s, int max) {
-		if (s == null) {
-			return "";
-		}
-		return s.length() <= max ? s : s.substring(0, max - 1) + "…";
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,7 @@
 package com.is442.autograder.validation;
 
+import com.is442.autograder.extraction.IdentityResolver;
+import com.is442.autograder.extraction.IdentityResolver.HeaderParseResult;
 import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StudentSubmission;
@@ -9,8 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -19,10 +19,17 @@ import java.util.stream.Collectors;
  */
 public class SubmissionValidator {
 
-	private static final Pattern NAME_PATTERN = Pattern.compile("\\*\\s*Name\\s*:\\s*([^*\\n]+)",
-			Pattern.CASE_INSENSITIVE);
-	private static final Pattern EMAIL_PATTERN = Pattern.compile("\\*\\s*Email\\s*ID\\s*:\\s*([\\w.]+)",
-			Pattern.CASE_INSENSITIVE);
+	private final IdentityResolver identityResolver;
+
+	/**
+	 * Construct a validator backed by the supplied identity resolver.
+	 *
+	 * @param identityResolver
+	 *            resolver used to parse Java file headers
+	 */
+	public SubmissionValidator(IdentityResolver identityResolver) {
+		this.identityResolver = identityResolver;
+	}
 
 	/**
 	 * Validate a submission's structure and file contents.
@@ -72,23 +79,19 @@ public class SubmissionValidator {
 
 	/**
 	 * Check that a Java file has valid Name and Email ID in its header comment.
+	 * Delegates header parsing to {@link IdentityResolver} to avoid duplicating
+	 * regex patterns.
 	 */
 	private void validateJavaHeader(Path javaFile, String questionId, StudentSubmission submission) {
 		try {
-			String content = Files.readString(javaFile);
-			String header = content.substring(0, Math.min(content.length(), 500));
+			HeaderParseResult result = identityResolver.parseHeader(javaFile);
 
-			Matcher nameMatcher = NAME_PATTERN.matcher(header);
-			Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
-			boolean hasName = nameMatcher.find();
-			boolean hasEmail = emailMatcher.find();
-			String nameVal = hasName ? nameMatcher.group(1).trim() : "";
-			String emailVal = hasEmail ? emailMatcher.group(1).trim() : "";
-
-			if (!hasName && !hasEmail) {
+			if (!result.hasAnyField()) {
 				submission.addAnomaly(new Anomaly(Anomaly.Type.MISSING_HEADER,
 						"No Name/Email header in " + javaFile.getFileName(), Anomaly.Severity.WARNING, questionId));
-			} else if (nameVal.isEmpty() || emailVal.isEmpty()) {
+			} else if (!result.isComplete()) {
+				String nameVal = result.name();
+				String emailVal = result.emailId();
 				submission.addAnomaly(new Anomaly(Anomaly.Type.INCOMPLETE_HEADER,
 						"Incomplete header in " + javaFile.getFileName() + " (Name="
 								+ (nameVal.isEmpty() ? "(missing)" : nameVal) + ", Email="

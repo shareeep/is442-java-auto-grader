@@ -3,6 +3,7 @@ package com.is442.autograder.reporting;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
+import com.is442.autograder.util.StringUtils;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -106,19 +107,10 @@ public class CSVExporter {
 			header.append(",Total,Anomalies");
 			writer.println(header);
 
-			// Data rows
+			// Data rows — sorted by OrgDefinedId ("zzz" for missing, so they sort last)
 			List<StudentSubmission> sortedSubs = submissions.stream().sorted((a, b) -> {
-				String aId = normalizeOrgId(a.getOrgDefinedId());
-				String bId = normalizeOrgId(b.getOrgDefinedId());
-				if (aId.isEmpty() && bId.isEmpty()) {
-					return a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
-				}
-				if (aId.isEmpty()) {
-					return 1;
-				}
-				if (bId.isEmpty()) {
-					return -1;
-				}
+				String aId = StringUtils.normalizeOrgId(a.getOrgDefinedId());
+				String bId = StringUtils.normalizeOrgId(b.getOrgDefinedId());
 				int idCompare = aId.compareToIgnoreCase(bId);
 				return idCompare != 0 ? idCompare : a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
 			}).toList();
@@ -146,14 +138,4 @@ public class CSVExporter {
 		}
 	}
 
-	private String normalizeOrgId(String orgId) {
-		if (orgId == null) {
-			return "";
-		}
-		String trimmed = orgId.trim();
-		if (trimmed.startsWith("#")) {
-			return trimmed.substring(1);
-		}
-		return trimmed;
-	}
 }

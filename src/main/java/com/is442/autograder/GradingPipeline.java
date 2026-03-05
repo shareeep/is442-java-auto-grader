@@ -3,10 +3,10 @@ package com.is442.autograder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -23,6 +23,7 @@ import com.is442.autograder.reporting.ConsoleLogCapture;
 import com.is442.autograder.reporting.ConsoleReporter;
 import com.is442.autograder.reporting.PdfReportGenerator;
 import com.is442.autograder.reporting.QuestionLogWriter;
+import com.is442.autograder.reporting.ScoresheetEnricher;
 import com.is442.autograder.util.FileUtils;
 import com.is442.autograder.validation.SubmissionValidator;
 
@@ -34,6 +35,7 @@ import com.is442.autograder.validation.SubmissionValidator;
 public class GradingPipeline {
 
 	private static final Logger LOGGER = Logger.getLogger(GradingPipeline.class.getName());
+	private static final DateTimeFormatter RUN_ID_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
 	private final AppConfig config;
 	private final ZipExtractor zipExtractor;
@@ -42,15 +44,17 @@ public class GradingPipeline {
 	private final SubmissionValidator submissionValidator;
 	private final CSVExporter csvExporter;
 	private final ConsoleReporter consoleReporter;
+	private final ScoresheetEnricher scoresheetEnricher;
 
 	public GradingPipeline(AppConfig config) {
 		this.config = config;
 		this.zipExtractor = new ZipExtractor();
 		this.identityResolver = new IdentityResolver();
 		this.structureNormalizer = new StructureNormalizer(identityResolver);
-		this.submissionValidator = new SubmissionValidator();
+		this.submissionValidator = new SubmissionValidator(identityResolver);
 		this.csvExporter = new CSVExporter();
 		this.consoleReporter = new ConsoleReporter();
+		this.scoresheetEnricher = new ScoresheetEnricher();
 	}
 
 	/**
@@ -78,7 +82,7 @@ public class GradingPipeline {
 
 		QuestionLogWriter logWriter = runOutputDir != null ? new QuestionLogWriter(runOutputDir) : null;
 		GradingEngine gradingEngine = new GradingEngine(new ProcessRunner(config.getTimeoutSeconds()), logWriter,
-				consoleReporter);
+				consoleReporter, config.getTemplateFolder());
 
 		try {
 			// 1. Find all ZIP files
@@ -141,7 +145,7 @@ public class GradingPipeline {
 
 			// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
 			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
-				enrichFromScoresheet(scoresheetPath, submissions);
+				scoresheetEnricher.enrich(scoresheetPath, submissions);
 			}
 
 			// 5. Print summary
@@ -174,64 +178,11 @@ public class GradingPipeline {
 		}
 	}
 
-	/**
-	 * Parse the scoresheet CSV and enrich submissions with official names and
-	 * OrgDefinedId. Scoresheet format: OrgDefinedId,Username,Last Name,First
-	 * Name,Email,... Values may be prefixed with '#' (e.g. "#01400001",
-	 * "#ping.lee.2023").
-	 */
-	private void enrichFromScoresheet(Path scoresheetPath, List<StudentSubmission> submissions) throws IOException {
-
-		// Build lookup: username -> submission
-		Map<String, StudentSubmission> subMap = new HashMap<>();
-		for (StudentSubmission sub : submissions) {
-			if (sub.getUsername() != null) {
-				subMap.put(sub.getUsername().toLowerCase(), sub);
-			}
-		}
-
-		List<String> lines = Files.readAllLines(scoresheetPath);
-		for (int i = 1; i < lines.size(); i++) { // skip header
-			String line = lines.get(i).trim();
-			if (line.isEmpty()) {
-				continue;
-			}
-
-			String[] parts = line.split(",", -1);
-			if (parts.length < 5) {
-				continue;
-			}
-
-			String orgId = parts[0].trim(); // e.g. "#01400001"
-			String rawUsername = parts[1].trim(); // e.g. "#ping.lee.2023"
-			String firstName = parts[3].trim(); // e.g. "PING LEE"
-
-			// Strip '#' prefix from username
-			String username = rawUsername.startsWith("#") ? rawUsername.substring(1) : rawUsername;
-
-			StudentSubmission sub = subMap.get(username.toLowerCase());
-			if (sub == null) {
-				continue;
-			}
-
-			// Set OrgDefinedId (keep the '#' prefix as-is from the source)
-			if (!orgId.isEmpty()) {
-				sub.setOrgDefinedId(orgId);
-			}
-
-			// Official name from scoresheet takes priority (Title Case)
-			if (!firstName.isEmpty()) {
-				sub.setName(IdentityResolver.toTitleCase(firstName));
-			}
-		}
-	}
-
 	private Path createRunOutputDir(Path baseOutputDir) throws IOException {
 		if (baseOutputDir == null) {
 			return null;
 		}
-		String runId = java.time.LocalDateTime.now()
-				.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+		String runId = LocalDateTime.now().format(RUN_ID_FORMATTER);
 		Path runDir = baseOutputDir.resolve(runId);
 		Files.createDirectories(runDir);
 		return runDir;

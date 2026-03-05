@@ -14,6 +14,7 @@ import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.ConsoleReporter;
 import com.is442.autograder.reporting.QuestionLogWriter;
+import com.is442.autograder.util.StringUtils;
 
 /**
  * Orchestrates the grading flow for a single submission: For each question:
@@ -26,12 +27,25 @@ public class GradingEngine {
 	private final ProcessRunner processRunner;
 	private final QuestionLogWriter questionLogWriter;
 	private final ConsoleReporter consoleReporter;
+	private final String templateFolderName;
 
+	/**
+	 * @param processRunner
+	 *            runner used to invoke javac and java
+	 * @param questionLogWriter
+	 *            log writer for per-question output (may be {@code null})
+	 * @param consoleReporter
+	 *            reporter for console progress messages (may be {@code null})
+	 * @param templateFolderName
+	 *            name of the template folder inside the project-materials directory
+	 *            that holds pre-compiled dependency class files
+	 */
 	public GradingEngine(ProcessRunner processRunner, QuestionLogWriter questionLogWriter,
-			ConsoleReporter consoleReporter) {
+			ConsoleReporter consoleReporter, String templateFolderName) {
 		this.processRunner = processRunner;
 		this.questionLogWriter = questionLogWriter;
 		this.consoleReporter = consoleReporter;
+		this.templateFolderName = templateFolderName;
 	}
 
 	/**
@@ -88,14 +102,9 @@ public class GradingEngine {
 					"Failed to copy tester: " + e.getMessage());
 		}
 
-		// 2.5. For Q3, auto-provide Shape/Circle/Rectangle class files
-		if ("Q3".equals(questionId)) {
-			copyQ3Dependencies(questionFolder, testerFilesDir);
-		}
-
-		// 2.6. For Q2, auto-provide DataException class file and data .txt files
-		if ("Q2a".equals(questionId) || "Q2b".equals(questionId)) {
-			copyQ2Dependencies(questionFolder, testerFilesDir);
+		// 2.5. Copy any pre-compiled dependency files declared in the question config
+		if (qc.getDependencyFolder() != null && !qc.getDependencyFiles().isEmpty()) {
+			copyDependencies(questionFolder, testerFilesDir, qc);
 		}
 
 		try {
@@ -116,9 +125,10 @@ public class GradingEngine {
 				String filteredError = filterNoteLines(error);
 				writeLogIfAvailable(submission, questionId, "compile-error", filteredError, "");
 				submission.addAnomaly(new Anomaly(Anomaly.Type.COMPILATION_ERROR,
-						"Compilation error in " + questionId + ": " + truncate(error, 200), Anomaly.Severity.ERROR,
-						questionId));
-				return QuestionResult.compilationFailure(questionId, qc.getMaxScore(), truncate(error, 500));
+						"Compilation error in " + questionId + ": " + StringUtils.truncate(error, 200),
+						Anomaly.Severity.ERROR, questionId));
+				return QuestionResult.compilationFailure(questionId, qc.getMaxScore(),
+						StringUtils.truncate(error, 500));
 			}
 
 			// 4. Run tester
@@ -151,8 +161,8 @@ public class GradingEngine {
 				String filteredError = filterNoteLines(error);
 				writeLogIfAvailable(submission, questionId, "runtime-error", filteredError, "");
 				submission.addAnomaly(new Anomaly(Anomaly.Type.RUNTIME_ERROR,
-						"Runtime error in " + questionId + ": " + truncate(error, 200), Anomaly.Severity.ERROR,
-						questionId));
+						"Runtime error in " + questionId + ": " + StringUtils.truncate(error, 200),
+						Anomaly.Severity.ERROR, questionId));
 			}
 
 			// 5. Parse score from last line of stdout
@@ -289,69 +299,44 @@ public class GradingEngine {
 	}
 
 	/**
-	 * Copy required class files for Q2 (DataException) from the template folder.
+	 * Copy pre-compiled dependency files declared in {@code qc} from the template
+	 * folder into the student question folder so they are on the classpath during
+	 * compilation and execution.
+	 *
+	 * <p>
+	 * The source directory is resolved as:
+	 * {@code <testerFilesDir>/../<templateFolderName>/<qc.dependencyFolder>/}
+	 *
+	 * @param questionFolder
+	 *            destination directory (student's question folder)
+	 * @param testerFilesDir
+	 *            directory containing the tester .java files
+	 * @param qc
+	 *            question configuration supplying the dependency folder and file
+	 *            list
 	 */
-	private void copyQ2Dependencies(Path questionFolder, Path testerFilesDir) {
+	private void copyDependencies(Path questionFolder, Path testerFilesDir, QuestionConfig qc) {
 		try {
-			// Template folder is at: is442-project-materials/RenameToYourUsername/Q2/
-			Path templateFolder = testerFilesDir.getParent().resolve("RenameToYourUsername").resolve("Q2");
+			Path templateFolder = testerFilesDir.getParent().resolve(templateFolderName)
+					.resolve(qc.getDependencyFolder());
 
 			if (!Files.isDirectory(templateFolder)) {
-				LOGGER.fine("Template Q2 folder not found at: " + templateFolder);
+				LOGGER.fine("Dependency folder not found at: " + templateFolder);
 				return;
 			}
 
-			// Copy DataException.class
-			Path source = templateFolder.resolve("DataException.class");
-			Path dest = questionFolder.resolve("DataException.class");
-			if (Files.isRegularFile(source)) {
-				Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
-				LOGGER.fine("Copied DataException.class to Q2 folder");
-			}
-
-			// Copy data files (persons.txt, students.txt)
-			String[] dataFiles = {"persons.txt", "students.txt"};
-			for (String fileName : dataFiles) {
-				Path dataSource = templateFolder.resolve(fileName);
-				Path dataDest = questionFolder.resolve(fileName);
-				if (Files.isRegularFile(dataSource)) {
-					Files.copy(dataSource, dataDest, StandardCopyOption.REPLACE_EXISTING);
-					LOGGER.fine("Copied " + fileName + " to Q2 folder");
-				}
-			}
-		} catch (IOException e) {
-			LOGGER.warning("Failed to copy Q2 dependencies: " + e.getMessage());
-		}
-	}
-
-	/**
-	 * Copy required class files for Q3 (Shape, Circle, Rectangle) from the template
-	 * folder. Since the exam question states "Only Q3.java and ShapeComparator.java
-	 * will be marked", students don't need to submit these dependency classes. The
-	 * autograder provides them automatically.
-	 */
-	private void copyQ3Dependencies(Path questionFolder, Path testerFilesDir) {
-		try {
-			// Template folder is at: is442-project-materials/RenameToYourUsername/Q3/
-			Path templateFolder = testerFilesDir.getParent().resolve("RenameToYourUsername").resolve("Q3");
-
-			if (!Files.isDirectory(templateFolder)) {
-				LOGGER.fine("Template Q3 folder not found at: " + templateFolder);
-				return;
-			}
-
-			// Copy Shape.class, Circle.class, Rectangle.class
-			String[] requiredClasses = {"Shape.class", "Circle.class", "Rectangle.class"};
-			for (String className : requiredClasses) {
-				Path source = templateFolder.resolve(className);
-				Path dest = questionFolder.resolve(className);
+			for (String fileName : qc.getDependencyFiles()) {
+				Path source = templateFolder.resolve(fileName.trim());
+				Path dest = questionFolder.resolve(fileName.trim());
 				if (Files.isRegularFile(source)) {
 					Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
-					LOGGER.fine("Copied " + className + " to Q3 folder");
+					LOGGER.fine("Copied " + fileName + " to " + questionFolder.getFileName());
+				} else {
+					LOGGER.fine("Dependency file not found: " + source);
 				}
 			}
 		} catch (IOException e) {
-			LOGGER.warning("Failed to copy Q3 dependencies: " + e.getMessage());
+			LOGGER.warning("Failed to copy dependencies for " + qc.getQuestionId() + ": " + e.getMessage());
 		}
 	}
 
@@ -371,11 +356,4 @@ public class GradingEngine {
 		}
 	}
 
-	private String truncate(String text, int maxLen) {
-		if (text == null) {
-			return "";
-		}
-		text = text.trim();
-		return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
-	}
 }
