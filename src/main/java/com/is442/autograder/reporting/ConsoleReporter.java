@@ -52,6 +52,10 @@ public class ConsoleReporter {
 	private PrintStream savedOut;
 	private PrintStream savedErr;
 
+	// Log grouping state
+	private String pendingStudentHeader = null;
+	private boolean inStudentGroup = false;
+
 	// ── Progress API
 	// ──────────────────────────────────────────────────────────────
 
@@ -164,9 +168,9 @@ public class ConsoleReporter {
 				int idx = start + r;
 				String raw = idx < logLines.size() ? stripAnsi(logLines.get(idx)) : "";
 				String lower = raw.toLowerCase();
-				if (lower.contains("error") || lower.contains("failed")) {
+				if (raw.startsWith("✖") || lower.contains("error") || lower.contains("failed")) {
 					g.setForegroundColor(TextColor.ANSI.RED);
-				} else if (lower.contains("warning") || lower.contains("timed out")) {
+				} else if (raw.startsWith("⚠") || lower.contains("warning") || lower.contains("timed out")) {
 					g.setForegroundColor(TextColor.ANSI.YELLOW);
 				} else {
 					g.setForegroundColor(TextColor.ANSI.DEFAULT);
@@ -236,16 +240,21 @@ public class ConsoleReporter {
 	// ── Logging
 	// ───────────────────────────────────────────────────────────────────
 
+	public void beginStudentLog(String name) {
+		pendingStudentHeader = name;
+		inStudentGroup = false;
+	}
+
 	public void logInfo(String message) {
 		printLog(message);
 	}
 
 	public void logWarning(String message) {
-		printLog("WARNING: " + message);
+		printLog("⚠  " + message);
 	}
 
 	public void logError(String message) {
-		printLog("ERROR: " + message);
+		printLog("✖  " + message);
 	}
 
 	public void logRaw(String message) {
@@ -253,8 +262,18 @@ public class ConsoleReporter {
 	}
 
 	private void printLog(String message) {
-		String log = "[" + TS_FORMATTER.format(Instant.now()) + "] " + message;
+		if (pendingStudentHeader != null) {
+			String header = "[" + TS_FORMATTER.format(Instant.now()) + "] ▸ " + pendingStudentHeader;
+			pendingStudentHeader = null;
+			inStudentGroup = true;
+			emitLogLine(header);
+		}
+		String indent = inStudentGroup ? "  " : "";
+		String log = "[" + TS_FORMATTER.format(Instant.now()) + "] " + indent + message;
+		emitLogLine(log);
+	}
 
+	private void emitLogLine(String log) {
 		if (!progressActive) {
 			System.out.println(log);
 			return;

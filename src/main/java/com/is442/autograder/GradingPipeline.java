@@ -118,6 +118,17 @@ public class GradingPipeline {
 					// Validate
 					submissionValidator.validate(submissionRoot, questionConfigs, submission);
 
+					// Log structural/validation anomalies immediately so the instructor
+					// sees them live (compilation/runtime anomalies are logged by GradingEngine)
+					consoleReporter.beginStudentLog(submission.getDisplayName());
+					for (com.is442.autograder.model.Anomaly a : submission.getAnomalies()) {
+						if (a.getSeverity() == com.is442.autograder.model.Anomaly.Severity.ERROR) {
+							consoleReporter.logError(a.getDescription());
+						} else {
+							consoleReporter.logWarning(a.getDescription());
+						}
+					}
+
 					// Grade
 					gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
 
