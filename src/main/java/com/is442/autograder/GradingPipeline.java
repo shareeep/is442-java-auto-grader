@@ -154,18 +154,14 @@ public class GradingPipeline {
 			// 6. Export scoresheet (if template provided)
 			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
-				csvExporter.export(scoresheetPath, outputCsv, submissions);
+				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
 			}
 
-			// 7. Export detailed report
-			Path detailedCsv = runOutputDir.resolve("detailed-report.csv");
-			csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
-			System.out.println("Detailed report exported to: " + detailedCsv);
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
-			// 8. Export PDF report
+			// 7. Export PDF report
 			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
 			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
 			System.out.println("PDF report exported to: " + pdfReport);
