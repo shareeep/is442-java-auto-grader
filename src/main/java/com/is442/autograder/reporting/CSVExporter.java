@@ -112,8 +112,7 @@ public class CSVExporter {
 	}
 
 	private String formatScore(double score) {
-		// Show integer when there's no fractional part
-		return score == Math.floor(score) ? String.valueOf((int) score) : String.valueOf(score);
+		return String.format("%.1f", score);
 	}
 
 }

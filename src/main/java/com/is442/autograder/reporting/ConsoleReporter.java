@@ -1,5 +1,14 @@
 package com.is442.autograder.reporting;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.graphics.TextGraphics;
@@ -11,15 +20,6 @@ import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Prints a formatted grading summary and anomaly report to the console. During
