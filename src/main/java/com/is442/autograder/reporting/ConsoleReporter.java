@@ -1,17 +1,31 @@
 package com.is442.autograder.reporting;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.googlecode.lanterna.TerminalSize;
+import com.googlecode.lanterna.TextColor;
+import com.googlecode.lanterna.graphics.TextGraphics;
+import com.googlecode.lanterna.screen.Screen;
+import com.googlecode.lanterna.screen.TerminalScreen;
+import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
+import com.googlecode.lanterna.terminal.Terminal;
 import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.QuestionResult;
 import com.is442.autograder.model.StudentSubmission;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-
 /**
- * Prints a formatted grading summary and anomaly report to the console.
+ * Prints a formatted grading summary and anomaly report to the console. During
+ * grading, shows a Lanterna TUI with a pinned progress bar at the top and a
+ * scrolling log panel below. Falls back to a simple \r-based bar if the
+ * terminal does not support Lanterna (e.g. piped output, TERM=dumb).
  */
 public class ConsoleReporter {
 
@@ -25,71 +39,256 @@ public class ConsoleReporter {
 	private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss")
 			.withZone(ZoneId.systemDefault());
 
+	// Progress state
 	private boolean progressActive = false;
 	private int progressTotal = 0;
 	private int currentProgress = 0;
 	private String currentStudent = "(starting...)";
-	/** Number of log lines printed below the bar since it was last anchored. */
-	private int linesBelow = 0;
+
+	// Lanterna state
+	private Screen screen;
+	private boolean lanternaMode = false;
+	private final List<String> logLines = new ArrayList<>();
+	private PrintStream savedOut;
+	private PrintStream savedErr;
+
+	// Log grouping state
+	private String pendingStudentHeader = null;
+	private boolean inStudentGroup = false;
+
+	// ── Progress API
+	// ──────────────────────────────────────────────────────────────
 
 	public void startProgress(int total) {
 		progressActive = true;
 		progressTotal = total;
 		currentProgress = 0;
-		linesBelow = 0;
 		currentStudent = "(starting...)";
-		// Print bar + newline. Cursor now sits exactly 1 line below the bar.
-		System.out.println(renderBar());
+		logLines.clear();
+
+		try {
+			Terminal terminal = new DefaultTerminalFactory().createTerminal();
+			screen = new TerminalScreen(terminal);
+			screen.startScreen();
+			screen.setCursorPosition(null);
+
+			// Suppress stdout/stderr so stray System.out calls don't corrupt the TUI
+			savedOut = System.out;
+			savedErr = System.err;
+			PrintStream sink = new PrintStream(OutputStream.nullOutputStream());
+			System.setOut(sink);
+			System.setErr(sink);
+
+			lanternaMode = true;
+			redrawScreen();
+		} catch (Exception e) {
+			// Not a real terminal — fall back to simple \r bar
+			screen = null;
+			lanternaMode = false;
+			savedOut = null;
+			savedErr = null;
+			System.out.print(barSimple());
+			System.out.flush();
+		}
 	}
 
 	public void updateCurrentStudent(String studentName) {
 		this.currentStudent = studentName;
-		redrawBar();
+		if (lanternaMode)
+			redrawScreen();
+		else
+			redrawBarSimple();
 	}
 
 	public void printProgress(int current, int total, String studentName) {
-		if (!progressActive) {
+		if (!progressActive)
 			startProgress(total);
-		}
 		this.currentProgress = current;
 		this.progressTotal = total;
 		this.currentStudent = studentName;
-
-		redrawBar();
+		if (lanternaMode)
+			redrawScreen();
+		else
+			redrawBarSimple();
 	}
 
 	public void endProgress() {
-		if (!progressActive) {
+		if (!progressActive)
 			return;
-		}
 		progressActive = false;
 		currentProgress = progressTotal;
-		redrawBar();
-		System.out.println();
+
+		if (lanternaMode) {
+			lanternaMode = false;
+			try {
+				screen.stopScreen();
+			} catch (IOException ignored) {
+			}
+			screen = null;
+			System.setOut(savedOut);
+			System.setErr(savedErr);
+			savedOut = null;
+			savedErr = null;
+			// Replay captured log lines so they reach run.log via ConsoleLogCapture tee
+			for (String line : logLines) {
+				System.out.println(line);
+			}
+		} else {
+			System.out.print("\r\u001B[2K" + barSimple() + "\n");
+			System.out.flush();
+		}
 	}
 
-	/**
-	 * Compute the bar string without printing.
-	 */
-	private String renderBar() {
-		int barWidth = 30;
-		int filled = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * barWidth);
-		String bar = "\u2588".repeat(filled) + "\u2591".repeat(barWidth - filled);
-		int percent = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * 100);
-		return "  [" + bar + "] " + percent + "%  Current: " + currentStudent;
+	// ── Lanterna rendering
+	// ────────────────────────────────────────────────────────
+
+	private void redrawScreen() {
+		if (screen == null)
+			return;
+		try {
+			screen.doResizeIfNecessary();
+			TerminalSize size = screen.getTerminalSize();
+			int h = size.getRows();
+			int w = size.getColumns();
+			TextGraphics g = screen.newTextGraphics();
+			g.setBackgroundColor(TextColor.ANSI.DEFAULT);
+
+			// Row 0: progress bar
+			g.setForegroundColor(TextColor.ANSI.CYAN);
+			g.putString(0, 0, pad(barLanterna(w), w));
+
+			// Row 1: divider
+			g.setForegroundColor(TextColor.ANSI.WHITE);
+			g.putString(0, 1, "\u2500".repeat(w));
+
+			// Rows 2..h-1: log area (most-recent lines at bottom)
+			int logRows = Math.max(0, h - 2);
+			int start = Math.max(0, logLines.size() - logRows);
+			for (int r = 0; r < logRows; r++) {
+				int idx = start + r;
+				String raw = idx < logLines.size() ? stripAnsi(logLines.get(idx)) : "";
+				String lower = raw.toLowerCase();
+				if (raw.startsWith("✖") || lower.contains("error") || lower.contains("failed")) {
+					g.setForegroundColor(TextColor.ANSI.RED);
+				} else if (raw.startsWith("⚠") || lower.contains("warning") || lower.contains("timed out")) {
+					g.setForegroundColor(TextColor.ANSI.YELLOW);
+				} else {
+					g.setForegroundColor(TextColor.ANSI.DEFAULT);
+				}
+				g.putString(0, 2 + r, pad(raw, w));
+			}
+
+			screen.refresh();
+		} catch (IOException ignored) {
+		}
 	}
 
-	/**
-	 * Go up {@code (1 + linesBelow)} lines to the bar, clear and redraw it, then
-	 * return the cursor to its original position. {@code linesBelow} is unchanged —
-	 * the cursor stays where it was before the call.
-	 */
-	private void redrawBar() {
-		int moveUp = 1 + linesBelow;
-		System.out.print("\u001B[" + moveUp + "A\r\u001B[2K" + renderBar());
-		System.out.print("\u001B[" + moveUp + "B\r");
+	private String barLanterna(int width) {
+		int barW = Math.max(10, Math.min(30, width - 30));
+		int filled = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * barW);
+		String bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, barW - filled));
+		int pct = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * 100);
+		return "  [" + bar + "] " + pct + "%  Current: " + currentStudent;
+	}
+
+	private static String pad(String s, int width) {
+		if (s.length() >= width)
+			return s.substring(0, width);
+		return s + " ".repeat(width - s.length());
+	}
+
+	private static String stripAnsi(String s) {
+		return s.replaceAll("\u001B\\[[\\d;]*[A-Za-z]", "");
+	}
+
+	// ── Simple fallback rendering
+	// ─────────────────────────────────────────────────
+
+	private String barSimple() {
+		int barW = 30;
+		int filled = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * barW);
+		String bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, barW - filled));
+		int pct = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * 100);
+		String line = "  [" + bar + "] " + pct + "%  Current: " + currentStudent;
+		int cols = terminalWidth();
+		return cols > 10 && line.length() > cols ? line.substring(0, cols - 1) : line;
+	}
+
+	private void redrawBarSimple() {
+		System.out.print("\r\u001B[2K" + barSimple());
 		System.out.flush();
 	}
+
+	private int terminalWidth() {
+		String env = System.getenv("COLUMNS");
+		if (env != null) {
+			try {
+				return Integer.parseInt(env.trim());
+			} catch (NumberFormatException ignored) {
+			}
+		}
+		try {
+			Process p = new ProcessBuilder("sh", "-c", "tput cols 2>/dev/null").start();
+			String out = new String(p.getInputStream().readAllBytes()).trim();
+			if (!out.isEmpty())
+				return Integer.parseInt(out);
+		} catch (Exception ignored) {
+		}
+		return 120;
+	}
+
+	// ── Logging
+	// ───────────────────────────────────────────────────────────────────
+
+	public void beginStudentLog(String name) {
+		pendingStudentHeader = name;
+		inStudentGroup = false;
+	}
+
+	public void logInfo(String message) {
+		printLog(message);
+	}
+
+	public void logWarning(String message) {
+		printLog("⚠  " + message);
+	}
+
+	public void logError(String message) {
+		printLog("✖  " + message);
+	}
+
+	public void logRaw(String message) {
+		printLog(message);
+	}
+
+	private void printLog(String message) {
+		if (pendingStudentHeader != null) {
+			String header = "[" + TS_FORMATTER.format(Instant.now()) + "] ▸ " + pendingStudentHeader;
+			pendingStudentHeader = null;
+			inStudentGroup = true;
+			emitLogLine(header);
+		}
+		String indent = inStudentGroup ? "  " : "";
+		String log = "[" + TS_FORMATTER.format(Instant.now()) + "] " + indent + message;
+		emitLogLine(log);
+	}
+
+	private void emitLogLine(String log) {
+		if (!progressActive) {
+			System.out.println(log);
+			return;
+		}
+
+		logLines.add(log);
+		if (lanternaMode) {
+			redrawScreen();
+		} else {
+			System.out.print("\r\u001B[2K" + log + "\n" + barSimple());
+			System.out.flush();
+		}
+	}
+
+	// ── Summary (printed after progress ends) ────────────────────────────────────
 
 	/**
 	 * Print the complete grading summary including scores table and anomalies.
@@ -99,22 +298,6 @@ public class ConsoleReporter {
 		printAnomalies(submissions);
 		System.out.println();
 		printScoreTable(submissions, questionConfigs);
-	}
-
-	public void logInfo(String message) {
-		printLog(message);
-	}
-
-	public void logWarning(String message) {
-		printLog("WARNING: " + message);
-	}
-
-	public void logError(String message) {
-		printLog("ERROR: " + message);
-	}
-
-	public void logRaw(String message) {
-		printLog(message);
 	}
 
 	private void printAnomalies(List<StudentSubmission> submissions) {
@@ -161,23 +344,5 @@ public class ConsoleReporter {
 			System.out.printf("\u2502 %s%-6.1f%s%n", totalColor, total, RESET);
 		}
 		System.out.println("\u2550".repeat(75));
-	}
-
-	private void printLog(String message) {
-		String log = "[" + TS_FORMATTER.format(Instant.now()) + "] " + message;
-
-		if (!progressActive) {
-			System.out.println(log);
-			return;
-		}
-
-		// Go up to the bar, redraw it, return to current position, clear the
-		// line, and print the log. Each call pushes the cursor 1 line further
-		// below the bar, so linesBelow must be incremented.
-		int moveUp = 1 + linesBelow;
-		System.out.print("\u001B[" + moveUp + "A\r\u001B[2K" + renderBar());
-		System.out.print("\u001B[" + moveUp + "B\r\u001B[2K");
-		System.out.println(log);
-		linesBelow++;
 	}
 }

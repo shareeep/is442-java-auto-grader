@@ -118,6 +118,17 @@ public class GradingPipeline {
 					// Validate
 					submissionValidator.validate(submissionRoot, questionConfigs, submission);
 
+					// Log structural/validation anomalies immediately so the instructor
+					// sees them live (compilation/runtime anomalies are logged by GradingEngine)
+					consoleReporter.beginStudentLog(submission.getDisplayName());
+					for (com.is442.autograder.model.Anomaly a : submission.getAnomalies()) {
+						if (a.getSeverity() == com.is442.autograder.model.Anomaly.Severity.ERROR) {
+							consoleReporter.logError(a.getDescription());
+						} else {
+							consoleReporter.logWarning(a.getDescription());
+						}
+					}
+
 					// Grade
 					gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
 
@@ -154,18 +165,14 @@ public class GradingPipeline {
 			// 6. Export scoresheet (if template provided)
 			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
-				csvExporter.export(scoresheetPath, outputCsv, submissions);
+				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
 			}
 
-			// 7. Export detailed report
-			Path detailedCsv = runOutputDir.resolve("detailed-report.csv");
-			csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
-			System.out.println("Detailed report exported to: " + detailedCsv);
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
-			// 8. Export PDF report
+			// 7. Export PDF report
 			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
 			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
 			System.out.println("PDF report exported to: " + pdfReport);
