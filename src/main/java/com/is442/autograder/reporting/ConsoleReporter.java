@@ -12,6 +12,8 @@ import java.util.List;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.graphics.TextGraphics;
+import com.googlecode.lanterna.input.KeyStroke;
+import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
@@ -52,9 +54,18 @@ public class ConsoleReporter {
 	private PrintStream savedOut;
 	private PrintStream savedErr;
 
+	// Stop-grading flag (set when user presses 'q' in Lanterna mode)
+	private volatile boolean stopRequested = false;
+	private Thread keyPollerThread = null;
+
 	// Log grouping state
 	private String pendingStudentHeader = null;
 	private boolean inStudentGroup = false;
+
+	/** Returns true if the user pressed 'q' to request a graceful stop. */
+	public boolean isStopRequested() {
+		return stopRequested;
+	}
 
 	// ── Progress API
 	// ──────────────────────────────────────────────────────────────
@@ -81,6 +92,27 @@ public class ConsoleReporter {
 
 			lanternaMode = true;
 			redrawScreen();
+
+			// Background thread: detect 'q' keypress immediately
+			keyPollerThread = new Thread(() -> {
+				while (!Thread.currentThread().isInterrupted() && lanternaMode) {
+					try {
+						KeyStroke key = screen.readInput();
+						if (key != null && key.getKeyType() == KeyType.Character) {
+							char c = key.getCharacter();
+							if ((c == 'q' || c == 'Q') && !stopRequested) {
+								stopRequested = true;
+								logLines.add("[" + TS_FORMATTER.format(Instant.now()) + "] ⚠ Stopping after current student completes...");
+								redrawScreen();
+							}
+						}
+					} catch (Exception ignored) {
+						break;
+					}
+				}
+			}, "key-poller");
+			keyPollerThread.setDaemon(true);
+			keyPollerThread.start();
 		} catch (Exception e) {
 			// Not a real terminal — fall back to simple \r bar
 			screen = null;
@@ -120,6 +152,10 @@ public class ConsoleReporter {
 
 		if (lanternaMode) {
 			lanternaMode = false;
+			if (keyPollerThread != null) {
+				keyPollerThread.interrupt();
+				keyPollerThread = null;
+			}
 			try {
 				screen.stopScreen();
 			} catch (IOException ignored) {
@@ -157,10 +193,19 @@ public class ConsoleReporter {
 			g.setForegroundColor(TextColor.ANSI.CYAN);
 			g.putString(0, 0, pad(barLanterna(w), w));
 
-			// Row 1: divider
+			// Row 1: stop hint
+			if (stopRequested) {
+				g.setForegroundColor(TextColor.ANSI.RED);
+				g.putString(0, 1, pad("  ⚠  Stopping — waiting for current student to finish...", w));
+			} else {
+				g.setForegroundColor(TextColor.ANSI.YELLOW);
+				g.putString(0, 1, pad("  Press q to stop grading after the current student finishes.", w));
+			}
+
+			// Row 2: divider
 			g.setForegroundColor(TextColor.ANSI.WHITE);
-			g.putString(0, 1, "-".repeat(w));
-			int logRows = Math.max(0, h - 2);
+			g.putString(0, 2, "-".repeat(w));
+			int logRows = Math.max(0, h - 3);
 			int start = Math.max(0, logLines.size() - logRows);
 			for (int r = 0; r < logRows; r++) {
 				int idx = start + r;

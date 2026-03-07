@@ -101,6 +101,11 @@ public class GradingPipeline {
 
 			// 2. Process each ZIP
 			for (int i = 0; i < zipFiles.size(); i++) {
+				// Honour a stop request (user pressed 'q' during grading)
+				if (consoleReporter.isStopRequested()) {
+					break;
+				}
+
 				Path zipFile = zipFiles.get(i);
 				String zipName = zipFile.getFileName().toString();
 
@@ -147,6 +152,11 @@ public class GradingPipeline {
 			consoleReporter.endProgress();
 			System.out.println();
 
+			if (consoleReporter.isStopRequested()) {
+				System.out.println(
+						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
+			}
+
 			// 3. Fill missing names using username-derived fallback
 			for (StudentSubmission sub : submissions) {
 				if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
@@ -163,7 +173,7 @@ public class GradingPipeline {
 			consoleReporter.printSummary(submissions, questionConfigs);
 
 			// 6. Export scoresheet (if template provided)
-			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+			if (!consoleReporter.isStopRequested() && scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
 				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
@@ -173,9 +183,11 @@ public class GradingPipeline {
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
 			// 7. Export PDF report
-			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
-			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
-			System.out.println("PDF report exported to: " + pdfReport);
+			if (!consoleReporter.isStopRequested()) {
+				Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
+				new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
+				System.out.println("PDF report exported to: " + pdfReport);
+			}
 
 			return submissions;
 		} finally {
