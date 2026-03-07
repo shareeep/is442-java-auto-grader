@@ -159,18 +159,16 @@ public class ConsoleReporter {
 
 			// Row 1: divider
 			g.setForegroundColor(TextColor.ANSI.WHITE);
-			g.putString(0, 1, "\u2500".repeat(w));
-
-			// Rows 2..h-1: log area (most-recent lines at bottom)
+		g.putString(0, 1, "-".repeat(w));
 			int logRows = Math.max(0, h - 2);
 			int start = Math.max(0, logLines.size() - logRows);
 			for (int r = 0; r < logRows; r++) {
 				int idx = start + r;
 				String raw = idx < logLines.size() ? stripAnsi(logLines.get(idx)) : "";
 				String lower = raw.toLowerCase();
-				if (raw.startsWith("✖") || lower.contains("error") || lower.contains("failed")) {
+				if (raw.startsWith("[ERROR]") || lower.contains("error") || lower.contains("failed")) {
 					g.setForegroundColor(TextColor.ANSI.RED);
-				} else if (raw.startsWith("⚠") || lower.contains("warning") || lower.contains("timed out")) {
+				} else if (raw.startsWith("[WARN]") || lower.contains("warning") || lower.contains("timed out")) {
 					g.setForegroundColor(TextColor.ANSI.YELLOW);
 				} else {
 					g.setForegroundColor(TextColor.ANSI.DEFAULT);
@@ -186,7 +184,7 @@ public class ConsoleReporter {
 	private String barLanterna(int width) {
 		int barW = Math.max(10, Math.min(30, width - 30));
 		int filled = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * barW);
-		String bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, barW - filled));
+		String bar = "#".repeat(filled) + "-".repeat(Math.max(0, barW - filled));
 		int pct = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * 100);
 		return "  [" + bar + "] " + pct + "%  Current: " + currentStudent;
 	}
@@ -207,7 +205,7 @@ public class ConsoleReporter {
 	private String barSimple() {
 		int barW = 30;
 		int filled = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * barW);
-		String bar = "\u2588".repeat(filled) + "\u2591".repeat(Math.max(0, barW - filled));
+		String bar = "#".repeat(filled) + "-".repeat(Math.max(0, barW - filled));
 		int pct = progressTotal == 0 ? 0 : (int) ((double) currentProgress / progressTotal * 100);
 		String line = "  [" + bar + "] " + pct + "%  Current: " + currentStudent;
 		int cols = terminalWidth();
@@ -250,11 +248,11 @@ public class ConsoleReporter {
 	}
 
 	public void logWarning(String message) {
-		printLog("⚠  " + message);
+		printLog("[WARN]  " + message);
 	}
 
 	public void logError(String message) {
-		printLog("✖  " + message);
+		printLog("[ERROR] " + message);
 	}
 
 	public void logRaw(String message) {
@@ -313,8 +311,8 @@ public class ConsoleReporter {
 			}
 			for (Anomaly anomaly : sub.getAnomalies()) {
 				String icon = anomaly.getSeverity() == Anomaly.Severity.ERROR
-						? RED + "  \u2716 "
-						: YELLOW + "  \u26a0 ";
+						? RED + "  [ERROR] "
+						: YELLOW + "  [WARN]  ";
 				System.out.println(icon + sub.getDisplayName() + " - " + anomaly.getDescription() + RESET);
 			}
 		}
@@ -322,27 +320,27 @@ public class ConsoleReporter {
 
 	private void printScoreTable(List<StudentSubmission> submissions, List<QuestionConfig> questionConfigs) {
 		System.out.println(BOLD + "GRADING SUMMARY" + RESET);
-		System.out.println("\u2550".repeat(75));
+		System.out.println("=".repeat(75));
 		System.out.printf(BOLD + " %-20s", "Student");
 		for (QuestionConfig qc : questionConfigs) {
-			System.out.printf("\u2502 %-5s", qc.getQuestionId());
+			System.out.printf("| %-5s", qc.getQuestionId());
 		}
-		System.out.printf("\u2502 %-6s%n" + RESET, "Total");
-		System.out.println("\u2500".repeat(21) + ("\u253c" + "\u2500".repeat(6)).repeat(questionConfigs.size())
-				+ "\u253c" + "\u2500".repeat(7));
+		System.out.printf("| %-6s%n" + RESET, "Total");
+		System.out.println("-".repeat(21) + ("+" + "-".repeat(6)).repeat(questionConfigs.size())
+				+ "+" + "-".repeat(7));
 		for (StudentSubmission sub : submissions) {
 			System.out.printf(" %-20s", sub.getDisplayName());
 			for (QuestionConfig qc : questionConfigs) {
 				double score = sub.getResults().stream().filter(r -> r.getQuestionId().equals(qc.getQuestionId()))
 						.mapToDouble(QuestionResult::getScore).findFirst().orElse(0.0);
 				String color = score >= qc.getMaxScore() ? GREEN : score > 0 ? YELLOW : RED;
-				System.out.printf("\u2502 %s%-5.1f%s", color, score, RESET);
+				System.out.printf("| %s%-5.1f%s", color, score, RESET);
 			}
 			double total = sub.getTotalScore();
 			double maxTotal = sub.getMaxPossibleScore();
 			String totalColor = total >= maxTotal ? GREEN : total > 0 ? CYAN : RED;
-			System.out.printf("\u2502 %s%-6.1f%s%n", totalColor, total, RESET);
+			System.out.printf("| %s%-6.1f%s%n", totalColor, total, RESET);
 		}
-		System.out.println("\u2550".repeat(75));
+		System.out.println("=".repeat(75));
 	}
 }
