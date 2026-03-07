@@ -159,7 +159,7 @@ public class ConsoleReporter {
 
 			// Row 1: divider
 			g.setForegroundColor(TextColor.ANSI.WHITE);
-		g.putString(0, 1, "-".repeat(w));
+			g.putString(0, 1, "-".repeat(w));
 			int logRows = Math.max(0, h - 2);
 			int start = Math.max(0, logLines.size() - logRows);
 			for (int r = 0; r < logRows; r++) {
@@ -326,8 +326,7 @@ public class ConsoleReporter {
 			System.out.printf("| %-5s", qc.getQuestionId());
 		}
 		System.out.printf("| %-6s%n" + RESET, "Total");
-		System.out.println("-".repeat(21) + ("+" + "-".repeat(6)).repeat(questionConfigs.size())
-				+ "+" + "-".repeat(7));
+		System.out.println("-".repeat(21) + ("+" + "-".repeat(6)).repeat(questionConfigs.size()) + "+" + "-".repeat(7));
 		for (StudentSubmission sub : submissions) {
 			System.out.printf(" %-20s", sub.getDisplayName());
 			for (QuestionConfig qc : questionConfigs) {
