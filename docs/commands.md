@@ -9,6 +9,9 @@ Quick reference for setting up and running the IS442 Auto-Grading System.
 java -version
 ```
 
+> **Unable to see Unicode characters** — for Windows users
+> Go to Control Panel > Clock and Region (Change date, time, or number formats) > Administrative > Change system locale... > Ensure "Use Unicode UTF-8..." is checked.
+
 > **SSL Fix**: If Gradle gives SSL/certificate errors, set `JAVA_HOME` to Temurin JDK:
 > ```bash
 > export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home
