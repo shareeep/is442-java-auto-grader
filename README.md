@@ -61,11 +61,58 @@ The final submissions will be under `is442-project-materials/student-submission/
 
 ## System Architecture (OO Design)
 
-The system follows a **staged pipeline** pattern where each stage is a single-responsibility class:
+### Overview
 
 ```
-EXTRACT → VALIDATE → COMPILE → EXECUTE → REPORT
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+│  EXTRACT │──▶│ VALIDATE │──▶│ COMPILE  │──▶│ EXECUTE  │──▶│  REPORT  │
+└──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
+     │              │              │              │              │
+     ▼              ▼              ▼              ▼              ▼
+  Unzip file    Check folder   Run javac     Run tester    Generate
+  + resolve     structure &    on student    with timeout  CSV scores
+  identity      fix issues     + tester                    + anomalies
 ```
+
+### Pipeline Flow
+
+The system processes each submission through a **linear staged pipeline**:
+
+```
+START → Load Config → Scan ZIPs → [For each ZIP]
+  → Extract → Parse Username → Validate → Normalize
+  → [For each Question] → Copy Tester → Compile → Run (with timeout) → Parse Score
+  → Sum Scores → [Next Student] → Export CSV → END
+```
+
+### Separation of Concerns (5 Layers)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      UI LAYER                               │
+│   Handles all user interaction (menu, inputs, progress)     │
+├─────────────────────────────────────────────────────────────┤
+│                   SERVICE LAYER                             │
+│   Contains all business logic:                              │
+│   - Extract ZIPs, validate structure, compile, execute      │
+├─────────────────────────────────────────────────────────────┤
+│                    MODEL LAYER                              │
+│   Pure data objects (no logic, just state):                 │
+│   - Student info, scores, results, anomalies                │
+├─────────────────────────────────────────────────────────────┤
+│                  REPORTING LAYER                            │
+│   Transforms results into output formats:                   │
+│   - CSV export, console summary, anomaly reports            │
+├─────────────────────────────────────────────────────────────┤
+│                   CONFIG LAYER                              │
+│   Externalized settings (no hardcoding):                    │
+│   - Paths, timeout, question definitions                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Data flow: `User Input → UI → Service → Model → Reporting → Output` (Config feeds into Service)
+
+### Class Responsibilities
 
 | Layer | Classes | Responsibility |
 |-------|---------|----------------|
@@ -78,7 +125,7 @@ EXTRACT → VALIDATE → COMPILE → EXECUTE → REPORT
 | Config | `AppConfig` | Reads `config.properties`; single source of truth for paths and timeouts |
 | UI | `ConsoleUI` | Interactive step-by-step prompts with `back` navigation |
 
-Each stage depends only on its input models and produces output models — stages are independently testable and replaceable.
+Each layer has one job — changes in one layer don't affect others (e.g. change CSV format → only touch Reporting; switch to GUI → only replace UI Layer).
 
 ## Open-Source Libraries
 
