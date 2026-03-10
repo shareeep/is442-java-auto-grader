@@ -102,7 +102,8 @@ public class ConsoleReporter {
 							char c = key.getCharacter();
 							if ((c == 'q' || c == 'Q') && !stopRequested) {
 								stopRequested = true;
-								logLines.add("[" + TS_FORMATTER.format(Instant.now()) + "] ⚠ Stopping after current student completes...");
+								logLines.add("[" + TS_FORMATTER.format(Instant.now())
+										+ "] ⚠ Stopping after current student completes...");
 								redrawScreen();
 							}
 						}
