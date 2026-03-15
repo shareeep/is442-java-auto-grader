@@ -81,7 +81,7 @@ public class GradingEngine {
 		// 1. Check if question folder exists
 		if (!Files.isDirectory(questionFolder)) {
 			LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": question folder not found");
-			logRaw(submission.getDisplayName() + " - " + questionId + ": question folder not found");
+			logWarning(questionId + "  │  Question folder not found");
 			return QuestionResult.missing(questionId, qc.getMaxScore());
 		}
 
@@ -118,9 +118,10 @@ public class GradingEngine {
 						? compileResult.getStdout()
 						: compileResult.getStderr();
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": compilation failed");
-				String singleLineError = firstRelevantLine(error);
-				String summaryLine = submission.getDisplayName() + " - " + questionId + ": " + singleLineError;
-				logRaw(summaryLine);
+				String singleLineError = cleanCompilerMessage(firstRelevantLine(error));
+				String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  Compile error: "
+						+ singleLineError;
+				logError(questionId + "  │  Compile error: " + singleLineError);
 				appendErrorSummary(summaryLine);
 				String filteredError = filterNoteLines(error);
 				writeLogIfAvailable(submission, questionId, "compile-error", filteredError, "");
@@ -137,8 +138,8 @@ public class GradingEngine {
 
 			if (runResult.isTimedOut()) {
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": execution timed out");
-				String summaryLine = submission.getDisplayName() + " - " + questionId + ": execution timed out";
-				logRaw(summaryLine);
+				String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  Timed out";
+				logWarning(questionId + "  │  Timed out");
 				appendErrorSummary(summaryLine);
 				// Parse partial score from stdout before the hang
 				// Each tester prints "Passed" per successful test (score += 1 each)
@@ -154,9 +155,10 @@ public class GradingEngine {
 
 			if (!runResult.isSuccess()) {
 				String error = runResult.getStderr().isEmpty() ? runResult.getStdout() : runResult.getStderr();
-				String singleLineError = firstRelevantLine(error);
-				String summaryLine = submission.getDisplayName() + " - " + questionId + ": " + singleLineError;
-				logRaw(summaryLine);
+				String singleLineError = cleanCompilerMessage(firstRelevantLine(error));
+				String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  Runtime error: "
+						+ singleLineError;
+				logError(questionId + "  │  Runtime error: " + singleLineError);
 				appendErrorSummary(summaryLine);
 				String filteredError = filterNoteLines(error);
 				writeLogIfAvailable(submission, questionId, "runtime-error", filteredError, "");
@@ -197,11 +199,26 @@ public class GradingEngine {
 		consoleReporter.logWarning(message);
 	}
 
+	private void logError(String message) {
+		if (consoleReporter == null) {
+			return;
+		}
+		consoleReporter.logError(message);
+	}
+
 	private void logRaw(String message) {
 		if (consoleReporter == null) {
 			return;
 		}
 		consoleReporter.logRaw(message);
+	}
+
+	/** Strips leading "Filename.java:NN: " prefix from javac/java output lines. */
+	private String cleanCompilerMessage(String line) {
+		if (line == null)
+			return "";
+		// e.g. "Q1a.java:23: error: reached end of file" → "error: reached end of file"
+		return line.replaceFirst("^[^:]+\\.java:\\d+:\\s*", "");
 	}
 
 	private String firstRelevantLine(String text) {

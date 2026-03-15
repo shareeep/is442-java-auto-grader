@@ -1,18 +1,16 @@
 package com.is442.autograder.reporting;
 
-import com.is442.autograder.model.QuestionConfig;
-import com.is442.autograder.model.QuestionResult;
-import com.is442.autograder.model.StudentSubmission;
-import com.is442.autograder.util.StringUtils;
-
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.is442.autograder.model.QuestionConfig;
+import com.is442.autograder.model.QuestionResult;
+import com.is442.autograder.model.StudentSubmission;
 
 /**
  * Exports grading results to CSV in the format matching IS442-ScoreSheet.csv.
@@ -36,106 +34,85 @@ public class CSVExporter {
 	 * @param submissions
 	 *            graded submissions to export
 	 */
-	public void export(Path templateCsvPath, Path outputCsvPath, List<StudentSubmission> submissions)
-			throws IOException {
+	public void export(Path templateCsvPath, Path outputCsvPath, List<StudentSubmission> submissions,
+			List<QuestionConfig> questionConfigs) throws IOException {
 
-		// Build a map of username -> totalScore
-		Map<String, Double> scoreMap = new HashMap<>();
+		// Build a map of username -> submission
+		Map<String, StudentSubmission> subMap = new HashMap<>();
 		for (StudentSubmission sub : submissions) {
 			if (sub.getUsername() != null) {
-				scoreMap.put(sub.getUsername().toLowerCase(), sub.getTotalScore());
+				subMap.put(sub.getUsername().toLowerCase(), sub);
 			}
 		}
 
+		// Read the template to get OrgDefinedId / Username / Name for each student
 		List<String> inputLines = Files.readAllLines(templateCsvPath);
-		List<String> outputLines = new ArrayList<>();
 
-		for (int i = 0; i < inputLines.size(); i++) {
+		// Header: OrgDefinedId,Username,Name,Q1a,Q1b,...,Total
+		List<String> headerList = new ArrayList<>();
+		headerList.add("OrgDefinedId");
+		headerList.add("Username");
+		headerList.add("Name");
+		for (QuestionConfig qc : questionConfigs) {
+			headerList.add(qc.getQuestionId());
+		}
+		headerList.add("Total");
+
+		// Build one row per student from the template (preserves all students,
+		// sorted alphabetically by Name)
+		List<List<String>> dataRows = new ArrayList<>();
+		for (int i = 1; i < inputLines.size(); i++) {
 			String line = inputLines.get(i);
-
-			if (i == 0) {
-				// Header line — pass through
-				outputLines.add(line);
-				continue;
-			}
-
 			if (line.trim().isEmpty()) {
-				outputLines.add(line);
 				continue;
 			}
-
-			// Parse CSV line
 			String[] parts = line.split(",", -1);
-			if (parts.length < 8) {
-				outputLines.add(line); // malformed, keep as-is
+			if (parts.length < 5) {
 				continue;
 			}
 
-			// Username is in column index 1, prefixed with #
+			// Template columns: [0]=OrgDefinedId [1]=Username [2]=Last Name [3]=First Name
+			String orgId = parts[0].trim();
 			String rawUsername = parts[1].trim();
+			// Name = First Name + Last Name (cols 3 then 2); last name is "_" placeholder
+			String lastName = parts[2].trim().equals("_") ? "" : parts[2].trim();
+			String firstName = parts[3].trim();
+			String name = (firstName + (lastName.isEmpty() ? "" : " " + lastName)).trim();
+
 			String username = rawUsername.startsWith("#") ? rawUsername.substring(1) : rawUsername;
+			StudentSubmission sub = subMap.get(username.toLowerCase());
 
-			// Look up score
-			Double score = scoreMap.get(username.toLowerCase());
-			if (score != null) {
-				// Column index 5 = "Calculated Final Grade Numerator"
-				parts[5] = String.valueOf(score);
+			List<String> row = new ArrayList<>();
+			row.add(orgId);
+			row.add(rawUsername);
+			row.add(name);
+			for (QuestionConfig qc : questionConfigs) {
+				double score = sub != null
+						? sub.getResults().stream().filter(r -> r.getQuestionId().equals(qc.getQuestionId()))
+								.mapToDouble(QuestionResult::getScore).findFirst().orElse(0.0)
+						: 0.0;
+				row.add(formatScore(score));
 			}
+			row.add(sub != null ? formatScore(sub.getTotalScore()) : "0");
 
-			outputLines.add(String.join(",", parts));
+			dataRows.add(row);
 		}
 
-		// Ensure output directory exists
+		// Sort alphabetically by Name (col 2)
+		dataRows.sort((a, b) -> a.get(2).compareToIgnoreCase(b.get(2)));
+
+		List<String> outputLines = new ArrayList<>();
+		outputLines.add(String.join(",", headerList));
+		for (List<String> row : dataRows) {
+			outputLines.add(String.join(",", row));
+		}
+
 		Files.createDirectories(outputCsvPath.getParent());
 		Files.write(outputCsvPath, outputLines);
 	}
 
-	/**
-	 * Export a detailed grading report CSV with per-question scores.
-	 */
-	public void exportDetailed(Path outputPath, List<StudentSubmission> submissions,
-			List<QuestionConfig> questionConfigs) throws IOException {
-
-		Files.createDirectories(outputPath.getParent());
-
-		try (PrintWriter writer = new PrintWriter(Files.newBufferedWriter(outputPath))) {
-			// Header
-			StringBuilder header = new StringBuilder("OrgDefinedId,Username,Name");
-			for (QuestionConfig qc : questionConfigs) {
-				header.append(",").append(qc.getQuestionId());
-			}
-			header.append(",Total,Anomalies");
-			writer.println(header);
-
-			// Data rows — sorted by OrgDefinedId ("zzz" for missing, so they sort last)
-			List<StudentSubmission> sortedSubs = submissions.stream().sorted((a, b) -> {
-				String aId = StringUtils.normalizeOrgId(a.getOrgDefinedId());
-				String bId = StringUtils.normalizeOrgId(b.getOrgDefinedId());
-				int idCompare = aId.compareToIgnoreCase(bId);
-				return idCompare != 0 ? idCompare : a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
-			}).toList();
-
-			for (StudentSubmission sub : sortedSubs) {
-				StringBuilder row = new StringBuilder();
-				// OrgDefinedId: only populated if scoresheet was provided
-				row.append(sub.getOrgDefinedId() != null ? sub.getOrgDefinedId() : "");
-				row.append(",").append(sub.getDisplayName());
-				row.append(",").append(sub.getName() != null ? sub.getName() : "");
-
-				for (QuestionConfig qc : questionConfigs) {
-					double score = sub.getResults().stream().filter(r -> r.getQuestionId().equals(qc.getQuestionId()))
-							.mapToDouble(QuestionResult::getScore).findFirst().orElse(0.0);
-					row.append(",").append(score);
-				}
-
-				row.append(",").append(sub.getTotalScore());
-
-				// Anomalies count
-				row.append(",").append(sub.getAnomalies().size());
-
-				writer.println(row);
-			}
-		}
+	private String formatScore(double score) {
+		return String.format("%.1f", score);
 	}
 
 }

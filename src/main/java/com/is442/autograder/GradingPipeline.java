@@ -101,6 +101,11 @@ public class GradingPipeline {
 
 			// 2. Process each ZIP
 			for (int i = 0; i < zipFiles.size(); i++) {
+				// Honour a stop request (user pressed 'q' during grading)
+				if (consoleReporter.isStopRequested()) {
+					break;
+				}
+
 				Path zipFile = zipFiles.get(i);
 				String zipName = zipFile.getFileName().toString();
 
@@ -117,6 +122,17 @@ public class GradingPipeline {
 
 					// Validate
 					submissionValidator.validate(submissionRoot, questionConfigs, submission);
+
+					// Log structural/validation anomalies immediately so the instructor
+					// sees them live (compilation/runtime anomalies are logged by GradingEngine)
+					consoleReporter.beginStudentLog(submission.getDisplayName());
+					for (com.is442.autograder.model.Anomaly a : submission.getAnomalies()) {
+						if (a.getSeverity() == com.is442.autograder.model.Anomaly.Severity.ERROR) {
+							consoleReporter.logError(a.getDescription());
+						} else {
+							consoleReporter.logWarning(a.getDescription());
+						}
+					}
 
 					// Grade
 					gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
@@ -136,6 +152,11 @@ public class GradingPipeline {
 			consoleReporter.endProgress();
 			System.out.println();
 
+			if (consoleReporter.isStopRequested()) {
+				System.out.println(
+						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
+			}
+
 			// 3. Fill missing names using username-derived fallback
 			for (StudentSubmission sub : submissions) {
 				if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
@@ -152,23 +173,21 @@ public class GradingPipeline {
 			consoleReporter.printSummary(submissions, questionConfigs);
 
 			// 6. Export scoresheet (if template provided)
-			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+			if (!consoleReporter.isStopRequested() && scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
-				csvExporter.export(scoresheetPath, outputCsv, submissions);
+				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
 			}
 
-			// 7. Export detailed report
-			Path detailedCsv = runOutputDir.resolve("detailed-report.csv");
-			csvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
-			System.out.println("Detailed report exported to: " + detailedCsv);
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
-			// 8. Export PDF report
-			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
-			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
-			System.out.println("PDF report exported to: " + pdfReport);
+			// 7. Export PDF report
+			if (!consoleReporter.isStopRequested()) {
+				Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
+				new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
+				System.out.println("PDF report exported to: " + pdfReport);
+			}
 
 			return submissions;
 		} finally {
