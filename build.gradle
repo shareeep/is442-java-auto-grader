@@ -22,6 +22,8 @@ repositories {
 }
 
 dependencies {
+    implementation platform('org.springframework.boot:spring-boot-dependencies:3.4.1')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.jfree:jfreechart:1.5.4'
     implementation 'com.github.librepdf:openpdf:1.3.42'
     implementation 'com.googlecode.lanterna:lanterna:3.1.2'
