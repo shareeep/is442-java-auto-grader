@@ -47,7 +47,8 @@ public class ClaudeApiClient {
 	 * @return raw Java code string containing the generated test case blocks
 	 */
 	public String generateTesterCode(String questionId, String testerClassName, String examContext,
-			String existingTesterCode, int numCases, String additionalContext) throws IOException, InterruptedException {
+			String existingTesterCode, int numCases, String additionalContext)
+			throws IOException, InterruptedException {
 
 		String apiKey = EnvLoader.get("OPENROUTER_API_KEY");
 		if (apiKey == null || apiKey.isBlank()) {
@@ -116,8 +117,8 @@ public class ClaudeApiClient {
 				.append(" new test cases as standalone { ... } blocks (no class wrapper, no imports). ")
 				.append("Each block must test the SAME method as shown in the existing tester above. ")
 				.append("Use WEIGHT_1, WEIGHT_2, ... WEIGHT_").append(numCases)
-				.append(" as weight placeholders (one per test case). ")
-				.append("You MUST produce exactly ").append(numCases).append(" { ... } blocks.");
+				.append(" as weight placeholders (one per test case). ").append("You MUST produce exactly ")
+				.append(numCases).append(" { ... } blocks.");
 
 		return sb.toString();
 	}

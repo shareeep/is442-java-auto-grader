@@ -103,8 +103,8 @@ public class GenerationController {
 		Path testersDir = testersDirStr != null ? Paths.get(testersDirStr) : null;
 		Path templateDir = templateDirStr != null ? Paths.get(templateDirStr) : null;
 
-		QuestionConfig qc = appConfig.getQuestionConfigs().stream()
-				.filter(q -> q.getQuestionId().equals(questionId)).findFirst().orElse(null);
+		QuestionConfig qc = appConfig.getQuestionConfigs().stream().filter(q -> q.getQuestionId().equals(questionId))
+				.findFirst().orElse(null);
 
 		if (qc == null) {
 			return ResponseEntity.badRequest()
@@ -124,8 +124,8 @@ public class GenerationController {
 					templateDir);
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
-			return ResponseEntity.ok(new GenerationResult(questionId, List.of(), false,
-					"Generation failed: " + e.getMessage(), ""));
+			return ResponseEntity
+					.ok(new GenerationResult(questionId, List.of(), false, "Generation failed: " + e.getMessage(), ""));
 		}
 	}
 
