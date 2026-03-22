@@ -1,11 +1,19 @@
 package com.is442.autograder;
 
 import com.is442.autograder.config.AppConfig;
+import com.is442.autograder.config.EnvLoader;
+import com.is442.autograder.generation.TestGenerationService;
+import com.is442.autograder.generation.TesterFileWriter;
+import com.is442.autograder.model.GeneratedTestCase;
+import com.is442.autograder.model.GenerationResult;
+import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.ui.ConsoleUI;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 /**
  * Entry point for the IS442 Auto Grading System.
@@ -20,6 +28,14 @@ import java.nio.file.Paths;
 public class App {
 
 	public static void main(String[] args) {
+		EnvLoader.load();
+
+		if (hasFlag(args, "--web")) {
+			// Web UI mode — launch Spring Boot
+			com.is442.autograder.web.WebApplication.main(args);
+			return;
+		}
+
 		try {
 			AppConfig config = new AppConfig();
 
@@ -27,8 +43,11 @@ public class App {
 				// Interactive mode
 				ConsoleUI ui = new ConsoleUI(config);
 				ui.start();
+			} else if (hasFlag(args, "--generate-tests")) {
+				// CLI generation mode
+				runGenerateCli(config, args);
 			} else {
-				// CLI mode
+				// CLI grading mode
 				runCli(config, args);
 			}
 		} catch (IOException e) {
@@ -74,17 +93,103 @@ public class App {
 		}
 	}
 
+	/**
+	 * Non-interactive CLI mode for test case generation. Generates with equal
+	 * weights and auto-saves.
+	 */
+	private static void runGenerateCli(AppConfig config, String[] args) {
+		Path examPdf = null;
+		Path testersDir = null;
+		Path outputDir = Paths.get("generated-testers");
+		int numCases = config.getAiDefaultCasesPerQuestion();
+
+		for (int i = 0; i < args.length - 1; i++) {
+			switch (args[i]) {
+				case "--exam" -> examPdf = Paths.get(args[++i]);
+				case "--testers", "-t" -> testersDir = Paths.get(args[++i]);
+				case "--num-cases" -> numCases = Integer.parseInt(args[++i]);
+				case "--output", "-o" -> outputDir = Paths.get(args[++i]);
+			}
+		}
+
+		if (examPdf == null) {
+			System.err.println("Error: --exam <path> is required for --generate-tests.");
+			System.exit(1);
+		}
+
+		if (EnvLoader.get("OPENROUTER_API_KEY") == null) {
+			System.err.println("Error: OPENROUTER_API_KEY is not set (env var or .env file).");
+			System.exit(1);
+		}
+
+		if (testersDir == null) {
+			testersDir = Paths.get("is442-project-materials/Tester-Files");
+		}
+
+		TestGenerationService service = new TestGenerationService(config);
+		TesterFileWriter writer = new TesterFileWriter();
+		List<QuestionConfig> questions = config.getQuestionConfigs();
+
+		for (QuestionConfig qc : questions) {
+			System.out.println("Generating for " + qc.getQuestionId() + "...");
+			Path existingTester = testersDir.resolve(qc.getTesterClassName() + ".java");
+			if (!Files.exists(existingTester)) {
+				existingTester = null;
+			}
+
+			try {
+				GenerationResult result = service.generateForQuestion(qc, examPdf, existingTester, numCases);
+
+				// Auto-save with equal weights (1.0 each)
+				List<GeneratedTestCase> cases = result.getCases();
+				String existingCode = existingTester != null ? Files.readString(existingTester) : null;
+				Path saved = writer.write(qc.getTesterClassName(), existingCode, result.getGeneratedCode(), cases,
+						testersDir, outputDir);
+
+				System.out
+						.println("  Saved: " + saved + " (compile: " + (result.isCompiledOk() ? "OK" : "FAILED") + ")");
+				if (!result.isCompiledOk()) {
+					System.err.println("  Compile errors:\n" + result.getCompileErrors());
+				}
+			} catch (Exception e) {
+				System.err.println("  Error for " + qc.getQuestionId() + ": " + e.getMessage());
+			}
+		}
+	}
+
+	private static boolean hasFlag(String[] args, String flag) {
+		for (String arg : args) {
+			if (arg.equals(flag)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static void printUsage() {
 		System.out.println("IS442 Auto Grading System");
 		System.out.println();
 		System.out.println("Usage: java -jar autograder.jar [options]");
 		System.out.println();
-		System.out.println("Options:");
+		System.out.println("Grading options:");
 		System.out.println("  --submissions, -s <dir>    Directory containing student ZIP files (required)");
 		System.out.println("  --testers, -t <dir>        Directory containing tester .java files (required)");
 		System.out.println("  --scoresheet, -c <file>    Path to template CSV scoresheet (optional)");
 		System.out.println("  --output, -o <dir>         Output directory (default: ./output)");
+		System.out.println();
+		System.out.println("Generation options:");
+		System.out.println("  --generate-tests           Run AI test case generation (non-interactive)");
+		System.out.println("  --exam <path>              Path to exam PDF (required with --generate-tests)");
+		System.out.println(
+				"  --testers, -t <dir>        Tester files directory (default: is442-project-materials/Tester-Files)");
+		System.out.println("  --num-cases <n>            Cases per question (default from config)");
+		System.out.println("  --output, -o <dir>         Output directory (default: ./generated-testers)");
+		System.out.println("  API key read from OPENROUTER_API_KEY environment variable (required).");
+		System.out.println();
 		System.out.println("  --help, -h                 Show this help message");
+		System.out.println();
+		System.out.println("Web UI:");
+		System.out.println("  --web                      Launch web UI (Spring Boot) on port 8080");
 		System.out.println();
 		System.out.println("If no arguments are provided, interactive mode is launched.");
 	}

@@ -102,6 +102,21 @@ public class AppConfig {
 		return properties.getProperty("assessment.template.folder", "RenameToYourUsername");
 	}
 
+	/** AI model name (default: claude-sonnet-4-6). */
+	public String getAiModel() {
+		return properties.getProperty("ai.model", "claude-sonnet-4-6");
+	}
+
+	/** Max tokens for AI generation (default: 4096). */
+	public int getAiMaxTokens() {
+		return Integer.parseInt(properties.getProperty("ai.max.tokens", "4096"));
+	}
+
+	/** Default number of test cases to generate per question (default: 3). */
+	public int getAiDefaultCasesPerQuestion() {
+		return Integer.parseInt(properties.getProperty("ai.default.cases.per.question", "3"));
+	}
+
 	private String[] getArray(String key) {
 		String value = properties.getProperty(key, "");
 		if (value.isEmpty()) {

@@ -48,3 +48,10 @@ is442-project-materials/
 
 # Output files
 output*/
+# Environment secrets
+.env
+
+# Frontend build artifacts
+src/main/resources/static/
+frontend/node_modules/
+frontend/dist/
