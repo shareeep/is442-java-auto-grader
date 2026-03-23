@@ -24,15 +24,15 @@ final class ChartDatasetFactory {
 			int high = (int) Math.min(low + binWidth - 1, (int) maxPossible - 1);
 			final double lowerBound = low;
 			final double upperBound = high;
-			long count = submissions.stream()
-					.filter(submission -> submission.getTotalScore() >= lowerBound
-							&& submission.getTotalScore() <= upperBound)
+			long count = submissions.stream().filter(
+					submission -> submission.getTotalScore() >= lowerBound && submission.getTotalScore() <= upperBound)
 					.count();
 			String label = low == high ? String.valueOf(low) : low + "–" + high;
 			dataset.addValue(count, "Students", label);
 		}
 
-		long perfectCount = submissions.stream().filter(submission -> submission.getTotalScore() >= maxPossible).count();
+		long perfectCount = submissions.stream().filter(submission -> submission.getTotalScore() >= maxPossible)
+				.count();
 		dataset.addValue(perfectCount, "Students", (int) maxPossible + " (full)");
 		return dataset;
 	}

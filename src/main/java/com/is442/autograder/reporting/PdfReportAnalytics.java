@@ -26,9 +26,7 @@ final class PdfReportAnalytics {
 				.filter(s -> s.getAnomalies().stream().anyMatch(a -> a.getSeverity() == Anomaly.Severity.ERROR))
 				.count();
 		long successful = total - withErrors;
-		long passing = classMax > 0
-				? submissions.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count()
-				: 0;
+		long passing = classMax > 0 ? submissions.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count() : 0;
 		long totalAnomalies = submissions.stream().mapToLong(s -> s.getAnomalies().size()).sum();
 		double average = submissions.stream().mapToDouble(StudentSubmission::getTotalScore).average().orElse(0);
 		double highest = submissions.stream().mapToDouble(StudentSubmission::getTotalScore).max().orElse(0);
@@ -38,7 +36,8 @@ final class PdfReportAnalytics {
 				median);
 	}
 
-	static List<QuestionStats> computeQuestionStats(List<StudentSubmission> submissions, List<QuestionConfig> questions) {
+	static List<QuestionStats> computeQuestionStats(List<StudentSubmission> submissions,
+			List<QuestionConfig> questions) {
 		int total = submissions.size();
 		return questions.stream().map(question -> {
 			String questionId = question.getQuestionId();
@@ -46,8 +45,8 @@ final class PdfReportAnalytics {
 					.filter(r -> r.getQuestionId().equals(questionId) && (r.isCompiled() || r.isExecuted())).count();
 			long fullPass = submissions.stream().flatMap(s -> s.getResults().stream())
 					.filter(r -> r.getQuestionId().equals(questionId) && r.getScore() >= r.getMaxScore()).count();
-			long partial = submissions.stream().flatMap(s -> s.getResults().stream())
-					.filter(r -> r.getQuestionId().equals(questionId) && r.getScore() > 0 && r.getScore() < r.getMaxScore())
+			long partial = submissions.stream().flatMap(s -> s.getResults().stream()).filter(
+					r -> r.getQuestionId().equals(questionId) && r.getScore() > 0 && r.getScore() < r.getMaxScore())
 					.count();
 			double average = submissions.stream().flatMap(s -> s.getResults().stream())
 					.filter(r -> r.getQuestionId().equals(questionId)).mapToDouble(QuestionResult::getScore).average()
@@ -57,9 +56,8 @@ final class PdfReportAnalytics {
 	}
 
 	static Map<Anomaly.Type, Long> countAnomaliesByType(List<StudentSubmission> submissions) {
-		return submissions.stream().flatMap(s -> s.getAnomalies().stream())
-				.collect(Collectors.groupingBy(Anomaly::getType, () -> new EnumMap<>(Anomaly.Type.class),
-						Collectors.counting()));
+		return submissions.stream().flatMap(s -> s.getAnomalies().stream()).collect(Collectors
+				.groupingBy(Anomaly::getType, () -> new EnumMap<>(Anomaly.Type.class), Collectors.counting()));
 	}
 
 	static InsightStats computeInsightStats(List<StudentSubmission> submissions, List<QuestionConfig> questions,
@@ -72,14 +70,12 @@ final class PdfReportAnalytics {
 		long timeouts = submissions.stream()
 				.filter(s -> s.getAnomalies().stream().anyMatch(a -> a.getType() == Anomaly.Type.EXECUTION_TIMEOUT))
 				.count();
-		long structuralIssues = submissions.stream()
-				.filter(s -> !anomaliesInCategory(s, structuralTypes).isEmpty()).count();
-		long metadataIssues = submissions.stream()
-				.filter(s -> !anomaliesInCategory(s, metadataTypes).isEmpty()).count();
+		long structuralIssues = submissions.stream().filter(s -> !anomaliesInCategory(s, structuralTypes).isEmpty())
+				.count();
+		long metadataIssues = submissions.stream().filter(s -> !anomaliesInCategory(s, metadataTypes).isEmpty())
+				.count();
 		long zeroScore = submissions.stream().filter(s -> s.getTotalScore() == 0).count();
-		long passing = classMax > 0
-				? submissions.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count()
-				: 0;
+		long passing = classMax > 0 ? submissions.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count() : 0;
 		QuestionConfig hardestQuestion = questions.stream()
 				.min(Comparator.comparingDouble(question -> passRateForQuestion(submissions, question))).orElse(null);
 		QuestionConfig easiestQuestion = questions.stream()
@@ -92,17 +88,20 @@ final class PdfReportAnalytics {
 		if (submissions.isEmpty()) {
 			return 0.0;
 		}
-		long passed = submissions.stream().flatMap(s -> s.getResults().stream()).filter(
-				r -> r.getQuestionId().equals(question.getQuestionId()) && r.getScore() >= r.getMaxScore()).count();
+		long passed = submissions.stream().flatMap(s -> s.getResults().stream())
+				.filter(r -> r.getQuestionId().equals(question.getQuestionId()) && r.getScore() >= r.getMaxScore())
+				.count();
 		return (double) passed / submissions.size();
 	}
 
 	static List<Anomaly> anomaliesInCategory(StudentSubmission submission, Set<Anomaly.Type> category) {
-		return submission.getAnomalies().stream().filter(a -> category.contains(a.getType())).collect(Collectors.toList());
+		return submission.getAnomalies().stream().filter(a -> category.contains(a.getType()))
+				.collect(Collectors.toList());
 	}
 
 	static double computeMedian(List<StudentSubmission> submissions) {
-		List<Double> scores = submissions.stream().map(StudentSubmission::getTotalScore).sorted().collect(Collectors.toList());
+		List<Double> scores = submissions.stream().map(StudentSubmission::getTotalScore).sorted()
+				.collect(Collectors.toList());
 		if (scores.isEmpty()) {
 			return 0;
 		}

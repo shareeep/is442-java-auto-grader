@@ -47,7 +47,8 @@ final class ConsoleSummaryPrinter {
 				continue;
 			}
 			for (Anomaly anomaly : sub.getAnomalies()) {
-				String icon = anomaly.getSeverity() == Anomaly.Severity.ERROR ? red + "  [ERROR] "
+				String icon = anomaly.getSeverity() == Anomaly.Severity.ERROR
+						? red + "  [ERROR] "
 						: yellow + "  [WARN]  ";
 				System.out.println(icon + sub.getDisplayName() + " - " + anomaly.getDescription() + reset);
 			}
@@ -62,8 +63,7 @@ final class ConsoleSummaryPrinter {
 			System.out.printf("| %-5s", qc.getQuestionId());
 		}
 		System.out.printf("| %-6s%n" + reset, "Total");
-		System.out.println("-".repeat(21) + ("+" + "-".repeat(6)).repeat(questionConfigs.size()) + "+"
-				+ "-".repeat(7));
+		System.out.println("-".repeat(21) + ("+" + "-".repeat(6)).repeat(questionConfigs.size()) + "+" + "-".repeat(7));
 		for (StudentSubmission sub : submissions) {
 			System.out.printf(" %-20s", sub.getDisplayName());
 			for (QuestionConfig qc : questionConfigs) {

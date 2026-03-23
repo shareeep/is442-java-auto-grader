@@ -189,8 +189,7 @@ public class ConsoleReporter {
 						pad("  \u26A0  Stopping \u2014 waiting for current student to finish...", width));
 			} else {
 				graphics.setForegroundColor(TextColor.ANSI.YELLOW);
-				graphics.putString(0, 1,
-						pad("  Press q to stop grading after the current student finishes.", width));
+				graphics.putString(0, 1, pad("  Press q to stop grading after the current student finishes.", width));
 			}
 
 			graphics.setForegroundColor(TextColor.ANSI.WHITE);
