@@ -30,72 +30,45 @@ import com.is442.autograder.model.StudentSubmission;
  */
 public final class ChartGenerator {
 
-	private ChartGenerator() {
-	}
-
-	// ── colours ─────────────────────────────────────────────────────────────
 	private static final Color BLUE = new Color(52, 120, 200);
 	private static final Color GREEN = new Color(46, 160, 90);
 	private static final Color RED = new Color(210, 80, 60);
 	private static final Color GRID = new Color(220, 220, 220);
 
-	// ── public chart builders ────────────────────────────────────────────────
+	private ChartGenerator() {
+	}
 
 	/** Score distribution bar chart (vertical). */
-	public static byte[] scoreDistributionChart(List<StudentSubmission> subs, double maxPossible) {
-		DefaultCategoryDataset ds = new DefaultCategoryDataset();
-		int binWidth = Math.max(1, (int) Math.ceil(maxPossible / 5.0));
-		for (int lo = 0; lo < (int) maxPossible; lo += binWidth) {
-			int hi = (int) Math.min(lo + binWidth - 1, (int) maxPossible - 1);
-			final double flo = lo;
-			final double fhi = hi;
-			long cnt = subs.stream().filter(s -> s.getTotalScore() >= flo && s.getTotalScore() <= fhi).count();
-			String label = (lo == hi) ? String.valueOf(lo) : lo + "–" + hi;
-			ds.addValue(cnt, "Students", label);
-		}
-		long perfect = subs.stream().filter(s -> s.getTotalScore() >= maxPossible).count();
-		ds.addValue(perfect, "Students", (int) maxPossible + " (full)");
-
-		JFreeChart chart = ChartFactory.createBarChart("Score Distribution", "Score Range", "Students", ds,
+	public static byte[] scoreDistributionChart(List<StudentSubmission> submissions, double maxPossible) {
+		DefaultCategoryDataset dataset = ChartDatasetFactory.scoreDistributionDataset(submissions, maxPossible);
+		JFreeChart chart = ChartFactory.createBarChart("Score Distribution", "Score Range", "Students", dataset,
 				PlotOrientation.VERTICAL, false, false, false);
 		applyStyle(chart, BLUE);
 		return toPng(chart, 560, 300);
 	}
 
 	/** Pass rate per question horizontal bar chart (%). */
-	public static byte[] passRateChart(List<StudentSubmission> subs, List<QuestionConfig> qcs) {
-		DefaultCategoryDataset ds = new DefaultCategoryDataset();
-		int total = subs.size();
-		for (QuestionConfig qc : qcs) {
-			long passed = subs.stream().flatMap(s -> s.getResults().stream())
-					.filter(r -> r.getQuestionId().equals(qc.getQuestionId()) && r.getScore() >= r.getMaxScore())
-					.count();
-			double pct = total == 0 ? 0 : (double) passed / total * 100.0;
-			ds.addValue(pct, "Pass Rate", qc.getQuestionId());
-		}
-		JFreeChart chart = ChartFactory.createBarChart("Full-Pass Rate by Question", "Question", "Pass Rate (%)", ds,
-				PlotOrientation.HORIZONTAL, false, true, false);
+	public static byte[] passRateChart(List<StudentSubmission> submissions, List<QuestionConfig> questions) {
+		DefaultCategoryDataset dataset = ChartDatasetFactory.passRateDataset(submissions, questions);
+		JFreeChart chart = ChartFactory.createBarChart("Full-Pass Rate by Question", "Question", "Pass Rate (%)",
+				dataset, PlotOrientation.HORIZONTAL, false, true, false);
 		applyStyle(chart, GREEN);
-		CategoryPlot greenPlot = (CategoryPlot) chart.getPlot();
-		greenPlot.getRangeAxis().setRange(0, 100);
-		greenPlot.getDomainAxis().setMaximumCategoryLabelLines(2);
+		CategoryPlot plot = (CategoryPlot) chart.getPlot();
+		plot.getRangeAxis().setRange(0, 100);
+		plot.getDomainAxis().setMaximumCategoryLabelLines(2);
 		return toPng(chart, 600, 280);
 	}
 
 	/** Anomaly frequency horizontal bar chart (top 8 types). */
 	public static byte[] anomalyFrequencyChart(Map<Anomaly.Type, Long> typeCounts) {
-		DefaultCategoryDataset ds = new DefaultCategoryDataset();
-		typeCounts.entrySet().stream().sorted(Map.Entry.<Anomaly.Type, Long>comparingByValue().reversed()).limit(8)
-				.forEach(e -> ds.addValue(e.getValue(), "Occurrences", friendlyName(e.getKey())));
-		JFreeChart chart = ChartFactory.createBarChart("Anomaly Frequency", "Issue Type", "Occurrences", ds,
+		DefaultCategoryDataset dataset = ChartDatasetFactory.anomalyFrequencyDataset(typeCounts);
+		JFreeChart chart = ChartFactory.createBarChart("Anomaly Frequency", "Issue Type", "Occurrences", dataset,
 				PlotOrientation.HORIZONTAL, false, true, false);
 		applyStyle(chart, RED);
-		CategoryPlot redPlot = (CategoryPlot) chart.getPlot();
-		redPlot.getDomainAxis().setMaximumCategoryLabelLines(2);
+		CategoryPlot plot = (CategoryPlot) chart.getPlot();
+		plot.getDomainAxis().setMaximumCategoryLabelLines(2);
 		return toPng(chart, 600, 340);
 	}
-
-	// ── helpers ──────────────────────────────────────────────────────────────
 
 	private static void applyStyle(JFreeChart chart, Color barColor) {
 		chart.setBackgroundPaint(Color.WHITE);
@@ -120,14 +93,14 @@ public final class ChartGenerator {
 	}
 
 	private static byte[] toPng(JFreeChart chart, int width, int height) {
-		BufferedImage img = chart.createBufferedImage(width, height);
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		BufferedImage image = chart.createBufferedImage(width, height);
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		try {
-			ImageIO.write(img, "PNG", out);
+			ImageIO.write(image, "PNG", output);
 		} catch (IOException e) {
 			throw new RuntimeException("Chart PNG generation failed", e);
 		}
-		return out.toByteArray();
+		return output.toByteArray();
 	}
 
 	static String friendlyName(Anomaly.Type type) {

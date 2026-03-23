@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -170,26 +169,17 @@ public class PdfReportGenerator {
 	private void writeSectionOverview(Document doc, List<StudentSubmission> subs, double classMax) throws IOException {
 		addSectionHeading(doc, "1", "Grading Overview");
 
-		int total = subs.size();
-		long withErrors = subs.stream()
-				.filter(s -> s.getAnomalies().stream().anyMatch(a -> a.getSeverity() == Anomaly.Severity.ERROR))
-				.count();
-		long successful = total - withErrors;
-		long passing = classMax > 0 ? subs.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count() : 0;
-		long totalAnomalies = subs.stream().mapToLong(s -> s.getAnomalies().size()).sum();
-		double avg = subs.stream().mapToDouble(StudentSubmission::getTotalScore).average().orElse(0);
-		double highest = subs.stream().mapToDouble(StudentSubmission::getTotalScore).max().orElse(0);
-		double lowest = subs.stream().mapToDouble(StudentSubmission::getTotalScore).min().orElse(0);
-		double median = computeMedian(subs);
+		PdfReportAnalytics.OverviewStats stats = PdfReportAnalytics.computeOverviewStats(subs, classMax);
 
-		String[][] summaryRows = {{"Total Submissions Processed", String.valueOf(total)},
-				{"Submissions Fully Processed", successful + " / " + total},
-				{"Submissions With Errors", withErrors + " / " + total}, {"Passing (>= 50%)", passing + " / " + total},
-				{"Total Anomalies Detected", String.valueOf(totalAnomalies)},
-				{"Average Score", fmt(avg) + " / " + fmt(classMax)},
-				{"Median Score", fmt(median) + " / " + fmt(classMax)},
-				{"Highest Score", fmt(highest) + " / " + fmt(classMax)},
-				{"Lowest Score", fmt(lowest) + " / " + fmt(classMax)},};
+		String[][] summaryRows = {{"Total Submissions Processed", String.valueOf(stats.total())},
+				{"Submissions Fully Processed", stats.successful() + " / " + stats.total()},
+				{"Submissions With Errors", stats.withErrors() + " / " + stats.total()},
+				{"Passing (>= 50%)", stats.passing() + " / " + stats.total()},
+				{"Total Anomalies Detected", String.valueOf(stats.totalAnomalies())},
+				{"Average Score", fmt(stats.average()) + " / " + fmt(classMax)},
+				{"Median Score", fmt(stats.median()) + " / " + fmt(classMax)},
+				{"Highest Score", fmt(stats.highest()) + " / " + fmt(classMax)},
+				{"Lowest Score", fmt(stats.lowest()) + " / " + fmt(classMax)},};
 		addTwoColumnTable(doc, "Metric", "Value", summaryRows);
 
 		if (classMax > 0 && !subs.isEmpty()) {
@@ -212,24 +202,17 @@ public class PdfReportGenerator {
 			throws IOException {
 		addSectionHeading(doc, "2", "Question Performance");
 
-		int total = subs.size();
 		PdfPTable tbl = newTable(new float[]{70, 55, 65, 70, 70, 70});
 		addHeaderRow(tbl, "Question", "Max Pts", "Avg Score", "Attempted", "Full Pass", "Partial");
 
 		boolean alt = false;
-		for (QuestionConfig qc : qcs) {
-			String qId = qc.getQuestionId();
-			long attempted = subs.stream().flatMap(s -> s.getResults().stream())
-					.filter(r -> r.getQuestionId().equals(qId) && (r.isCompiled() || r.isExecuted())).count();
-			long fullPass = subs.stream().flatMap(s -> s.getResults().stream())
-					.filter(r -> r.getQuestionId().equals(qId) && r.getScore() >= r.getMaxScore()).count();
-			long partial = subs.stream().flatMap(s -> s.getResults().stream())
-					.filter(r -> r.getQuestionId().equals(qId) && r.getScore() > 0 && r.getScore() < r.getMaxScore())
-					.count();
-			double avg = subs.stream().flatMap(s -> s.getResults().stream()).filter(r -> r.getQuestionId().equals(qId))
-					.mapToDouble(QuestionResult::getScore).average().orElse(0);
-			addDataRow(tbl, alt, qId, fmt(qc.getMaxScore()), fmt(avg) + " / " + fmt(qc.getMaxScore()),
-					attempted + " / " + total, pct((double) fullPass / total), pct((double) partial / total));
+		for (PdfReportAnalytics.QuestionStats stats : PdfReportAnalytics.computeQuestionStats(subs, qcs)) {
+			QuestionConfig question = stats.question();
+			addDataRow(tbl, alt, question.getQuestionId(), fmt(question.getMaxScore()),
+					fmt(stats.averageScore()) + " / " + fmt(question.getMaxScore()),
+					stats.attempted() + " / " + stats.totalSubmissions(),
+					pct((double) stats.fullPass() / stats.totalSubmissions()),
+					pct((double) stats.partial() / stats.totalSubmissions()));
 			alt = !alt;
 		}
 		doc.add(tbl);
@@ -248,18 +231,19 @@ public class PdfReportGenerator {
 
 		// Key insight bullets
 		if (!qcs.isEmpty()) {
-			QuestionConfig hardest = qcs.stream().min(Comparator.comparingDouble(qc -> passRateForQuestion(subs, qc)))
-					.orElse(null);
-			QuestionConfig easiest = qcs.stream().max(Comparator.comparingDouble(qc -> passRateForQuestion(subs, qc)))
-					.orElse(null);
+			PdfReportAnalytics.InsightStats insightStats = PdfReportAnalytics.computeInsightStats(subs, qcs,
+					STRUCTURAL_TYPES, METADATA_TYPES);
+			QuestionConfig hardest = insightStats.hardestQuestion();
+			QuestionConfig easiest = insightStats.easiestQuestion();
 			if (hardest != null) {
 				addSubHeading(doc, "Key Insight");
 				StringBuilder insight = new StringBuilder();
 				insight.append("• ").append(hardest.getQuestionId()).append(" had the lowest full-pass rate (")
-						.append(pct(passRateForQuestion(subs, hardest))).append(") — students struggled most here.");
+						.append(pct(PdfReportAnalytics.passRateForQuestion(subs, hardest)))
+						.append(") — students struggled most here.");
 				if (easiest != null && !easiest.getQuestionId().equals(hardest.getQuestionId())) {
 					insight.append("\n• ").append(easiest.getQuestionId()).append(" had the highest full-pass rate (")
-							.append(pct(passRateForQuestion(subs, easiest))).append(").");
+							.append(pct(PdfReportAnalytics.passRateForQuestion(subs, easiest))).append(").");
 				}
 				long zeroScore = subs.stream().filter(s -> s.getTotalScore() == 0).count();
 				if (zeroScore > 0) {
@@ -282,8 +266,7 @@ public class PdfReportGenerator {
 	private void writeSectionAnomalies(Document doc, List<StudentSubmission> subs) throws IOException {
 		addSectionHeading(doc, "3", "Anomaly Summary");
 
-		Map<Anomaly.Type, Long> counts = subs.stream().flatMap(s -> s.getAnomalies().stream()).collect(Collectors
-				.groupingBy(Anomaly::getType, () -> new EnumMap<>(Anomaly.Type.class), Collectors.counting()));
+		Map<Anomaly.Type, Long> counts = PdfReportAnalytics.countAnomaliesByType(subs);
 
 		if (counts.isEmpty()) {
 			addBodyText(doc, "No anomalies were detected.");
@@ -353,7 +336,7 @@ public class PdfReportGenerator {
 		addHeaderRow(tbl, "Student", "Status", "Issues");
 		boolean alt = false;
 		for (StudentSubmission sub : subs) {
-			List<Anomaly> structural = anomaliesInCategory(sub, STRUCTURAL_TYPES);
+			List<Anomaly> structural = PdfReportAnalytics.anomaliesInCategory(sub, STRUCTURAL_TYPES);
 			boolean ok = structural.isEmpty();
 			String status = ok ? "OK" : "ISSUES";
 			String issues = ok
@@ -371,11 +354,12 @@ public class PdfReportGenerator {
 		doc.add(tbl);
 		gap(doc);
 
-		boolean anyIssue = subs.stream().anyMatch(s -> !anomaliesInCategory(s, STRUCTURAL_TYPES).isEmpty());
+		boolean anyIssue = subs.stream()
+				.anyMatch(s -> !PdfReportAnalytics.anomaliesInCategory(s, STRUCTURAL_TYPES).isEmpty());
 		if (anyIssue) {
 			addSubHeading(doc, "Detail — Submissions With Structural Issues");
 			for (StudentSubmission sub : subs) {
-				List<Anomaly> structural = anomaliesInCategory(sub, STRUCTURAL_TYPES);
+				List<Anomaly> structural = PdfReportAnalytics.anomaliesInCategory(sub, STRUCTURAL_TYPES);
 				if (structural.isEmpty()) {
 					continue;
 				}
@@ -751,22 +735,18 @@ public class PdfReportGenerator {
 		}
 
 		int total = subs.size();
-		double classMax = qcs.stream().mapToDouble(QuestionConfig::getMaxScore).sum();
-		long compileErrors = subs.stream()
-				.filter(s -> s.getAnomalies().stream().anyMatch(a -> a.getType() == Anomaly.Type.COMPILATION_ERROR))
-				.count();
-		long timeouts = subs.stream()
-				.filter(s -> s.getAnomalies().stream().anyMatch(a -> a.getType() == Anomaly.Type.EXECUTION_TIMEOUT))
-				.count();
-		long structIssues = subs.stream().filter(s -> !anomaliesInCategory(s, STRUCTURAL_TYPES).isEmpty()).count();
-		long metaIssues = subs.stream().filter(s -> !anomaliesInCategory(s, METADATA_TYPES).isEmpty()).count();
-		long zeroScore = subs.stream().filter(s -> s.getTotalScore() == 0).count();
-		long passing = classMax > 0 ? subs.stream().filter(s -> s.getTotalScore() / classMax >= 0.5).count() : 0;
+		PdfReportAnalytics.InsightStats insightStats = PdfReportAnalytics.computeInsightStats(subs, qcs,
+				STRUCTURAL_TYPES, METADATA_TYPES);
+		double classMax = insightStats.classMax();
+		long compileErrors = insightStats.compileErrors();
+		long timeouts = insightStats.timeouts();
+		long structIssues = insightStats.structuralIssues();
+		long metaIssues = insightStats.metadataIssues();
+		long zeroScore = insightStats.zeroScore();
+		long passing = insightStats.passing();
 
-		QuestionConfig hardestQ = qcs.stream().min(Comparator.comparingDouble(qc -> passRateForQuestion(subs, qc)))
-				.orElse(null);
-		QuestionConfig easiestQ = qcs.stream().max(Comparator.comparingDouble(qc -> passRateForQuestion(subs, qc)))
-				.orElse(null);
+		QuestionConfig hardestQ = insightStats.hardestQuestion();
+		QuestionConfig easiestQ = insightStats.easiestQuestion();
 
 		// ── Key Observations ────────────────────────────────────────────────
 		addSubHeading(doc, "Key Observations");
@@ -795,11 +775,11 @@ public class PdfReportGenerator {
 		}
 		if (hardestQ != null) {
 			observations.add(hardestQ.getQuestionId() + " had the lowest full-pass rate ("
-					+ pct(passRateForQuestion(subs, hardestQ)) + ").");
+					+ pct(PdfReportAnalytics.passRateForQuestion(subs, hardestQ)) + ").");
 		}
 		if (easiestQ != null && hardestQ != null && !easiestQ.getQuestionId().equals(hardestQ.getQuestionId())) {
 			observations.add(easiestQ.getQuestionId() + " had the highest full-pass rate ("
-					+ pct(passRateForQuestion(subs, easiestQ)) + ").");
+					+ pct(PdfReportAnalytics.passRateForQuestion(subs, easiestQ)) + ").");
 		}
 
 		PdfPTable obsTbl = newTable(new float[]{30, 420});
@@ -847,7 +827,7 @@ public class PdfReportGenerator {
 		// ── Recommendations ──────────────────────────────────────────────────
 		addSubHeading(doc, "Recommendations");
 		List<String> recs = new ArrayList<>();
-		if (hardestQ != null && passRateForQuestion(subs, hardestQ) < 0.6) {
+		if (hardestQ != null && PdfReportAnalytics.passRateForQuestion(subs, hardestQ) < 0.6) {
 			recs.add("Revisit " + hardestQ.getQuestionId()
 					+ " in future lectures — most students did not achieve full marks.");
 		}
@@ -890,73 +870,9 @@ public class PdfReportGenerator {
 	 */
 	private List<String[]> parseTesterOutput(String stdout) {
 		List<String[]> results = new ArrayList<>();
-		if (stdout == null || stdout.isBlank()) {
-			return results;
-		}
-		String testNum = null;
-		String methodCall = null;
-		String expected = null;
-		String actual = null;
-		String failReason = null;
-		boolean inTest = false;
-
-		for (String rawLine : stdout.split("\n")) {
-			String line = rawLine.trim();
-			if (line.isEmpty()) {
-				continue;
-			}
-			try {
-				Double.parseDouble(line);
-				continue;
-			} catch (NumberFormatException ignored) {
-			}
-			if (line.startsWith("-") && line.chars().filter(c -> c == '-').count() > 5) {
-				continue;
-			}
-			if (line.matches("Test \\d+:.*")) {
-				int colonIdx = line.indexOf(':');
-				testNum = line.substring(5, colonIdx).trim();
-				methodCall = line.substring(colonIdx + 1).trim();
-				expected = null;
-				actual = null;
-				failReason = null;
-				inTest = true;
-				continue;
-			}
-			if (!inTest) {
-				continue;
-			}
-			if (line.equals("Passed")) {
-				results.add(new String[]{testNum, "PASS", expected, actual, failReason, methodCall});
-				inTest = false;
-				continue;
-			}
-			if (line.startsWith("Failed -> ")) {
-				failReason = line.substring("Failed -> ".length()).trim();
-				results.add(new String[]{testNum, "FAIL", expected, actual, failReason, methodCall});
-				inTest = false;
-				continue;
-			}
-			if (line.equals("Failed")) {
-				results.add(new String[]{testNum, "FAIL", expected, actual, failReason, methodCall});
-				inTest = false;
-				continue;
-			}
-			if (line.startsWith("Expected")) {
-				int barStart = line.indexOf(":|");
-				int barEnd = line.lastIndexOf('|');
-				if (barStart >= 0 && barEnd > barStart + 1) {
-					expected = line.substring(barStart + 2, barEnd);
-				}
-				continue;
-			}
-			if (line.startsWith("Actual")) {
-				int barStart = line.indexOf(":|");
-				int barEnd = line.lastIndexOf('|');
-				if (barStart >= 0 && barEnd > barStart + 1) {
-					actual = line.substring(barStart + 2, barEnd);
-				}
-			}
+		for (TesterOutputParser.ParsedTestResult parsed : TesterOutputParser.parseTesterOutput(stdout)) {
+			results.add(new String[]{parsed.testNumber(), parsed.status(), parsed.expected(), parsed.actual(),
+					parsed.failReason(), parsed.methodCall()});
 		}
 		return results;
 	}
@@ -967,51 +883,9 @@ public class PdfReportGenerator {
 	 */
 	private List<String[]> parseExceptions(String stderr) {
 		List<String[]> results = new ArrayList<>();
-		if (stderr == null || stderr.isBlank()) {
-			return results;
-		}
-		String exClass = null;
-		String exMessage = null;
-		String exFile = null;
-		String exLine = null;
-		boolean inException = false;
-
-		for (String rawLine : stderr.split("\n")) {
-			String line = rawLine.trim();
-			if (line.isEmpty()) {
-				continue;
-			}
-			if (line.startsWith("at ")) {
-				if (inException && exFile == null) {
-					java.util.regex.Matcher m = java.util.regex.Pattern.compile("at [^(]+\\(([^:)]+):?(\\d*)\\)")
-							.matcher(line);
-					if (m.find()) {
-						String file = m.group(1);
-						String lineNum = m.group(2);
-						if (!file.contains("Tester")) {
-							exFile = file;
-							exLine = lineNum;
-						}
-					}
-				}
-				continue;
-			}
-			if (!rawLine.startsWith("\t") && !rawLine.startsWith("    ")) {
-				if (inException) {
-					results.add(new String[]{exClass, exMessage, exFile, exLine});
-				}
-				int colonIdx = line.indexOf(": ");
-				String fullClass = colonIdx >= 0 ? line.substring(0, colonIdx) : line;
-				int dotIdx = fullClass.lastIndexOf('.');
-				exClass = dotIdx >= 0 ? fullClass.substring(dotIdx + 1) : fullClass;
-				exMessage = colonIdx >= 0 ? line.substring(colonIdx + 2) : null;
-				exFile = null;
-				exLine = null;
-				inException = true;
-			}
-		}
-		if (inException) {
-			results.add(new String[]{exClass, exMessage, exFile, exLine});
+		for (TesterOutputParser.ParsedException parsed : TesterOutputParser.parseExceptions(stderr)) {
+			results.add(new String[]{parsed.simpleClassName(), parsed.message(), parsed.studentSourceFile(),
+					parsed.lineNumber()});
 		}
 		return results;
 	}
@@ -1216,28 +1090,6 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 	// Statistics helpers
 	// ══════════════════════════════════════════════════════════════════════════
-
-	private double passRateForQuestion(List<StudentSubmission> subs, QuestionConfig qc) {
-		if (subs.isEmpty()) {
-			return 0.0;
-		}
-		long passed = subs.stream().flatMap(s -> s.getResults().stream())
-				.filter(r -> r.getQuestionId().equals(qc.getQuestionId()) && r.getScore() >= r.getMaxScore()).count();
-		return (double) passed / subs.size();
-	}
-
-	private List<Anomaly> anomaliesInCategory(StudentSubmission sub, Set<Anomaly.Type> category) {
-		return sub.getAnomalies().stream().filter(a -> category.contains(a.getType())).collect(Collectors.toList());
-	}
-
-	private double computeMedian(List<StudentSubmission> subs) {
-		List<Double> scores = subs.stream().map(StudentSubmission::getTotalScore).sorted().collect(Collectors.toList());
-		if (scores.isEmpty()) {
-			return 0;
-		}
-		int n = scores.size();
-		return n % 2 == 0 ? (scores.get(n / 2 - 1) + scores.get(n / 2)) / 2.0 : scores.get(n / 2);
-	}
 
 	// ══════════════════════════════════════════════════════════════════════════
 	// Formatting utilities
