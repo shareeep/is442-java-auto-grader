@@ -13,9 +13,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * Entry point for the IS442 Auto Grading System.
  *
- * Supports three modes: 1. Web UI mode (no args or --web) - launches Spring Boot 2. 
- * Interactive mode (--cli) - launches console menu 3.
- * CLI mode (with args) - runs grading directly
+ * Supports three modes: 1. Web UI mode (no args or --web) - launches Spring
+ * Boot 2. Interactive mode (--cli) - launches console menu 3. CLI mode (with
+ * args) - runs grading directly
  *
  * CLI Usage: java -jar autograder.jar --submissions ./student-submission \
  * --testers ./Tester-Files \ --scoresheet ./IS442-ScoreSheet.csv \ --output
