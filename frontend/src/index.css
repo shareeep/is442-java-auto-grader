@@ -1,48 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply bg-background text-primary font-sans antialiased overflow-x-hidden;
-    /* Hide scrollbar for a cleaner look */
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-  }
-  
-  body::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply text-charcoal tracking-tight font-outfit;
-  }
+/* Global styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@layer utilities {
-  .noise-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    pointer-events: none;
-    opacity: 0.05;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  }
-
-  .text-shadow-sm {
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  }
-  
-  .glass-card {
-    @apply bg-background/60 backdrop-blur-xl border border-primary/10 shadow-[0_8px_32px_rgba(0,0,0,0.05)] rounded-[2rem];
-  }
-
-  .btn-magnetic {
-    @apply relative overflow-hidden transition-all duration-300 transform rounded-[2rem] hover:scale-[1.03];
-    cubic-bezier: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-  
-  .input-field {
-    @apply w-full bg-white/50 border border-primary/20 backdrop-blur-sm rounded-xl px-4 py-3 text-charcoal font-sans outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all duration-300 placeholder:text-charcoal/40;
-  }
+body {
+  font-family: sans-serif;
 }
