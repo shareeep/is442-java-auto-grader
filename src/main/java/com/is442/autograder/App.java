@@ -15,16 +15,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
 /**
  * Entry point for the IS442 Auto Grading System.
  *
- * Supports two modes: 1. Interactive mode (no args) - launches console menu 2.
- * CLI mode (with args) - runs grading directly
+ * Supports three modes: 1. Web UI mode (no args or --web) - launches Spring
+ * Boot 2. Interactive mode (--cli) - launches console menu 3. CLI mode (with
+ * args) - runs grading directly
  *
  * CLI Usage: java -jar autograder.jar --submissions ./student-submission \
  * --testers ./Tester-Files \ --scoresheet ./IS442-ScoreSheet.csv \ --output
  * ./output
  */
+@SpringBootApplication
 public class App {
 
 	public static void main(String[] args) {
@@ -39,7 +44,10 @@ public class App {
 		try {
 			AppConfig config = new AppConfig();
 
-			if (args.length == 0) {
+			if (args.length == 0 || (args.length == 1 && args[0].equals("--web"))) {
+				// Launch Spring Boot web server
+				SpringApplication.run(App.class, args);
+			} else if (args.length == 1 && args[0].equals("--cli")) {
 				// Interactive mode
 				ConsoleUI ui = new ConsoleUI(config);
 				ui.start();

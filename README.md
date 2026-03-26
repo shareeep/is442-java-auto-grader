@@ -106,7 +106,7 @@ START → Load Config → Scan ZIPs → [For each ZIP]
 ├─────────────────────────────────────────────────────────────┤
 │                   CONFIG LAYER                              │
 │   Externalized settings (no hardcoding):                    │
-│   - Paths, timeout, question definitions                    │
+│   - Paths, timeout, question definitions                     |
 └─────────────────────────────────────────────────────────────┘
 ```
 

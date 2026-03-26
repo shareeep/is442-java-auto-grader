@@ -36,9 +36,16 @@ build/
 .idea/
 *.iml
 .vscode/
+*.code-workspace
 .project
 .classpath
 .settings/
+
+# Eclipse / IntelliJ compiled output
+bin/
+
+# Node
+node_modules/
 
 # Requirements 
 is442-project-materials/
