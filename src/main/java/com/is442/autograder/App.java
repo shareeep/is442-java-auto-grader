@@ -135,18 +135,14 @@ public class App {
 			}
 
 			List<QuestionConfig> inferredConfigs = inferred.getQuestions().stream()
-					.map(InferredQuestionConfig::toQuestionConfig)
-					.filter(qc -> qc.getMaxScore() > 0)
-					.map(qc -> {
+					.map(InferredQuestionConfig::toQuestionConfig).filter(qc -> qc.getMaxScore() > 0).map(qc -> {
 						if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
 							String parent = qc.getQuestionId().replaceFirst("([a-z])$", "");
-							return new QuestionConfig(qc.getQuestionId(), parent,
-									qc.getTesterClassName(), qc.getMaxScore(),
-									qc.getDependencyFolder(), qc.getDependencyFiles());
+							return new QuestionConfig(qc.getQuestionId(), parent, qc.getTesterClassName(),
+									qc.getMaxScore(), qc.getDependencyFolder(), qc.getDependencyFiles());
 						}
 						return qc;
-					})
-					.toList();
+					}).toList();
 
 			System.out.println("Inferred " + inferredConfigs.size() + " question(s): "
 					+ inferredConfigs.stream().map(QuestionConfig::getQuestionId).toList());

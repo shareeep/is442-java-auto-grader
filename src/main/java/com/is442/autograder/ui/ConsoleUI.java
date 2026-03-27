@@ -108,18 +108,16 @@ public class ConsoleUI {
 							step = 2;
 						} else {
 							inferredConfigs = inferred.getQuestions().stream()
-									.map(InferredQuestionConfig::toQuestionConfig)
-									.filter(qc -> qc.getMaxScore() > 0)
+									.map(InferredQuestionConfig::toQuestionConfig).filter(qc -> qc.getMaxScore() > 0)
 									.map(qc -> {
 										if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
 											String parentFolder = inferFolderFromQuestionId(qc.getQuestionId());
 											return new QuestionConfig(qc.getQuestionId(), parentFolder,
-													qc.getTesterClassName(), qc.getMaxScore(),
-													qc.getDependencyFolder(), qc.getDependencyFiles());
+													qc.getTesterClassName(), qc.getMaxScore(), qc.getDependencyFolder(),
+													qc.getDependencyFiles());
 										}
 										return qc;
-									})
-									.toList();
+									}).toList();
 							displayInferredQuestions(inferredConfigs);
 							System.out.print("\n  Proceed with these questions? [y/n]: ");
 							String confirm = scanner.nextLine().trim();
