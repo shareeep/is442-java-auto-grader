@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertCircle, Loader2, Users, ArrowRight,
   TrendingUp, BarChart2, TriangleAlert,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import GradingTerminal from '../components/GradingTerminal';
 import ResultsTable from '../components/ResultsTable';
@@ -13,6 +13,7 @@ import type { Submission } from '../components/SubmissionDetails';
 import { listRunsOptions } from '../generated/@tanstack/react-query.gen';
 import { getStudentCode } from '../api/client';
 import { formatRunTimestamp } from '../lib/utils';
+import { useGraderStore } from '../store/graderStore';
 
 type Phase = 'upload' | 'grading' | 'results';
 
@@ -130,28 +131,39 @@ const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (r
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">No past runs found</div>
           ) : (
             <div className="max-h-64 overflow-auto">
-              {runs.map(run => (
-                <button
-                  key={run.id}
-                  onClick={() => { onLoad(run.id); setOpen(false); }}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary transition-colors text-left border-b border-border/50 last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{formatRunTimestamp(run.timestamp)}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Users size={10} /> {run.studentCount} students
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    {run.hasPdf && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>
-                    )}
-                    {run.hasCsv && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {runs.map(run => {
+                const failed = run.studentCount === 0;
+                return (
+                  <button
+                    key={run.id}
+                    onClick={() => { if (!failed) { onLoad(run.id); setOpen(false); } }}
+                    disabled={failed}
+                    className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left border-b border-border/50 last:border-0 ${
+                      failed
+                        ? 'opacity-40 cursor-not-allowed'
+                        : 'hover:bg-secondary'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{formatRunTimestamp(run.timestamp)}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        {failed
+                          ? <><AlertCircle size={10} className="text-destructive" /> Incomplete run</>
+                          : <><Users size={10} /> {run.studentCount} students</>
+                        }
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      {run.hasPdf && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>
+                      )}
+                      {run.hasCsv && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -177,12 +189,28 @@ const GraderWorkspace: React.FC = () => {
   const [testerFiles, setTesterFiles] = useState<File[]>([]);
   const [scoresheetFiles, setScoresheetFiles] = useState<File[]>([]);
   const [examFiles, setExamFiles] = useState<File[]>([]);
-  const [phase, setPhase] = useState<Phase>('upload');
   const [streamFormData, setStreamFormData] = useState<FormData | null>(null);
-  const [result, setResult] = useState<GradingResult | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(true);
+
+  const phase = useGraderStore((s) => s.phase);
+  const result = useGraderStore((s) => s.result);
+  const runId = useGraderStore((s) => s.runId);
+  const setPhase = useGraderStore((s) => s.setPhase);
+  const setResult = useGraderStore((s) => s.setResult);
+  const setRunId = useGraderStore((s) => s.setRunId);
+  const graderReset = useGraderStore((s) => s.reset);
+
+  // Block navigation while grading is active
+  const blocker = useBlocker(phase === 'grading');
+
+  // If we come back mid-grading (FormData is gone — can't resume stream), reset to upload
+  useEffect(() => {
+    if (phase === 'grading') {
+      graderReset();
+      setError('Grading was interrupted. Please re-upload and run again.');
+    }
+  }, []);
 
   const { data: pastRunsData, isLoading: runsLoading, refetch: refetchRuns } = useQuery(listRunsOptions());
   const pastRuns: PastRun[] = (pastRunsData as unknown as PastRun[]) ?? [];
@@ -215,9 +243,7 @@ const GraderWorkspace: React.FC = () => {
   };
 
   const handleReset = () => {
-    setPhase('upload');
-    setResult(null);
-    setRunId(null);
+    graderReset();
     setError(null);
     setStreamFormData(null);
     setSubmissionFiles([]);
@@ -254,12 +280,12 @@ const GraderWorkspace: React.FC = () => {
               <Terminal size={14} /> Show Log
             </button>
           )}
-          {phase === 'results' && (
+          {(phase === 'results' || (phase === 'upload' && error)) && (
             <button
               onClick={handleReset}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
             >
-              <RotateCcw size={14} /> New Run
+              <RotateCcw size={14} /> {phase === 'results' ? 'New Run' : 'Clear'}
             </button>
           )}
         </div>
@@ -269,6 +295,36 @@ const GraderWorkspace: React.FC = () => {
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm">
           <AlertCircle size={16} className="shrink-0" />
           {error}
+        </div>
+      )}
+
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <AlertCircle size={20} className="text-destructive" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground text-sm">Grading in progress</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Leaving now will cancel the current run.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => blocker.reset()}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors"
+              >
+                Stay
+              </button>
+              <button
+                onClick={() => blocker.proceed()}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                Leave anyway
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -10,34 +10,45 @@ import {
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { saveResults, refineCode } from '@/api/client';
+import { useWizardStore } from '../../store/wizardStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface FinalizeExportProps {
-  data: any;
-  onUpdate: (data: any) => void;
   onBack: () => void;
 }
 
-const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
-  const [exporting, setExporting] = useState(false);
-  const [exportComplete, setExportComplete] = useState(false);
-  const [exportPath, setExportPath] = useState<string | null>(null);
-  const results = data.results || {};
+const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
+  const { examId, testerId } = useWizardStore(
+    useShallow((s) => ({ examId: s.examId, testerId: s.testerId }))
+  );
+  const { exportComplete, exportPath } = useWizardStore(
+    useShallow((s) => ({ exportComplete: s.exportComplete, exportPath: s.exportPath }))
+  );
+  const results = useWizardStore((s) => s.results);
+  const localCode = useWizardStore((s) => s.localCode);
+  const setLocalCode = useWizardStore((s) => s.setLocalCode);
+  const initLocalCode = useWizardStore((s) => s.initLocalCode);
+  const setExportComplete = useWizardStore((s) => s.setExportComplete);
+
   const questionIds = Object.keys(results);
-
   const [activeQid, setActiveQid] = useState<string | null>(questionIds[0] || null);
-
   const [refinePrompt, setRefinePrompt] = useState('');
   const [refining, setRefining] = useState(false);
-  const [localCode, setLocalCode] = useState<Record<string, string>>({});
+  const [exporting, setExporting] = useState(false);
 
+  // Initialise localCode from results on first load (if not already set)
   useEffect(() => {
     const initial: Record<string, string> = {};
+    let needsInit = false;
     for (const qid of questionIds) {
-      if (results[qid]?.generatedCode) {
+      if (results[qid]?.generatedCode && !localCode[qid]) {
         initial[qid] = results[qid].generatedCode;
+        needsInit = true;
       }
     }
-    setLocalCode(initial);
+    if (needsInit) {
+      initLocalCode({ ...localCode, ...initial });
+    }
   }, []);
 
   const handleRefine = async () => {
@@ -45,12 +56,12 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
     setRefining(true);
     try {
       const res = await refineCode({
-        examId: data.examId,
+        examId: examId!,
         questionId: activeQid,
         currentCode: localCode[activeQid],
         refinementPrompt: refinePrompt.trim(),
       });
-      setLocalCode(prev => ({ ...prev, [activeQid]: res.refinedCode }));
+      setLocalCode(activeQid, res.refinedCode);
       setRefinePrompt('');
     } catch (err) {
       console.error('Refine failed:', err);
@@ -61,13 +72,12 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
 
   const handleExport = async () => {
     setExporting(true);
-    setExportPath(null);
     try {
       const entries = questionIds.map(qid => {
         const r = results[qid];
         return {
           questionId: qid,
-          testerClassName: r.questionId + 'Tester',
+          testerClassName: qid + 'Tester',
           generatedCode: localCode[qid] || r.generatedCode || '',
           cases: (r.cases || []).map((c: any) => ({
             description: c.description || '',
@@ -79,14 +89,13 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
       });
 
       await saveResults({
-        examId: data.examId,
-        testerId: data.testerId,
+        examId: examId!,
+        testerId: testerId ?? undefined,
         outputDir: 'generated-testers',
         results: entries,
         updateMaxScores: true,
       });
-      setExportComplete(true);
-      setExportPath('generated-testers/');
+      setExportComplete('generated-testers/');
     } catch (err: any) {
       console.error('Export failed:', err);
     } finally {
@@ -192,7 +201,6 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
                       <span className="text-[9px] px-2 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-mono">COMPILED</span>
                     )}
                   </div>
-
                 </div>
 
                 <div className="h-[420px]">
@@ -208,6 +216,8 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ data, onBack }) => {
                         language="java"
                         style={vscDarkPlus}
                         showLineNumbers
+                        wrapLines
+                        wrapLongLines
                         customStyle={{ margin: 0, fontSize: '11px', background: '#0D1117', minHeight: '100%' }}
                         lineNumberStyle={{ minWidth: '2.5em', color: '#484f58' }}
                       >

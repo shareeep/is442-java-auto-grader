@@ -224,7 +224,8 @@ const RunResults: React.FC = () => {
               writing={false}
               header={false}
               copyButton
-              className="rounded-none border-none flex-1 min-h-0"
+              wrapLines
+              className="rounded-none border-none flex-1 min-h-0 w-full"
             >
               {activeTab.content}
             </CodeEditor>
@@ -236,8 +237,8 @@ const RunResults: React.FC = () => {
           )}
         </div>
 
-        {/* ── Right: Scores Panel (320px) ── */}
-        <div className="w-[320px] shrink-0 border-l border-border bg-card flex flex-col overflow-hidden">
+        {/* ── Right: Scores Panel ── */}
+        <div className="w-[360px] shrink-0 border-l border-border bg-card flex flex-col overflow-hidden">
           <div className="px-3 py-2 border-b border-border shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scores</span>
           </div>
@@ -252,9 +253,14 @@ const RunResults: React.FC = () => {
                     onClick={() => setExpandedScore(isOpen ? null : s.username)}
                     className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-secondary/50 transition-colors text-left"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       {isOpen ? <ChevronDown size={12} className="text-muted-foreground shrink-0" /> : <ChevronRight size={12} className="text-muted-foreground shrink-0" />}
-                      <span className="text-xs font-medium text-foreground truncate">{s.displayName || s.username}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{s.displayName || s.username}</p>
+                        {s.displayName && s.displayName !== s.username && (
+                          <p className="text-[10px] text-muted-foreground truncate">{s.username}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       {s.anomalies.length > 0 && (

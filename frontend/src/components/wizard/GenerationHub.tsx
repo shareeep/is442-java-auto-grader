@@ -2,37 +2,44 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Sparkles, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2 } from 'lucide-react';
 import { recommend as apiRecommend, executeQuestion } from '@/api/client';
+import { useWizardStore } from '../../store/wizardStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface GenerationHubProps {
-  data: any;
-  onUpdate: (data: any) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-const GenerationHub: React.FC<GenerationHubProps> = ({ data, onUpdate, onNext, onBack }) => {
-  const [selectedQs, setSelectedQs] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<Record<string, any>>({});
+const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
+  const { examId, templateId, testerId } = useWizardStore(
+    useShallow((s) => ({ examId: s.examId, templateId: s.templateId, testerId: s.testerId }))
+  );
+  const inferredConfig = useWizardStore((s) => s.inferredConfig);
+  const selectedQs = useWizardStore((s) => s.selectedQs);
+  const recommendations = useWizardStore((s) => s.recommendations);
+  const results = useWizardStore((s) => s.results);
+  const setSelectedQs = useWizardStore((s) => s.setSelectedQs);
+  const setRecommendation = useWizardStore((s) => s.setRecommendation);
+  const setResult = useWizardStore((s) => s.setResult);
+
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
-  const [results, setResults] = useState<Record<string, any>>({});
   const [loadingRec, setLoadingRec] = useState<string | null>(null);
 
   const toggleQ = (qid: string) => {
-    setSelectedQs(prev =>
-      prev.includes(qid) ? prev.filter(q => q !== qid) : [...prev, qid]
+    setSelectedQs(
+      selectedQs.includes(qid) ? selectedQs.filter(q => q !== qid) : [...selectedQs, qid]
     );
   };
 
   const getRecommendation = async (qid: string) => {
     setLoadingRec(qid);
     try {
-      const rec = await apiRecommend({ examId: data.examId, questionId: qid });
-      setRecommendations(prev => ({ ...prev, [qid]: rec }));
+      const rec = await apiRecommend({ examId: examId!, questionId: qid });
+      setRecommendation(qid, rec);
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,18 +49,18 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ data, onUpdate, onNext, o
 
   const executeGen = async (qid: string) => {
     setGenerating(prev => ({ ...prev, [qid]: true }));
-    const question = data.inferredConfig.questions.find((q: any) => q.questionId === qid);
+    const question = inferredConfig?.questions?.find((q: any) => q.questionId === qid);
     const rec = recommendations[qid];
 
     try {
       const result = await executeQuestion({
-        examId: data.examId,
-        testerId: data.testerId,
-        templateId: data.templateId,
+        examId: examId!,
+        testerId,
+        templateId,
         numCases: rec?.recommendedCount || 3,
-        question: question
+        question: question!,
       });
-      setResults(prev => ({ ...prev, [qid]: result }));
+      setResult(qid, result);
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,9 +68,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ data, onUpdate, onNext, o
     }
   };
 
-  const [progress, setProgress] = useState<Record<string, number>>({});
-
-  const allQuestions = (data.inferredConfig?.questions || []).filter((q: any) => q.maxScore > 0);
+  const allQuestions = (inferredConfig?.questions || []).filter((q: any) => q.maxScore > 0);
 
   return (
     <div className="flex flex-col gap-6 pb-20 animate-in fade-in slide-in-from-right-4">
@@ -77,10 +82,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ data, onUpdate, onNext, o
             <ChevronLeft size={16} className="mr-1" /> Review
           </Button>
           <Button
-            onClick={() => {
-              onUpdate({ results });
-              onNext();
-            }}
+            onClick={onNext}
             className="rounded-md px-6 glow-blue"
             disabled={Object.keys(results).length === 0}
           >

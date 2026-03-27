@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, GraduationCap, LayoutPanelLeft, ListChecks, FileCheck } from 'lucide-react';
+import { CheckCircle2, GraduationCap, LayoutPanelLeft, ListChecks, FileCheck, RotateCcw } from 'lucide-react';
 
 import ProjectSetup from './ProjectSetup';
 import InferenceReview from './InferenceReview';
 import GenerationHub from './GenerationHub';
 import FinalizeExport from './FinalizeExport';
+import { useWizardStore } from '../../store/wizardStore';
 
 const STEPS = [
   { id: 1, title: 'Project Setup', icon: GraduationCap },
@@ -15,34 +16,20 @@ const STEPS = [
 ];
 
 const Wizard: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [wizardData, setWizardData] = useState<any>({
-    examId: null,
-    templateId: null,
-    testerId: null,
-    inferredConfig: null,
-    selectedQuestions: [],
-  });
+  const currentStep = useWizardStore((s) => s.currentStep);
+  const setStep = useWizardStore((s) => s.setStep);
+  const reset = useWizardStore((s) => s.reset);
 
-  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
-
-  const updateData = (data: any) => {
-    setWizardData((prev: any) => ({ ...prev, ...data }));
-  };
+  const nextStep = () => setStep(Math.min(currentStep + 1, STEPS.length));
+  const prevStep = () => setStep(Math.max(currentStep - 1, 1));
 
   const renderStep = () => {
     switch (currentStep) {
-      case 1:
-        return <ProjectSetup data={wizardData} onUpdate={updateData} onNext={nextStep} />;
-      case 2:
-        return <InferenceReview data={wizardData} onUpdate={updateData} onNext={nextStep} onBack={prevStep} />;
-      case 3:
-        return <GenerationHub data={wizardData} onUpdate={updateData} onNext={nextStep} onBack={prevStep} />;
-      case 4:
-        return <FinalizeExport data={wizardData} onUpdate={updateData} onBack={prevStep} />;
-      default:
-        return null;
+      case 1: return <ProjectSetup onNext={nextStep} />;
+      case 2: return <InferenceReview onNext={nextStep} onBack={prevStep} />;
+      case 3: return <GenerationHub onNext={nextStep} onBack={prevStep} />;
+      case 4: return <FinalizeExport onBack={prevStep} />;
+      default: return null;
     }
   };
 
@@ -57,8 +44,18 @@ const Wizard: React.FC = () => {
             Generalized grading pipeline with automated inference.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
-          Step {currentStep} of {STEPS.length}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={reset}
+            className="text-muted-foreground hover:text-foreground gap-1.5"
+          >
+            <RotateCcw size={13} /> Start Over
+          </Button>
+          <div className="flex items-center gap-2 text-xs font-mono text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
+            Step {currentStep} of {STEPS.length}
+          </div>
         </div>
       </header>
 

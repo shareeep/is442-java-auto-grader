@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { useWizardStore } from '../../store/wizardStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, ListChecks, FileSearch, FolderSearch } from 'lucide-react';
 
 interface InferenceReviewProps {
-  data: any;
-  onUpdate: (data: any) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -15,8 +14,8 @@ interface QuestionGroup {
   children: any[];
 }
 
-const InferenceReview: React.FC<InferenceReviewProps> = ({ data, onNext, onBack }) => {
-  const config = data.inferredConfig;
+const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => {
+  const config = useWizardStore((s) => s.inferredConfig);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const groups = useMemo(() => {

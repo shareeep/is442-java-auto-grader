@@ -62,6 +62,7 @@ type CodeEditorProps = Omit<React.ComponentProps<"div">, "onCopy"> & {
   inViewOnce?: boolean
   copyButton?: boolean
   writing?: boolean
+  wrapLines?: boolean
   title?: string
   onDone?: () => void
   onCopy?: (content: string) => void
@@ -86,6 +87,7 @@ function CodeEditor({
   inViewOnce = true,
   copyButton = false,
   writing = true,
+  wrapLines = false,
   title,
   onDone,
   onCopy,
@@ -242,6 +244,7 @@ function CodeEditor({
         <div
           className={cn(
             "[&>pre,_&_code]:!bg-transparent [&>pre,_&_code]:[background:transparent_!important] [&>pre,_&_code]:border-none [&_code]:!text-[13px]",
+            wrapLines && "[&_pre]:!whitespace-pre-wrap [&_pre]:!break-words",
             cursor &&
               !isDone &&
               "[&_.line:last-of-type::after]:content-['|'] [&_.line:last-of-type::after]:animate-pulse [&_.line:last-of-type::after]:inline-block [&_.line:last-of-type::after]:w-[1ch] [&_.line:last-of-type::after]:-translate-px",
