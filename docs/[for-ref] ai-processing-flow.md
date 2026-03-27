@@ -11,18 +11,40 @@ User (Browser)
   │
   ▼
 React Wizard (4 steps)
-  │  Zustand store: examId, templateId, testerId, inferredConfig, results
+  │  State: Zustand store
+  │    examId, templateId, testerId
+  │    inferredConfig, selectedQs, results, localCode
   │
   ▼ HTTP (upload IDs, not raw paths)
 Spring Boot REST API
   │  ConcurrentHashMap: examId/templateId/testerId → temp Path
   │
-  ├─► ConfigInferenceService   (PDF scan + filesystem scan → question config)
-  ├─► TestGenerationService    (orchestrates prompts + parses responses)
-  ├─► LangChainService         (@AiService — 3 LLM methods)
-  ├─► PdfParser                (Docling Serve → markdown)
-  ├─► TesterFileWriter         (StructuredTestCase[] → .java code)
-  └─► SessionDatabase          (SQLite cache — PDF markdown, question metadata)
+  ├─► GenerationController.analyzeSetup()
+  │      └─ ConfigInferenceService.inferConfig()
+  │             ├─ PdfParser.extractAllText()
+  │             │      └─ Docling Serve (http://localhost:5001) → markdown
+  │             │             (or SessionDatabase cache)
+  │             └─ filesystem scan → InferredConfig
+  │
+  ├─► GenerationController.execute()
+  │      └─ TestGenerationService.generateForQuestion()
+  │             └─ LangChainService.generateTestCasesJson()
+  │                    └─ OpenRouter API → AI-generated test cases JSON
+  │
+  ├─► GenerationController.recommend()
+  │      └─ TestGenerationService.recommendTestCases()
+  │             └─ LangChainService.recommendJson()
+  │                    └─ OpenRouter API → test case recommendations
+  │
+  ├─► GenerationController.refine()
+  │      └─ TestGenerationService.refineCode()
+  │             └─ LangChainService.refineCode()
+  │                    └─ OpenRouter API → refined Java code
+  │
+  ├─► GenerationController.save()
+  │      └─ TesterFileWriter.write() → .java files on disk
+  │
+  └─► SessionDatabase  (SQLite — caches markdown + question metadata)
 ```
 
 ---
@@ -419,10 +441,20 @@ interface LangChainService {
   @SystemMessage("You are an expert Java test case analyst... return ONLY valid JSON object...")
   String recommendJson(@UserMessage String prompt);
 
-  @SystemMessage("You are a Java test code refiner... return ONLY valid Java code...")
+  @SystemMessage("You are a Java code refiner... return ONLY valid Java code...")
   String refineCode(@UserMessage String prompt);
 }
 ```
+
+**AI responses — two formats:**
+
+| Method | AI returns | Parsed into |
+|--------|-----------|-------------|
+| `generateTestCasesJson` | JSON array | `List<StructuredTestCase>` POJO (Jackson) |
+| `recommendJson` | JSON object | `TestCaseRecommendation` POJO (Jackson) |
+| `refineCode` | Plain Java code | Raw `String` — used directly, no parsing |
+
+JSON responses are deserialized into domain objects for type safety. Plain text (refine) is returned as-is.
 
 **Configuration (`application.properties`):**
 ```properties
