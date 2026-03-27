@@ -21,9 +21,14 @@ interface OpenTab { key: string; label: string; content: string; }
 interface LineComment { text: string; timestamp: string; }
 
 // ── Inline code viewer with line numbers + professor comments ──────────────
-const CodeViewer: React.FC<{ code: string }> = ({ code }) => {
+interface CodeViewerProps {
+  code: string;
+  comments: Record<number, LineComment[]>;
+  onCommentsChange: (updater: (prev: Record<number, LineComment[]>) => Record<number, LineComment[]>) => void;
+}
+
+const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChange }) => {
   const [htmlLines, setHtmlLines] = useState<string[]>([]);
-  const [comments, setComments] = useState<Record<number, LineComment[]>>({});
   const [addingComment, setAddingComment] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [hovered, setHovered] = useState<number | null>(null);
@@ -39,10 +44,15 @@ const CodeViewer: React.FC<{ code: string }> = ({ code }) => {
           theme: 'github-dark',
         });
         if (cancelled) return;
-        // Extract per-line HTML from shiki's <span class="line">...</span>
-        const matches = [...html.matchAll(/<span class="line">(.*?)<\/span>/gs)];
-        const lines = matches.length > 0
-          ? matches.map(m => m[1])
+        // Extract per-line HTML: split on the line-open tag, then strip the
+        // line-closing </span> using lastIndexOf (non-greedy regex wrongly
+        // stops at the first inner token </span>).
+        const rawSegments = html.split('<span class="line">').slice(1);
+        const lines = rawSegments.length > 0
+          ? rawSegments.map(seg => {
+              const close = seg.lastIndexOf('</span>');
+              return close >= 0 ? seg.slice(0, close) : seg;
+            })
           : code.split('\n').map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
         setHtmlLines(lines);
       } catch {
@@ -60,7 +70,7 @@ const CodeViewer: React.FC<{ code: string }> = ({ code }) => {
 
   const submit = (line: number) => {
     if (!draft.trim()) return;
-    setComments(prev => ({
+    onCommentsChange(prev => ({
       ...prev,
       [line]: [...(prev[line] ?? []), {
         text: draft.trim(),
@@ -69,6 +79,13 @@ const CodeViewer: React.FC<{ code: string }> = ({ code }) => {
     }));
     setDraft('');
     setAddingComment(null);
+  };
+
+  const deleteComment = (line: number, idx: number) => {
+    onCommentsChange(prev => ({
+      ...prev,
+      [line]: (prev[line] ?? []).filter((_, j) => j !== idx),
+    }));
   };
 
   const totalComments = Object.values(comments).reduce((s, arr) => s + arr.length, 0);
@@ -143,10 +160,7 @@ const CodeViewer: React.FC<{ code: string }> = ({ code }) => {
                     </span>
                     <span className="text-[10px] text-[#4d5566]">{c.timestamp}</span>
                     <button
-                      onClick={() => setComments(prev => ({
-                        ...prev,
-                        [ln]: (prev[ln] ?? []).filter((_, j) => j !== ci),
-                      }))}
+                      onClick={() => deleteComment(ln, ci)}
                       className="ml-auto text-[#4d5566] hover:text-[#8b949e] transition-colors"
                     >
                       <X size={10} />
@@ -224,6 +238,8 @@ const RunResults: React.FC = () => {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const [expandedScore, setExpandedScore] = useState<string | null>(null);
+  // comments keyed by tabKey → line number → comments array (survives tab switches)
+  const [allComments, setAllComments] = useState<Record<string, Record<number, LineComment[]>>>({});
 
   const toggleStudent = useCallback(async (username: string) => {
     setExpandedStudents(prev => {
@@ -408,7 +424,16 @@ const RunResults: React.FC = () => {
 
           {/* Code viewer or empty state */}
           {activeTab ? (
-            <CodeViewer code={activeTab.content} />
+            <CodeViewer
+              code={activeTab.content}
+              comments={allComments[activeTab.key] ?? {}}
+              onCommentsChange={updater =>
+                setAllComments(prev => ({
+                  ...prev,
+                  [activeTab.key]: updater(prev[activeTab.key] ?? {}),
+                }))
+              }
+            />
           ) : (
             <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center bg-[#0d1117]">
               <FileIcon size={32} className="text-[#3d4451]" />
