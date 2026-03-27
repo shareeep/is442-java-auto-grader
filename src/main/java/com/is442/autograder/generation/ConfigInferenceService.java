@@ -339,7 +339,8 @@ public class ConfigInferenceService {
 			String content = Files.readString(testerPath);
 			Matcher tcMatcher = TCNUM_INCREMENT.matcher(content);
 			int count = 0;
-			while (tcMatcher.find()) count++;
+			while (tcMatcher.find())
+				count++;
 			if (count > 0)
 				return count;
 

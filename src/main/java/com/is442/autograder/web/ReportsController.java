@@ -73,7 +73,8 @@ public class ReportsController {
 
 	private long countLogDirs(Path runDir) {
 		Path logsDir = runDir.resolve("logs");
-		if (!Files.isDirectory(logsDir)) return 0;
+		if (!Files.isDirectory(logsDir))
+			return 0;
 		try (Stream<Path> s = Files.list(logsDir)) {
 			return s.filter(Files::isDirectory).count();
 		} catch (IOException e) {
@@ -83,7 +84,8 @@ public class ReportsController {
 
 	@GetMapping("/{id}/pdf")
 	public ResponseEntity<Resource> getPdf(@PathVariable String id) {
-		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
 		Path pdf = OUTPUT_DIR.resolve(id).resolve("instructor-report.pdf");
 		if (!Files.exists(pdf)) {
 			return ResponseEntity.notFound().build();
@@ -95,7 +97,8 @@ public class ReportsController {
 
 	@GetMapping("/{id}/csv")
 	public ResponseEntity<Resource> getCsv(@PathVariable String id) {
-		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
 		Path runDir = OUTPUT_DIR.resolve(id);
 		Path csv = runDir.resolve("IS442-ScoreSheet-Graded.csv");
 		if (!Files.exists(csv)) {
@@ -112,7 +115,8 @@ public class ReportsController {
 
 	@GetMapping("/{id}/results")
 	public ResponseEntity<?> getResults(@PathVariable String id) {
-		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
 		Path results = OUTPUT_DIR.resolve(id).resolve("results.json");
 		if (!Files.exists(results)) {
 			return ResponseEntity.notFound().build();
@@ -122,7 +126,8 @@ public class ReportsController {
 
 	@GetMapping("/{id}/code/{username}")
 	public ResponseEntity<?> getStudentCode(@PathVariable String id, @PathVariable String username) {
-		if (isUnsafePathSegment(id) || isUnsafePathSegment(username)) return ResponseEntity.badRequest().build();
+		if (isUnsafePathSegment(id) || isUnsafePathSegment(username))
+			return ResponseEntity.badRequest().build();
 		Path codeDir = OUTPUT_DIR.resolve(id).resolve("code").resolve(username);
 		if (!Files.isDirectory(codeDir)) {
 			return ResponseEntity.notFound().build();
@@ -146,7 +151,8 @@ public class ReportsController {
 
 	@GetMapping("/{id}/logs")
 	public ResponseEntity<?> getLogs(@PathVariable String id) {
-		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
 		Path logsDir = OUTPUT_DIR.resolve(id).resolve("logs");
 		if (!Files.isDirectory(logsDir)) {
 			return ResponseEntity.ok(Map.of("runLog", "", "students", List.of()));
