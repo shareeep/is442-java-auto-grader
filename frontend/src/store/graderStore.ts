@@ -43,7 +43,7 @@ export const useGraderStore = create<GraderStore>()(
           set((s) => { s.runId = id; }, undefined, 'grader/setRunId'),
 
         reset: () =>
-          set(() => ({ ...initialState }), true, 'grader/reset'),
+          set((s) => Object.assign(s, initialState), undefined, 'grader/reset'),
       })),
       {
         name: 'GraderStore',

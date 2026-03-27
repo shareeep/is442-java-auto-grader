@@ -84,7 +84,7 @@ export const useWizardStore = create<WizardStore>()(
           set((s) => { s.exportComplete = true; s.exportPath = path; }, undefined, 'wizard/setExportComplete'),
 
         reset: () =>
-          set(() => ({ ...initialState }), true, 'wizard/reset'),
+          set((s) => Object.assign(s, initialState), undefined, 'wizard/reset'),
       })),
       {
         name: 'WizardStore',
