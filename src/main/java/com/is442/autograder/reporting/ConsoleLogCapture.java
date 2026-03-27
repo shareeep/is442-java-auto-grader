@@ -5,17 +5,12 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 /**
  * Captures console output to a run-level log file.
  */
 public class ConsoleLogCapture implements AutoCloseable {
 
-	private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-			.withZone(ZoneId.systemDefault());
 	private final PrintStream originalOut;
 	private final PrintStream originalErr;
 	private final PrintStream teeOut;
@@ -48,7 +43,7 @@ public class ConsoleLogCapture implements AutoCloseable {
 		System.setOut(teeOut);
 		System.setErr(teeErr);
 
-		filePrint.println("Run started: " + TS_FORMATTER.format(Instant.now()));
+		filePrint.println("Run started: " + ReportLogSupport.timestampNow());
 		filePrint.println();
 
 		return new ConsoleLogCapture(originalOut, originalErr, teeOut, teeErr, filePrint);
@@ -58,7 +53,7 @@ public class ConsoleLogCapture implements AutoCloseable {
 	public void close() {
 		try {
 			fileStream.println();
-			fileStream.println("Run ended: " + TS_FORMATTER.format(Instant.now()));
+			fileStream.println("Run ended: " + ReportLogSupport.timestampNow());
 			fileStream.flush();
 		} finally {
 			System.setOut(originalOut);
