@@ -78,14 +78,12 @@ public class GradingEngine {
 		String questionId = qc.getQuestionId();
 		Path questionFolder = submissionRoot.resolve(qc.getFolder());
 
-		// 1. Check if question folder exists
 		if (!Files.isDirectory(questionFolder)) {
 			LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": question folder not found");
 			logWarning(questionId + "  │  Question folder not found");
 			return QuestionResult.missing(questionId, qc.getMaxScore());
 		}
 
-		// 2. Copy tester file into question folder
 		Path testerSource = testerFilesDir.resolve(qc.getTesterClassName() + ".java");
 		Path testerDest = questionFolder.resolve(qc.getTesterClassName() + ".java");
 
@@ -102,13 +100,11 @@ public class GradingEngine {
 					"Failed to copy tester: " + e.getMessage());
 		}
 
-		// 2.5. Copy any pre-compiled dependency files declared in the question config
 		if (qc.getDependencyFolder() != null && !qc.getDependencyFiles().isEmpty()) {
 			copyDependencies(questionFolder, testerFilesDir, qc);
 		}
 
 		try {
-			// 3. Compile all .java files
 			ProcessResult compileResult = processRunner.compile(questionFolder);
 			writeLogIfAvailable(submission, questionId, "compile", compileResult.getStdout(),
 					compileResult.getStderr());
@@ -132,7 +128,6 @@ public class GradingEngine {
 						StringUtils.truncate(error, 500));
 			}
 
-			// 4. Run tester
 			ProcessResult runResult = processRunner.run(questionFolder, qc.getTesterClassName());
 			writeLogIfAvailable(submission, questionId, "run", runResult.getStdout(), runResult.getStderr());
 
@@ -167,14 +162,12 @@ public class GradingEngine {
 						Anomaly.Severity.ERROR, questionId));
 			}
 
-			// 5. Parse score from last line of stdout
 			double score = parseScore(runResult.getStdout());
 
 			return new QuestionResult(questionId, score, qc.getMaxScore(), true, true, runResult.getStdout(),
 					runResult.getStderr());
 
 		} finally {
-			// 6. Clean up: remove tester file and compiled classes
 			cleanupTester(questionFolder, qc.getTesterClassName());
 		}
 	}

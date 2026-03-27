@@ -23,14 +23,14 @@ import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 /**
- * Phase 7.2 — SSE endpoint that streams grading progress in real time.
+ * SSE endpoint that streams grading progress in real time.
  */
 @RestController
 @RequestMapping("/api/grade")
 public class GradingStreamController {
 
 	private static final Logger logger = LoggerFactory.getLogger(GradingStreamController.class);
-	private final ExecutorService executor = Executors.newCachedThreadPool();
+	private final ExecutorService executor = Executors.newFixedThreadPool(4);
 	private final AppConfig appConfig;
 
 	// Stores emitters for active grading sessions
@@ -92,8 +92,7 @@ public class GradingStreamController {
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "init", "message", "Initializing grading pipeline...")));
 
-				AppConfig config = new AppConfig();
-				GradingPipeline pipeline = new GradingPipeline(config);
+				GradingPipeline pipeline = new GradingPipeline(appConfig);
 
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "grading", "message", "Starting grading...")));
@@ -150,12 +149,7 @@ public class GradingStreamController {
 		return emitter;
 	}
 
-	/**
-	 * Writes results.json and copies student .java files into the run output
-	 * directory.
-	 */
 	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
-		// 1. Save results.json
 		try {
 			List<Map<String, Object>> payloads = submissions.stream().map(this::buildStudentPayload).toList();
 			String json = new ObjectMapper().writeValueAsString(payloads);
@@ -164,7 +158,6 @@ public class GradingStreamController {
 			logger.warn("Failed to write results.json", e);
 		}
 
-		// 2. Copy each student's extracted .java files to code/{username}/
 		for (StudentSubmission sub : submissions) {
 			Path root = sub.getRootPath();
 			if (root == null || !Files.exists(root))

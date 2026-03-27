@@ -52,7 +52,6 @@ export async function uploadExam(file: File): Promise<UploadResponse> {
   return json(res);
 }
 
-/** Pre-parse PDF in background after upload */
 export async function preparsePdf(examId: string): Promise<{ status: string }> {
   const res = await fetch(`${BASE}/api/generation/preparse-pdf`, {
     method: "POST",
@@ -62,7 +61,6 @@ export async function preparsePdf(examId: string): Promise<{ status: string }> {
   return json(res);
 }
 
-/** Upload a template directory (files from webkitdirectory picker). */
 export async function uploadTemplate(files: File[]): Promise<UploadDirResponse> {
   const form = new FormData();
   for (const file of files) {
@@ -77,7 +75,6 @@ export async function uploadTemplate(files: File[]): Promise<UploadDirResponse> 
   return json(res);
 }
 
-/** Upload tester files (files from webkitdirectory picker). */
 export async function uploadTesters(files: File[]): Promise<UploadDirResponse> {
   const form = new FormData();
   for (const file of files) {
@@ -131,7 +128,6 @@ export async function saveResults(req: SaveRequest): Promise<SaveResponse> {
   return json(res);
 }
 
-/** Phase 2 — Analyze exam PDF + uploaded directories → InferredConfig */
 export async function analyzeSetup(
   req: AnalyzeSetupRequest
 ): Promise<InferredConfig> {
@@ -144,7 +140,6 @@ export async function analyzeSetup(
   return json(res);
 }
 
-/** Phase 2/3 — Generate for a single question using confirmed InferredQuestionConfig */
 export async function executeQuestion(
   req: ExecuteQuestionRequest
 ): Promise<GenerationResult> {
@@ -156,7 +151,6 @@ export async function executeQuestion(
   return json(res);
 }
 
-/** Phase 4 — Ask AI to recommend test count + concepts for a question */
 export async function recommend(
   req: RecommendRequest
 ): Promise<TestCaseRecommendation> {
@@ -168,7 +162,6 @@ export async function recommend(
   return json(res);
 }
 
-/** Phase 5 — Refine generated code via LLM */
 export async function refineCode(req: {
   examId: string;
   questionId: string;
@@ -183,7 +176,6 @@ export async function refineCode(req: {
   return json(res);
 }
 
-/** Phase 5 — Fetch student template source files for split-pane viewer */
 export async function fetchTemplateSource(
   templateId: string,
   folder: string
@@ -194,13 +186,11 @@ export async function fetchTemplateSource(
   return json(res);
 }
 
-/** RunResults — structured per-student scores for a run */
 export async function getRunResults(runId: string): Promise<any[]> {
   const res = await fetch(`${BASE}/api/reports/${encodeURIComponent(runId)}/results`);
   return json(res);
 }
 
-/** RunResults — .java source files for a specific student in a run */
 export async function getStudentCode(runId: string, username: string): Promise<Record<string, string>> {
   const res = await fetch(
     `${BASE}/api/reports/${encodeURIComponent(runId)}/code/${encodeURIComponent(username)}`
@@ -208,7 +198,6 @@ export async function getStudentCode(runId: string, username: string): Promise<R
   return json(res);
 }
 
-/** Phase 7.1 — List past grading runs */
 export async function listReports(): Promise<
   Array<{
     id: string;
@@ -222,7 +211,6 @@ export async function listReports(): Promise<
   return json(res);
 }
 
-/** Phase 7.1 — Get run logs */
 export async function getRunLogs(
   runId: string
 ): Promise<{

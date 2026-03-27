@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  FolderArchive, FileCode2, FileSpreadsheet, FileText,
+  FolderArchive, FileCode2, FileSpreadsheet,
   Play, History, ChevronDown, RotateCcw, Terminal,
   CheckCircle2, AlertCircle, Loader2, Users, ArrowRight,
   TrendingUp, BarChart2, TriangleAlert,
@@ -11,16 +11,8 @@ import GradingTerminal from '../components/GradingTerminal';
 import ResultsTable from '../components/ResultsTable';
 import type { Submission } from '../components/SubmissionDetails';
 import { listRunsOptions } from '../generated/@tanstack/react-query.gen';
-import { getStudentCode } from '../api/client';
 import { formatRunTimestamp } from '../lib/utils';
 import { useGraderStore } from '../store/graderStore';
-
-type Phase = 'upload' | 'grading' | 'results';
-
-interface GradingResult {
-  status: string;
-  submissions: Submission[];
-}
 
 interface PastRun {
   id: string;
@@ -97,8 +89,8 @@ const UploadCard: React.FC<UploadCardProps> = ({
   );
 };
 
-const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (runId: string) => void }> = ({
-  runs, loading, onLoad,
+const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (runId: string) => void; onViewAll: () => void }> = ({
+  runs, loading, onLoad, onViewAll,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -132,6 +124,7 @@ const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (r
           ) : (
             <div className="max-h-64 overflow-auto">
               {runs.map(run => {
+
                 const failed = run.studentCount === 0;
                 return (
                   <button
@@ -166,6 +159,12 @@ const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (r
               })}
             </div>
           )}
+          <button
+            onClick={() => { setOpen(false); onViewAll(); }}
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors border-t border-border"
+          >
+            View all past runs <ArrowRight size={11} />
+          </button>
         </div>
       )}
     </div>
@@ -188,7 +187,6 @@ const GraderWorkspace: React.FC = () => {
   const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
   const [testerFiles, setTesterFiles] = useState<File[]>([]);
   const [scoresheetFiles, setScoresheetFiles] = useState<File[]>([]);
-  const [examFiles, setExamFiles] = useState<File[]>([]);
   const [streamFormData, setStreamFormData] = useState<FormData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(true);
@@ -249,7 +247,6 @@ const GraderWorkspace: React.FC = () => {
     setSubmissionFiles([]);
     setTesterFiles([]);
     setScoresheetFiles([]);
-    setExamFiles([]);
     setTerminalOpen(true);
   };
 
@@ -271,7 +268,7 @@ const GraderWorkspace: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 mt-1">
-          <PastRunsDropdown runs={pastRuns} loading={runsLoading} onLoad={id => navigate(`/results/${id}`)} />
+          <PastRunsDropdown runs={pastRuns} loading={runsLoading} onLoad={id => navigate(`/results/${id}`)} onViewAll={() => navigate('/past-runs')} />
           {phase === 'results' && !terminalOpen && (
             <button
               onClick={() => setTerminalOpen(true)}
@@ -359,14 +356,6 @@ const GraderWorkspace: React.FC = () => {
               accept=".csv" name="scoresheet"
               count={scoresheetFiles.length}
               onChange={files => { setScoresheetFiles(files); setError(null); }}
-            />
-            <UploadCard
-              label="Exam PDF"
-              hint="Upload the exam PDF to enable AI test generation"
-              icon={<FileText size={20} />}
-              accept=".pdf" name="exam"
-              count={examFiles.length}
-              onChange={files => { setExamFiles(files); setError(null); }}
             />
           </div>
 

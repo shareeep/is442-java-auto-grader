@@ -332,18 +332,14 @@ public class ConfigInferenceService {
 		return deps;
 	}
 
+	private static final Pattern TCNUM_INCREMENT = Pattern.compile("tcNum\\s*\\+\\+");
+
 	private double computeMaxScoreFromTester(Path testerPath) {
 		try {
 			String content = Files.readString(testerPath);
-			// Count occurrences of "tcNum++" or "tcNum ++"
+			Matcher tcMatcher = TCNUM_INCREMENT.matcher(content);
 			int count = 0;
-			int index = 0;
-			while ((index = content.indexOf("tcNum", index)) != -1) {
-				if (content.substring(index).matches("^tcNum\\s*\\+\\+.*[\\s\\S]*$")) {
-					count++;
-				}
-				index += 5;
-			}
+			while (tcMatcher.find()) count++;
 			if (count > 0)
 				return count;
 

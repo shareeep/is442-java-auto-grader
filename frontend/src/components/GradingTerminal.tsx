@@ -22,6 +22,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
   const [done, setDone] = useState(false);
   const termRef = useRef<HTMLDivElement>(null);
   const allStudents = useRef<any[]>([]);
+  const completedRef = useRef(false);
 
   const now = () => {
     const d = new Date();
@@ -39,6 +40,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
 
   useEffect(() => {
     allStudents.current = [];
+    completedRef.current = false;
     const controller = new AbortController();
 
     const runStream = async () => {
@@ -92,7 +94,8 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
         }
 
         // If stream ends without a 'complete' event, handle gracefully
-        if (!done) {
+        if (!completedRef.current) {
+          completedRef.current = true;
           setDone(true);
           if (allStudents.current.length > 0) {
             onComplete(allStudents.current);
@@ -131,6 +134,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
           break;
         case 'complete':
           addLog({ type: 'complete', timestamp: now(), message: `${data.message} (${data.totalStudents} students)` });
+          completedRef.current = true;
           setDone(true);
           setPhase('Complete');
           onComplete(allStudents.current, data.runId);

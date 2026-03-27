@@ -9,6 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +19,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * Phase 7.1 — Browse past grading runs stored in the output/ directory.
+ * Browse past grading runs stored in the output/ directory.
  */
 @RestController
 @RequestMapping("/api/reports")
@@ -25,6 +27,10 @@ public class ReportsController {
 
 	private static final Logger logger = LoggerFactory.getLogger(ReportsController.class);
 	private static final Path OUTPUT_DIR = Paths.get("output");
+
+	private boolean isUnsafePathSegment(String segment) {
+		return segment.contains("..") || segment.contains("/") || segment.contains("\\");
+	}
 
 	@GetMapping("/list")
 	public ResponseEntity<?> listRuns() {
@@ -43,17 +49,19 @@ public class ReportsController {
 						run.put("hasCsv", Files.exists(dir.resolve("IS442-ScoreSheet-Graded.csv"))
 								|| Files.exists(dir.resolve("detailed-report.csv")));
 
-						// Count student log folders
-						Path logsDir = dir.resolve("logs");
-						if (Files.isDirectory(logsDir)) {
-							try (Stream<Path> logStream = Files.list(logsDir)) {
-								long studentCount = logStream.filter(Files::isDirectory).count();
-								run.put("studentCount", studentCount);
-							} catch (IOException e) {
-								run.put("studentCount", 0);
+						// Count students: prefer results.json (written after every run and
+						// accurate), fall back to logs/ subdirectories which may undercount if
+						// a student's log dir was never created due to an early failure.
+						Path resultsJson = dir.resolve("results.json");
+						if (Files.exists(resultsJson)) {
+							try {
+								List<?> results = new ObjectMapper().readValue(resultsJson.toFile(), List.class);
+								run.put("studentCount", results.size());
+							} catch (Exception e) {
+								run.put("studentCount", countLogDirs(dir));
 							}
 						} else {
-							run.put("studentCount", 0);
+							run.put("studentCount", countLogDirs(dir));
 						}
 						return run;
 					}).toList();
@@ -63,12 +71,19 @@ public class ReportsController {
 		}
 	}
 
+	private long countLogDirs(Path runDir) {
+		Path logsDir = runDir.resolve("logs");
+		if (!Files.isDirectory(logsDir)) return 0;
+		try (Stream<Path> s = Files.list(logsDir)) {
+			return s.filter(Files::isDirectory).count();
+		} catch (IOException e) {
+			return 0;
+		}
+	}
+
 	@GetMapping("/{id}/pdf")
 	public ResponseEntity<Resource> getPdf(@PathVariable String id) {
-		// Sanitize id to prevent path traversal
-		if (id.contains("..") || id.contains("/") || id.contains("\\")) {
-			return ResponseEntity.badRequest().build();
-		}
+		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
 		Path pdf = OUTPUT_DIR.resolve(id).resolve("instructor-report.pdf");
 		if (!Files.exists(pdf)) {
 			return ResponseEntity.notFound().build();
@@ -80,9 +95,7 @@ public class ReportsController {
 
 	@GetMapping("/{id}/csv")
 	public ResponseEntity<Resource> getCsv(@PathVariable String id) {
-		if (id.contains("..") || id.contains("/") || id.contains("\\")) {
-			return ResponseEntity.badRequest().build();
-		}
+		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
 		Path runDir = OUTPUT_DIR.resolve(id);
 		Path csv = runDir.resolve("IS442-ScoreSheet-Graded.csv");
 		if (!Files.exists(csv)) {
@@ -99,9 +112,7 @@ public class ReportsController {
 
 	@GetMapping("/{id}/results")
 	public ResponseEntity<?> getResults(@PathVariable String id) {
-		if (id.contains("..") || id.contains("/") || id.contains("\\")) {
-			return ResponseEntity.badRequest().build();
-		}
+		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
 		Path results = OUTPUT_DIR.resolve(id).resolve("results.json");
 		if (!Files.exists(results)) {
 			return ResponseEntity.notFound().build();
@@ -111,10 +122,7 @@ public class ReportsController {
 
 	@GetMapping("/{id}/code/{username}")
 	public ResponseEntity<?> getStudentCode(@PathVariable String id, @PathVariable String username) {
-		if (id.contains("..") || id.contains("/") || id.contains("\\") || username.contains("..")
-				|| username.contains("/") || username.contains("\\")) {
-			return ResponseEntity.badRequest().build();
-		}
+		if (isUnsafePathSegment(id) || isUnsafePathSegment(username)) return ResponseEntity.badRequest().build();
 		Path codeDir = OUTPUT_DIR.resolve(id).resolve("code").resolve(username);
 		if (!Files.isDirectory(codeDir)) {
 			return ResponseEntity.notFound().build();
@@ -138,9 +146,7 @@ public class ReportsController {
 
 	@GetMapping("/{id}/logs")
 	public ResponseEntity<?> getLogs(@PathVariable String id) {
-		if (id.contains("..") || id.contains("/") || id.contains("\\")) {
-			return ResponseEntity.badRequest().build();
-		}
+		if (isUnsafePathSegment(id)) return ResponseEntity.badRequest().build();
 		Path logsDir = OUTPUT_DIR.resolve(id).resolve("logs");
 		if (!Files.isDirectory(logsDir)) {
 			return ResponseEntity.ok(Map.of("runLog", "", "students", List.of()));

@@ -34,6 +34,9 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
 
 # Fix lint
 ./gradlew spotlessApply
+
+# Reset the SQLite session cache (clears parsed PDFs and inferred question configs)
+rm -f data/session.db
 ```
 
 ## Features

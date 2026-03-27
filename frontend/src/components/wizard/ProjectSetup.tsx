@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
 import { uploadExam, uploadTemplate, uploadTesters, analyzeSetup, preparsePdf } from '@/api/client';
@@ -44,13 +44,13 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
   };
 
   return (
-    <Card className="border-border bg-card min-h-[280px]">
+    <Card className="border-border bg-card">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-accent/10 rounded text-accent">
+          <div className="p-2 bg-accent/10 rounded text-accent shrink-0">
             <FolderOpen size={18} />
           </div>
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className="text-base">{title}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -84,9 +84,9 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
               : <Upload size={18} />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
+            <p className="text-sm font-medium text-foreground">
               {uploading ? 'Uploading...'
-                : uploadId ? folderName || 'Uploaded'
+                : uploadId ? (folderName || 'Uploaded')
                 : 'Click to select & upload folder'}
             </p>
             {uploadId && (
@@ -190,84 +190,88 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-20">
-      {/* PDF Upload */}
-      <Card className="border-border bg-card min-h-[280px]">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-accent/10 rounded text-accent">
-              <FileUp size={20} />
-            </div>
-            <div>
+    <div className="flex flex-col gap-4 pb-20">
+      {/* Main upload row: PDF square + two dir cards stacked */}
+      <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
+        {/* PDF Upload — square card */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-accent/10 rounded text-accent shrink-0">
+                <FileUp size={20} />
+              </div>
               <CardTitle>Exam PDF</CardTitle>
-              <CardDescription>Upload the exam PDF</CardDescription>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-10 bg-secondary/50 hover:bg-secondary hover:border-primary/30 transition-colors group cursor-pointer relative">
-            <input
-              type="file"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              onChange={handleFileChange}
-              accept=".pdf"
-            />
-            <div className="w-14 h-14 bg-card rounded-lg flex items-center justify-center border border-border group-hover:border-primary/30 transition-colors mb-4">
-              {examId
-                ? <CheckCircle2 className="text-vsc-green" size={28} />
-                : <FileUp className="text-muted-foreground" size={28} />
-              }
-            </div>
-            <p className="font-outfit font-bold text-foreground">
-              {file ? file.name : examId ? 'PDF uploaded' : 'Click or drag PDF to upload'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Maximum size 10MB</p>
-          </div>
-
-          {uploadError && (
-            <div className="flex items-center gap-3 p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in">
-              <AlertCircle size={16} />
-              <p className="text-sm">{uploadError}</p>
-            </div>
-          )}
-
-          {examId && !uploadError && (
-            <div className={`flex items-center gap-3 p-3 rounded-md border animate-in fade-in ${
-              parsingPdf
-                ? 'bg-primary/10 text-primary border-primary/20'
-                : 'bg-vsc-green/10 text-vsc-green border-vsc-green/20'
-            }`}>
-              {parsingPdf ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              <p className="text-sm font-medium">
-                {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded and ready for inference.'}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-8 bg-secondary/50 hover:bg-secondary hover:border-primary/30 transition-colors cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileChange}
+                accept=".pdf"
+              />
+              <div className="w-14 h-14 bg-card rounded-lg flex items-center justify-center border border-border mb-4">
+                {uploading
+                  ? <Loader2 className="text-primary animate-spin" size={28} />
+                  : examId
+                    ? <CheckCircle2 className="text-vsc-green" size={28} />
+                    : <FileUp className="text-muted-foreground" size={28} />
+                }
+              </div>
+              <p className="font-outfit font-bold text-foreground text-center">
+                {uploading ? 'Uploading...' : file ? file.name : examId ? 'PDF uploaded' : 'Click or drag PDF to upload'}
               </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <p className="text-xs text-muted-foreground mt-1">Maximum size 10MB</p>
+            </label>
 
-      <FolderUploadCard
-        title="Template Directory"
-        hint="Select the folder containing student code templates (e.g. RenameToYourUsername with Q1, Q2 subfolders)."
-        uploadId={templateId}
-        onUpload={handleUploadTemplate}
-      />
+            {uploadError && (
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in">
+                <AlertCircle size={16} />
+                <p className="text-sm">{uploadError}</p>
+              </div>
+            )}
 
-      <FolderUploadCard
-        title="Testers Directory"
-        hint="Select the folder containing existing Tester.java files (e.g. Tester-Files with Q1Tester.java, etc.)."
-        uploadId={testerId}
-        onUpload={handleUploadTesters}
-      />
+            {examId && !uploadError && (
+              <div className={`flex items-center gap-3 p-3 rounded-md border animate-in fade-in ${
+                parsingPdf
+                  ? 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-vsc-green/10 text-vsc-green border-vsc-green/20'
+              }`}>
+                {parsingPdf ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                <p className="text-sm font-medium">
+                  {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded and ready for inference.'}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Two directory cards stacked */}
+        <div className="flex flex-col gap-4">
+          <FolderUploadCard
+            title="Template Directory"
+            hint="Select the folder containing student code templates (e.g. RenameToYourUsername with Q1, Q2 subfolders)."
+            uploadId={templateId}
+            onUpload={handleUploadTemplate}
+          />
+          <FolderUploadCard
+            title="Testers Directory"
+            hint="Select the folder containing existing Tester.java files (e.g. Tester-Files with Q1Tester.java, etc.)."
+            uploadId={testerId}
+            onUpload={handleUploadTesters}
+          />
+        </div>
+      </div>
 
       {inferError && (
-        <div className="md:col-span-3 flex items-center gap-3 p-4 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center gap-3 p-4 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in slide-in-from-top-2">
           <AlertCircle size={18} />
           <p className="text-sm font-medium">{inferError}</p>
         </div>
       )}
 
-      <div className="md:col-span-3 flex justify-center">
+      <div className="flex justify-center">
         <Button
           size="lg"
           onClick={handleBeginInference}

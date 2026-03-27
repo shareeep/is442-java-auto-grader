@@ -50,7 +50,7 @@ function fileIcon(name: string) {
   const ext = name.split('.').pop()?.toLowerCase();
   if (ext === 'java') return <FileCode2 size={13} className="text-vsc-orange shrink-0" />;
   if (ext === 'csv') return <FileSpreadsheet size={13} className="text-vsc-green shrink-0" />;
-  if (ext === 'pdf') return <FileText size={13} className="text-vsc-blue shrink-0" />;
+  if (ext === 'pdf') return <FileText size={13} className="text-muted-foreground shrink-0" />;
   return <FileText size={13} className="text-vsc-text-dim shrink-0" />;
 }
 

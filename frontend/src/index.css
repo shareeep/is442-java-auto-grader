@@ -62,22 +62,22 @@
   .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: oklch(0.22 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: oklch(0.22 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
+    --primary: oklch(0.93 0.008 85);
+    --primary-foreground: oklch(0.15 0 0);
+    --secondary: oklch(0.29 0 0);
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
+    --muted: oklch(0.29 0 0);
+    --muted-foreground: oklch(0.65 0 0);
+    --accent: oklch(0.68 0.18 32);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 18%);
+    --input: oklch(1 0 0 / 18%);
+    --ring: oklch(0.93 0.008 85);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -158,7 +158,7 @@
 
   /* Glow effects for VS Code aesthetic */
   .glow-blue {
-    box-shadow: 0 0 20px rgba(88, 166, 255, 0.15);
+    box-shadow: 0 0 20px rgba(232, 227, 213, 0.12);
   }
   .glow-accent {
     box-shadow: 0 0 20px rgba(247, 129, 102, 0.15);
