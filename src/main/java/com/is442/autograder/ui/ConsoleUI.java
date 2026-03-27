@@ -2,6 +2,9 @@ package com.is442.autograder.ui;
 
 import com.is442.autograder.GradingPipeline;
 import com.is442.autograder.config.AppConfig;
+import com.is442.autograder.App;
+import com.is442.autograder.generation.LangChainService;
+import com.is442.autograder.generation.PdfParser;
 import com.is442.autograder.generation.TestGenerationService;
 import com.is442.autograder.generation.TesterFileWriter;
 import com.is442.autograder.model.GeneratedTestCase;
@@ -261,8 +264,10 @@ public class ConsoleUI {
 		}
 
 		// Run generation
-		TestGenerationService service = new TestGenerationService(config);
+		LangChainService aiService = App.createLangChainService(config);
 		TesterFileWriter writer = new TesterFileWriter();
+		PdfParser pdfParser = new PdfParser(config.getDoclingServeUrl());
+		TestGenerationService service = new TestGenerationService(aiService, writer);
 
 		for (QuestionConfig qc : selectedQuestions) {
 			System.out.println("\n  Generating for " + qc.getQuestionId() + "...");
@@ -273,7 +278,8 @@ public class ConsoleUI {
 
 			GenerationResult result;
 			try {
-				result = service.generateForQuestion(qc, examPdf, existingTester, numCases);
+				String examContext = pdfParser.extractQuestionSection(examPdf, qc.getQuestionId());
+				result = service.generateForQuestion(qc, examContext, existingTester, numCases, null);
 			} catch (Exception e) {
 				System.out.println("  ✖ Error generating for " + qc.getQuestionId() + ": " + e.getMessage());
 				continue;

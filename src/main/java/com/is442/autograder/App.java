@@ -2,6 +2,8 @@ package com.is442.autograder;
 
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.config.EnvLoader;
+import com.is442.autograder.generation.LangChainService;
+import com.is442.autograder.generation.PdfParser;
 import com.is442.autograder.generation.TestGenerationService;
 import com.is442.autograder.generation.TesterFileWriter;
 import com.is442.autograder.model.GeneratedTestCase;
@@ -9,10 +11,15 @@ import com.is442.autograder.model.GenerationResult;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.ui.ConsoleUI;
 
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
+import dev.langchain4j.service.AiServices;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 
 import org.springframework.boot.SpringApplication;
@@ -62,6 +69,25 @@ public class App {
 			System.err.println("Failed to load configuration: " + e.getMessage());
 			System.exit(1);
 		}
+	}
+
+	/**
+	 * Create a LangChainService instance for CLI use (outside Spring context). Uses
+	 * LangChain4j's AiServices factory with OpenRouter-compatible model.
+	 */
+	public static LangChainService createLangChainService(AppConfig config) {
+		String apiKey = EnvLoader.get("OPENROUTER_API_KEY");
+		if (apiKey == null || apiKey.isBlank()) {
+			throw new IllegalStateException("OPENROUTER_API_KEY is not set (env var or .env file).");
+		}
+
+		OpenAiChatModel model = OpenAiChatModel.builder().apiKey(apiKey)
+				.modelName(config.getAiModel() != null ? config.getAiModel() : "minimax/minimax-m2.7")
+				.baseUrl("https://openrouter.ai/api/v1").maxTokens(4096).timeout(Duration.ofSeconds(180)).maxRetries(2)
+				.defaultRequestParameters(OpenAiChatRequestParameters.builder().reasoningEffort("low").build())
+				.logRequests(true).logResponses(true).build();
+
+		return AiServices.create(LangChainService.class, model);
 	}
 
 	/**
@@ -134,8 +160,10 @@ public class App {
 			testersDir = Paths.get("is442-project-materials/Tester-Files");
 		}
 
-		TestGenerationService service = new TestGenerationService(config);
+		LangChainService aiService = createLangChainService(config);
 		TesterFileWriter writer = new TesterFileWriter();
+		PdfParser pdfParser = new PdfParser(config.getDoclingServeUrl());
+		TestGenerationService service = new TestGenerationService(aiService, writer);
 		List<QuestionConfig> questions = config.getQuestionConfigs();
 
 		for (QuestionConfig qc : questions) {
@@ -146,7 +174,9 @@ public class App {
 			}
 
 			try {
-				GenerationResult result = service.generateForQuestion(qc, examPdf, existingTester, numCases);
+				// CLI mode: parse PDF on-the-fly (no DB cache)
+				String examContext = pdfParser.extractQuestionSection(examPdf, qc.getQuestionId());
+				GenerationResult result = service.generateForQuestion(qc, examContext, existingTester, numCases, null);
 
 				// Auto-save with equal weights (1.0 each)
 				List<GeneratedTestCase> cases = result.getCases();

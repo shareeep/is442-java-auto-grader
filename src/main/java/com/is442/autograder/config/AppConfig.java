@@ -2,10 +2,15 @@ package com.is442.autograder.config;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import com.is442.autograder.model.InferredConfig;
+import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 
 /**
@@ -48,6 +53,15 @@ public class AppConfig {
 	/** The assessment name shown in the instructor report header. */
 	public String getAssessmentName() {
 		return properties.getProperty("assessment.name", "Assessment");
+	}
+
+	/** The URL of the local Docling Serve container for PDF parsing. */
+	public String getDoclingServeUrl() {
+		String envUrl = System.getenv("DOCLING_SERVE_URL");
+		if (envUrl != null && !envUrl.isBlank()) {
+			return envUrl;
+		}
+		return properties.getProperty("docling.serve.url", "http://localhost:5001");
 	}
 
 	/**
@@ -115,6 +129,61 @@ public class AppConfig {
 	/** Default number of test cases to generate per question (default: 3). */
 	public int getAiDefaultCasesPerQuestion() {
 		return Integer.parseInt(properties.getProperty("ai.default.cases.per.question", "3"));
+	}
+
+	/**
+	 * Persist an InferredConfig to config.properties on disk and update the
+	 * in-memory properties so that subsequent calls to
+	 * {@link #getQuestionConfigs()} return the new values without a server restart.
+	 */
+	public void writeQuestionConfigs(InferredConfig inferredConfig) throws IOException {
+		List<String> ids = new ArrayList<>();
+		List<String> folders = new ArrayList<>();
+		List<String> testers = new ArrayList<>();
+		List<String> scores = new ArrayList<>();
+		List<String> depFolders = new ArrayList<>();
+		List<String> depFiles = new ArrayList<>();
+
+		for (InferredQuestionConfig q : inferredConfig.getQuestions()) {
+			ids.add(q.getQuestionId());
+			folders.add(q.getFolder() != null ? q.getFolder() : "");
+			testers.add(q.getTester() != null ? q.getTester() : "");
+			scores.add(String.valueOf(q.getMaxScore()));
+			depFolders.add(q.getDependencyFolder() != null ? q.getDependencyFolder() : "");
+			depFiles.add(q.getDependencyFiles() != null && !q.getDependencyFiles().isEmpty()
+					? String.join(";", q.getDependencyFiles())
+					: "");
+		}
+
+		String idsStr = String.join(",", ids);
+		String foldersStr = String.join(",", folders);
+		String testersStr = String.join(",", testers);
+		String scoresStr = String.join(",", scores);
+		String depFoldersStr = String.join(",", depFolders);
+		String depFilesStr = String.join(",", depFiles);
+
+		// Update in-memory properties
+		properties.setProperty("questions.list", idsStr);
+		properties.setProperty("questions.folders", foldersStr);
+		properties.setProperty("questions.testers", testersStr);
+		properties.setProperty("questions.max.scores", scoresStr);
+		properties.setProperty("questions.dependency.folders", depFoldersStr);
+		properties.setProperty("questions.dependency.files", depFilesStr);
+
+		// Persist to disk (best-effort; server must be run from project root)
+		Path configPath = Paths.get("src/main/resources/config.properties");
+		if (Files.exists(configPath)) {
+			String content = Files.readString(configPath);
+			content = content.replaceFirst("(?m)^questions\\.list=.*$", "questions.list=" + idsStr);
+			content = content.replaceFirst("(?m)^questions\\.folders=.*$", "questions.folders=" + foldersStr);
+			content = content.replaceFirst("(?m)^questions\\.testers=.*$", "questions.testers=" + testersStr);
+			content = content.replaceFirst("(?m)^questions\\.max\\.scores=.*$", "questions.max.scores=" + scoresStr);
+			content = content.replaceFirst("(?m)^questions\\.dependency\\.folders=.*$",
+					"questions.dependency.folders=" + depFoldersStr);
+			content = content.replaceFirst("(?m)^questions\\.dependency\\.files=.*$",
+					"questions.dependency.files=" + depFilesStr);
+			Files.writeString(configPath, content);
+		}
 	}
 
 	private String[] getArray(String key) {

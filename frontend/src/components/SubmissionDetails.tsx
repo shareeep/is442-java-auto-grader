@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { ArrowLeft, ShieldAlert, CheckCircle2, LayoutList, Activity } from 'lucide-react';
-import gsap from 'gsap';
+import React from 'react';
+import { ArrowLeft, CheckCircle2, XCircle, ShieldAlert, Minus } from 'lucide-react';
 
 interface Anomaly {
   severity: string;
@@ -29,149 +28,143 @@ interface SubmissionDetailsProps {
 }
 
 const SubmissionDetails: React.FC<SubmissionDetailsProps> = ({ submission, onBack }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
   const isPerfect = submission.totalScore === submission.maxPossibleScore;
-  const hasAnomalies = submission.anomalies && submission.anomalies.length > 0;
+  const results = submission.results ?? [];
+  const anomalies = submission.anomalies ?? [];
 
-  useEffect(() => {
-    if (containerRef.current) {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0, x: 20 },
-        { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }
-      );
-      
-      gsap.fromTo(
-        containerRef.current.querySelectorAll('.stagger-item'),
-        { opacity: 0, y: 15 },
-        { opacity: 1, y: 0, duration: 0.4, stagger: 0.05, ease: "power3.out", delay: 0.1 }
-      );
-    }
-  }, [submission]);
+  // Match anomalies to a question row by checking if the question ID appears in the description
+  const getQuestionAnomalies = (questionId: string) =>
+    anomalies.filter(a => a.description.toLowerCase().includes(questionId.toLowerCase()));
 
-  const handleBack = () => {
-    gsap.to(containerRef.current, {
-      opacity: 0,
-      x: -20,
-      duration: 0.3,
-      ease: "power2.inOut",
-      onComplete: onBack
-    });
-  };
+  // Anomalies that don't match any specific question
+  const allMatchedAnomalies = new Set(
+    results.flatMap(r => getQuestionAnomalies(r.questionId).map(a => a.description))
+  );
+  const globalAnomalies = anomalies.filter(a => !allMatchedAnomalies.has(a.description));
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-6">
-      
-      {/* Header / Navigation Controls */}
-      <div className="flex items-center justify-between">
-        <button 
-          onClick={handleBack}
-          className="magnetic-button group flex items-center gap-2 px-4 py-2 bg-white/50 border border-primary/20 rounded-lg text-primary hover:bg-white hover:border-primary/40 transition-all font-mono text-xs uppercase tracking-widest font-bold"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Submissions
-        </button>
-      </div>
+    <div className="flex flex-col gap-4">
 
-      {/* Identity Profile & Score Header */}
-      <div className="glass-card p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 stagger-item border-primary/10">
-        <div className="flex flex-col">
-          <h2 className="font-outfit text-3xl font-bold text-primary mb-1">
-            {submission.name || 'Unknown Student'}
-          </h2>
-          <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">
-            Student ID: {submission.username || submission.displayName}
+      {/* Compact header */}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          >
+            <ArrowLeft size={13} /> Back
+          </button>
+          <div className="w-px h-6 bg-border" />
+          <div>
+            <h2 className="text-base font-outfit font-bold text-foreground leading-tight">
+              {submission.name || 'Unknown Student'}
+            </h2>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {submission.username || submission.displayName}
+            </span>
+          </div>
+        </div>
+        <div className={`flex items-baseline gap-1 px-4 py-2 rounded-lg border font-mono ${
+          isPerfect ? 'border-vsc-green/30 bg-vsc-green/10' : 'border-border bg-secondary'
+        }`}>
+          <span className={`text-2xl font-bold ${isPerfect ? 'text-vsc-green' : 'text-primary'}`}>
+            {submission.totalScore}
           </span>
-        </div>
-        
-        <div className={`px-6 py-4 rounded-xl border flex gap-4 items-center ${isPerfect ? 'bg-green-50 border-green-200' : 'bg-background border-primary/20'}`}>
-          <div className="flex flex-col text-right">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-charcoal/50 mb-1">Final Score</span>
-            <div className="flex items-baseline gap-1">
-              <span className={`font-mono text-4xl font-bold ${isPerfect ? 'text-green-700' : 'text-primary'}`}>
-                {submission.totalScore}
-              </span>
-              <span className="font-mono text-sm text-charcoal/30">/{submission.maxPossibleScore}</span>
-            </div>
-          </div>
+          <span className="text-sm text-muted-foreground">/{submission.maxPossibleScore}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Left Column: Anomalies */}
-        <div className="flex flex-col gap-4 stagger-item">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity size={20} className={hasAnomalies ? 'text-accent' : 'text-green-600'} />
-            <h3 className="font-outfit text-xl font-bold text-primary">Errors & Warnings</h3>
-          </div>
-          
-          {hasAnomalies ? (
-            <div className="flex flex-col gap-3">
-              {submission.anomalies!.map((anomaly, idx) => (
-                <div key={idx} className="glass-card p-4 border-[#FAD1CD] bg-[#FDE8E6]/50 flex gap-4 items-start">
-                  <div className="pt-1 text-accent"><ShieldAlert size={18} /></div>
-                  <div className="flex flex-col">
-                    <span className="font-mono text-[10px] uppercase font-bold text-accent tracking-widest mb-1">{anomaly.severity}</span>
-                    <p className="text-sm font-sans text-charcoal/80 leading-relaxed font-medium">
-                      {anomaly.description}
-                    </p>
+      {/* Evaluation matrix with inline anomalies */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="grid grid-cols-12 px-5 py-2.5 border-b border-border bg-secondary/50">
+          <div className="col-span-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Question</div>
+          <div className="col-span-5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Score</div>
+          <div className="col-span-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Result</div>
+        </div>
+
+        {results.length === 0 ? (
+          <div className="py-10 text-center text-xs font-mono text-muted-foreground">No results recorded</div>
+        ) : (
+          results.map((r, i) => {
+            const pct = r.maxScore > 0 ? (r.score / r.maxScore) * 100 : 0;
+            const passed = r.score === r.maxScore;
+            const partial = r.score > 0 && !passed;
+            const qAnomalies = getQuestionAnomalies(r.questionId);
+
+            return (
+              <div key={i} className="border-b border-border/40 last:border-0">
+                {/* Question row */}
+                <div className="grid grid-cols-12 px-5 py-3 items-center">
+                  <div className="col-span-3 font-mono text-sm font-semibold text-foreground/80">
+                    {r.questionId}
+                  </div>
+                  <div className="col-span-5 flex items-center gap-2.5">
+                    <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          passed ? 'bg-vsc-green' : partial ? 'bg-yellow-500' : 'bg-accent'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-xs text-muted-foreground shrink-0">
+                      {r.score}/{r.maxScore}
+                    </span>
+                  </div>
+                  <div className="col-span-4 flex items-center justify-end gap-1.5">
+                    {passed ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-vsc-green">
+                        <CheckCircle2 size={11} /> Pass
+                      </span>
+                    ) : partial ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-500">
+                        <Minus size={11} /> Partial
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-accent">
+                        <XCircle size={11} /> Fail
+                      </span>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="glass-card p-8 border-green-200 bg-green-50/50 flex flex-col items-center justify-center text-center gap-3">
-              <CheckCircle2 size={32} className="text-green-600" />
-              <div className="flex flex-col">
-                <span className="font-outfit font-bold text-lg text-green-800">Valid Submission</span>
-                <span className="font-mono text-xs text-green-600/70">No anomalies or structural violations detected.</span>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Right Column: Question Results */}
-        <div className="flex flex-col gap-4 stagger-item">
-          <div className="flex items-center gap-2 mb-2">
-            <LayoutList size={20} className="text-primary" />
-            <h3 className="font-outfit text-xl font-bold text-primary">Evaluation Matrix</h3>
-          </div>
-
-          <div className="glass-card overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-primary/5 border-b border-primary/10">
-              <div className="col-span-8 font-mono text-[10px] uppercase tracking-widest text-primary/60 font-semibold">Question</div>
-              <div className="col-span-4 font-mono text-[10px] uppercase tracking-widest text-primary/60 font-semibold text-right">Score</div>
-            </div>
-
-            <div className="flex flex-col max-h-[400px] overflow-y-auto">
-              {submission.results && submission.results.length > 0 ? (
-                submission.results.map((req, idx) => {
-                  const passed = req.score === req.maxScore;
-                  return (
-                    <div key={idx} className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-primary/5 last:border-0 items-center">
-                      <div className="col-span-8 font-sans text-sm font-medium text-charcoal/80 flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${passed ? 'bg-green-500' : 'bg-accent'}`} />
-                        {req.questionId}
-                      </div>
-                      <div className="col-span-4 flex justify-end font-mono text-sm">
-                        <span className={passed ? 'text-green-700 font-bold' : 'text-accent font-bold'}>{req.score}</span>
-                        <span className="text-charcoal/30">/{req.maxScore}</span>
-                      </div>
+                {/* Inline anomalies for this question */}
+                {qAnomalies.map((a, ai) => (
+                  <div key={ai} className="flex items-start gap-3 px-5 py-2 bg-accent/5 border-t border-accent/10">
+                    <ShieldAlert size={11} className="text-accent shrink-0 mt-0.5" />
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="font-mono text-[9px] font-bold text-accent uppercase tracking-wider shrink-0">
+                        {a.severity}
+                      </span>
+                      <p className="text-xs text-foreground/70 leading-relaxed truncate">{a.description}</p>
                     </div>
-                  );
-                })
-              ) : (
-                <div className="px-5 py-8 text-center text-sm font-mono text-charcoal/40">
-                  No discrete questions logged.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        )}
       </div>
 
+      {/* Global anomalies — not tied to any specific question */}
+      {globalAnomalies.length > 0 && (
+        <div className="rounded-xl border border-accent/20 bg-accent/5 overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-accent/15 bg-accent/5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Submission Warnings</span>
+          </div>
+          {globalAnomalies.map((a, i) => (
+            <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-accent/10 last:border-0">
+              <ShieldAlert size={13} className="text-accent shrink-0 mt-0.5" />
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="font-mono text-[9px] font-bold text-accent uppercase tracking-wider shrink-0">
+                  {a.severity}
+                </span>
+                <p className="text-sm text-foreground/80 leading-relaxed">{a.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

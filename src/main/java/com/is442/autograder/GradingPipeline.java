@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -72,6 +73,22 @@ public class GradingPipeline {
 	 */
 	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir)
 			throws IOException {
+		return run(submissionsDir, testerFilesDir, scoresheetPath, outputDir, null);
+	}
+
+	/**
+	 * Run the full grading pipeline with a per-student callback for live streaming.
+	 *
+	 * @param onStudentGraded
+	 *            called immediately after each student is graded (may be null)
+	 */
+	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir,
+			Consumer<StudentSubmission> onStudentGraded) throws IOException {
+		return run(submissionsDir, testerFilesDir, scoresheetPath, outputDir, onStudentGraded, null);
+	}
+
+	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir,
+			Consumer<StudentSubmission> onStudentGraded, Consumer<String> onStudentStarted) throws IOException {
 
 		ConsoleLogCapture logCapture = null;
 		Path runOutputDir = outputDir;
@@ -112,6 +129,10 @@ public class GradingPipeline {
 				StudentSubmission submission = new StudentSubmission(zipName);
 				consoleReporter.updateCurrentStudent(submission.getDisplayName());
 
+				if (onStudentStarted != null) {
+					onStudentStarted.accept(submission.getDisplayName());
+				}
+
 				try {
 					// Extract to temp directory
 					Path tempDir = FileUtils.createTempDir("autograder-" + zipName.replace(".zip", ""));
@@ -145,8 +166,18 @@ public class GradingPipeline {
 					System.err.println("  ✖ Error processing " + zipName + ": " + e.getMessage());
 				}
 
+				// Fill missing name immediately so callback and later enrichment both have it
+				if ((submission.getName() == null || submission.getName().isEmpty())
+						&& submission.getUsername() != null) {
+					submission.setName(identityResolver.deriveNameFromUsername(submission.getUsername()));
+				}
+
 				consoleReporter.printProgress(i + 1, zipFiles.size(), submission.getDisplayName());
 				submissions.add(submission);
+
+				if (onStudentGraded != null) {
+					onStudentGraded.accept(submission);
+				}
 			}
 
 			consoleReporter.endProgress();
@@ -155,13 +186,6 @@ public class GradingPipeline {
 			if (consoleReporter.isStopRequested()) {
 				System.out.println(
 						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
-			}
-
-			// 3. Fill missing names using username-derived fallback
-			for (StudentSubmission sub : submissions) {
-				if ((sub.getName() == null || sub.getName().isEmpty()) && sub.getUsername() != null) {
-					sub.setName(identityResolver.deriveNameFromUsername(sub.getUsername()));
-				}
 			}
 
 			// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided

@@ -52,6 +52,7 @@ public class EnvLoader {
 					value = value.substring(1, value.length() - 1);
 				}
 				values.put(key, value);
+				System.setProperty(key, value);
 			}
 		} catch (IOException e) {
 			System.err.println("Warning: could not read .env file: " + e.getMessage());

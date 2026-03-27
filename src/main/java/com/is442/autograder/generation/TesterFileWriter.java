@@ -1,6 +1,7 @@
 package com.is442.autograder.generation;
 
 import com.is442.autograder.model.GeneratedTestCase;
+import com.is442.autograder.model.StructuredTestCase;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -58,6 +59,95 @@ public class TesterFileWriter {
 		Path outputFile = outputDir.resolve(generatedClassName + ".java");
 		Files.writeString(outputFile, fileContent);
 		return outputFile;
+	}
+
+	/**
+	 * Build Java test case blocks from a list of structured test cases. The
+	 * returned string contains the inner content of the grade() method — it does
+	 * NOT include the class wrapper or the method signature. Each block is a
+	 * standalone {@code { ... }} statement that follows the existing tester
+	 * convention (tcNum++, score +=, printed pass/fail).
+	 *
+	 * @param cases
+	 *            list of structured test cases
+	 * @return Java source fragment ready to embed inside grade()
+	 */
+	public String buildCodeFromStructured(List<StructuredTestCase> cases) {
+		StringBuilder sb = new StringBuilder();
+		for (StructuredTestCase tc : cases) {
+			sb.append("        {\n");
+			// Comment header
+			String concept = tc.conceptCovered() != null ? tc.conceptCovered() : "";
+			String desc = tc.description() != null ? tc.description() : "";
+			if (!concept.isBlank()) {
+				sb.append("            // ").append(concept).append(": ").append(desc).append("\n");
+			} else {
+				sb.append("            // ").append(desc).append("\n");
+			}
+			sb.append("            System.out.println(\"Test \" + tcNum + \": ").append(desc.replace("\"", "'"))
+					.append("\");\n");
+
+			if (tc.expectsException()) {
+				// Exception path
+				String exType = tc.exceptionType() != null ? tc.exceptionType() : "Exception";
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  => Expected ").append(exType)
+						.append(" but none thrown — Failed\");\n");
+				sb.append("            } catch (").append(exType).append(" e) {\n");
+				sb.append("                System.out.println(\"  => Caught expected ").append(exType)
+						.append(" — Passed\");\n");
+				sb.append("                score += ").append(tc.weight()).append(";\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Wrong exception: \" + e.getClass().getSimpleName() + \" — Failed\");\n");
+				sb.append("            }\n");
+			} else if (tc.assertion() == null || tc.assertion().isBlank()) {
+				// Void method path (no assertion)
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  => Passed\");\n");
+				sb.append("                score += ").append(tc.weight()).append(";\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Exception: \" + e.getMessage() + \" — Failed\");\n");
+				sb.append("            }\n");
+			} else {
+				// Non-void path — compare result using LLM-provided assertion
+				String expected = tc.expected() != null ? tc.expected().replace("\"", "'") : "";
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                var result = ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  Expected: ").append(expected).append("\");\n");
+				sb.append("                System.out.println(\"  Actual:   \" + result);\n");
+				sb.append("                if (").append(tc.assertion()).append(") {\n");
+				sb.append("                    System.out.println(\"  => Passed\");\n");
+				sb.append("                    score += ").append(tc.weight()).append(";\n");
+				sb.append("                } else {\n");
+				sb.append("                    System.out.println(\"  => Failed\");\n");
+				sb.append("                }\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Exception: \" + e.getMessage() + \" — Failed\");\n");
+				sb.append("            }\n");
+			}
+			sb.append("            tcNum++;\n");
+			sb.append("        }\n\n");
+		}
+		return sb.toString();
+	}
+
+	private void appendSetup(StringBuilder sb, String setup) {
+		if (setup != null && !setup.isBlank()) {
+			for (String line : setup.split(";")) {
+				String trimmed = line.trim();
+				if (!trimmed.isBlank()) {
+					sb.append("                ").append(trimmed).append(";\n");
+				}
+			}
+		}
 	}
 
 	/**

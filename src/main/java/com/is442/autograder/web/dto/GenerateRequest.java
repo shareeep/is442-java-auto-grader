@@ -5,8 +5,8 @@ import java.util.List;
 public class GenerateRequest {
 
 	private String examId;
-	private String testersDir;
-	private String templateDir;
+	private String testerId;
+	private String templateId;
 	private List<QuestionSelection> questions;
 
 	public String getExamId() {
@@ -17,20 +17,20 @@ public class GenerateRequest {
 		this.examId = examId;
 	}
 
-	public String getTestersDir() {
-		return testersDir;
+	public String getTesterId() {
+		return testerId;
 	}
 
-	public void setTestersDir(String testersDir) {
-		this.testersDir = testersDir;
+	public void setTesterId(String testerId) {
+		this.testerId = testerId;
 	}
 
-	public String getTemplateDir() {
-		return templateDir;
+	public String getTemplateId() {
+		return templateId;
 	}
 
-	public void setTemplateDir(String templateDir) {
-		this.templateDir = templateDir;
+	public void setTemplateId(String templateId) {
+		this.templateId = templateId;
 	}
 
 	public List<QuestionSelection> getQuestions() {

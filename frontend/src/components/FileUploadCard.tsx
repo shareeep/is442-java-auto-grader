@@ -1,6 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import gsap from 'gsap';
-import { UploadCloud, CheckCircle2, AlertTriangle, Play } from 'lucide-react';
+import React, { useRef } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 
 interface FileUploadProps {
   label: string;
@@ -25,7 +24,7 @@ export const FileUploadCard: React.FC<FileUploadProps> = ({ label, description, 
       <div 
         ref={containerRef}
         className={`relative ${className} flex flex-col items-center justify-center text-center transition-all duration-300 group ${
-          count > 0 ? 'bg-accent/5' : 'bg-white/40 hover:bg-white/80'
+          count > 0 ? 'bg-accent/5' : 'bg-card hover:bg-secondary'
         }`}
       >
         {/* Absolute dashed border overlay */}
@@ -53,7 +52,7 @@ export const FileUploadCard: React.FC<FileUploadProps> = ({ label, description, 
             {isRequired && <span className="text-[10px] text-accent font-bold uppercase tracking-wider bg-accent/10 px-2 py-1 rounded">Req</span>}
           </div>
           
-          <p className="font-sans text-sm text-charcoal/60 mb-8 max-w-sm">{description}</p>
+          <p className="font-sans text-sm text-muted-foreground mb-8 max-w-sm">{description}</p>
           
           {count > 0 ? (
             <span className="font-sans font-bold text-accent px-6 py-2.5 bg-accent/10 rounded-full text-sm flex items-center gap-2 shadow-sm">
