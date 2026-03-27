@@ -117,7 +117,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onBack} disabled={exporting} className="rounded-md">
-            <ChevronLeft size={16} className="mr-1" /> Adjust Hub
+            <ChevronLeft size={16} className="mr-1" /> Generation Hub
           </Button>
           <Button
             onClick={handleExport}

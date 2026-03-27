@@ -3,6 +3,9 @@ package com.is442.autograder.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is442.autograder.GradingPipeline;
 import com.is442.autograder.config.AppConfig;
+import com.is442.autograder.generation.ConfigInferenceService;
+import com.is442.autograder.model.InferredConfig;
+import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StudentSubmission;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -90,9 +93,19 @@ public class GradingStreamController {
 			try {
 				emitter.send(SseEmitter.event().name("session").data(Map.of("sessionId", sessionId)));
 				emitter.send(SseEmitter.event().name("status")
-						.data(Map.of("phase", "init", "message", "Initializing grading pipeline...")));
+						.data(Map.of("phase", "inference", "message", "Inferring question configuration...")));
+
+				ConfigInferenceService inferenceService = new ConfigInferenceService();
+				InferredConfig inferred = inferenceService.inferConfig(null, appConfig.getTemplateFolder(),
+						testersDir.toString());
+				List<QuestionConfig> inferredConfigs = inferenceService.toQuestionConfigs(inferred);
+
+				emitter.send(SseEmitter.event().name("status").data(
+						Map.of("phase", "inference", "message", "Inferred " + inferredConfigs.size() + " question(s): "
+								+ inferredConfigs.stream().map(QuestionConfig::getQuestionId).toList())));
 
 				GradingPipeline pipeline = new GradingPipeline(appConfig);
+				pipeline.setInferredQuestionConfigs(inferredConfigs);
 
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "grading", "message", "Starting grading...")));

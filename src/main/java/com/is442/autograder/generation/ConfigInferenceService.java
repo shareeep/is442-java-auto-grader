@@ -20,6 +20,7 @@ import com.is442.autograder.model.ConfigConflict;
 import com.is442.autograder.model.ConfigConflict.ConflictType;
 import com.is442.autograder.model.InferredConfig;
 import com.is442.autograder.model.InferredQuestionConfig;
+import com.is442.autograder.model.QuestionConfig;
 
 public class ConfigInferenceService {
 
@@ -391,6 +392,18 @@ public class ConfigInferenceService {
 		} catch (IOException e) {
 			logger.warn("Could not list directory: {}", dir);
 		}
+	}
+
+	public List<QuestionConfig> toQuestionConfigs(InferredConfig inferred) {
+		return inferred.getQuestions().stream().map(InferredQuestionConfig::toQuestionConfig)
+				.filter(qc -> qc.getMaxScore() > 0).map(qc -> {
+					if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
+						String parent = extractQuestionPrefix(qc.getQuestionId());
+						return new QuestionConfig(qc.getQuestionId(), parent, qc.getTesterClassName(), qc.getMaxScore(),
+								qc.getDependencyFolder(), qc.getDependencyFiles());
+					}
+					return qc;
+				}).toList();
 	}
 
 	private String extractQuestionPrefix(String questionId) {

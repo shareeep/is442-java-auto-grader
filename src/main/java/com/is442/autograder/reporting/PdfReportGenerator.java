@@ -737,7 +737,6 @@ public class PdfReportGenerator {
 		int total = subs.size();
 		PdfReportAnalytics.InsightStats insightStats = PdfReportAnalytics.computeInsightStats(subs, qcs,
 				STRUCTURAL_TYPES, METADATA_TYPES);
-		double classMax = insightStats.classMax();
 		long compileErrors = insightStats.compileErrors();
 		long timeouts = insightStats.timeouts();
 		long structIssues = insightStats.structuralIssues();

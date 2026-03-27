@@ -4,26 +4,12 @@ import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.config.EnvLoader;
 import com.is442.autograder.generation.ConfigInferenceService;
 import com.is442.autograder.model.InferredConfig;
-import com.is442.autograder.model.InferredQuestionConfig;
-import com.is442.autograder.model.QuestionConfig;
-import com.is442.autograder.generation.LangChainService;
-import com.is442.autograder.generation.PdfParser;
-import com.is442.autograder.generation.TestGenerationService;
-import com.is442.autograder.generation.TesterFileWriter;
-import com.is442.autograder.model.GeneratedTestCase;
-import com.is442.autograder.model.GenerationResult;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.ui.ConsoleUI;
 
-import dev.langchain4j.model.openai.OpenAiChatModel;
-import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
-import dev.langchain4j.service.AiServices;
-
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.List;
 
 import org.springframework.boot.SpringApplication;
@@ -63,9 +49,6 @@ public class App {
 				ConfigInferenceService configInferenceService = new ConfigInferenceService();
 				ConsoleUI ui = new ConsoleUI(config, configInferenceService);
 				ui.start();
-			} else if (hasFlag(args, "--generate-tests")) {
-				// CLI generation mode
-				runGenerateCli(config, args);
 			} else {
 				// CLI grading mode
 				runCli(config, args);
@@ -74,25 +57,6 @@ public class App {
 			System.err.println("Failed to load configuration: " + e.getMessage());
 			System.exit(1);
 		}
-	}
-
-	/**
-	 * Create a LangChainService instance for CLI use (outside Spring context). Uses
-	 * LangChain4j's AiServices factory with OpenRouter-compatible model.
-	 */
-	public static LangChainService createLangChainService(AppConfig config) {
-		String apiKey = EnvLoader.get("OPENROUTER_API_KEY");
-		if (apiKey == null || apiKey.isBlank()) {
-			throw new IllegalStateException("OPENROUTER_API_KEY is not set (env var or .env file).");
-		}
-
-		OpenAiChatModel model = OpenAiChatModel.builder().apiKey(apiKey)
-				.modelName(config.getAiModel() != null ? config.getAiModel() : "minimax/minimax-m2.7")
-				.baseUrl("https://openrouter.ai/api/v1").maxTokens(4096).timeout(Duration.ofSeconds(180)).maxRetries(2)
-				.defaultRequestParameters(OpenAiChatRequestParameters.builder().reasoningEffort("low").build())
-				.logRequests(true).logResponses(true).build();
-
-		return AiServices.create(LangChainService.class, model);
 	}
 
 	/**
@@ -134,15 +98,7 @@ public class App {
 				System.exit(1);
 			}
 
-			List<QuestionConfig> inferredConfigs = inferred.getQuestions().stream()
-					.map(InferredQuestionConfig::toQuestionConfig).filter(qc -> qc.getMaxScore() > 0).map(qc -> {
-						if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
-							String parent = qc.getQuestionId().replaceFirst("([a-z])$", "");
-							return new QuestionConfig(qc.getQuestionId(), parent, qc.getTesterClassName(),
-									qc.getMaxScore(), qc.getDependencyFolder(), qc.getDependencyFiles());
-						}
-						return qc;
-					}).toList();
+			List<QuestionConfig> inferredConfigs = inferenceService.toQuestionConfigs(inferred);
 
 			System.out.println("Inferred " + inferredConfigs.size() + " question(s): "
 					+ inferredConfigs.stream().map(QuestionConfig::getQuestionId).toList());
@@ -153,85 +109,6 @@ public class App {
 		} catch (IOException e) {
 			System.err.println("Error during grading: " + e.getMessage());
 			System.exit(1);
-		}
-	}
-
-	/**
-	 * Non-interactive CLI mode for test case generation. Generates with equal
-	 * weights and auto-saves.
-	 */
-	private static void runGenerateCli(AppConfig config, String[] args) {
-		Path examPdf = null;
-		Path testersDir = null;
-		Path outputDir = Paths.get("generated-testers");
-		int numCases = config.getAiDefaultCasesPerQuestion();
-
-		for (int i = 0; i < args.length - 1; i++) {
-			switch (args[i]) {
-				case "--exam" -> examPdf = Paths.get(args[++i]);
-				case "--testers", "-t" -> testersDir = Paths.get(args[++i]);
-				case "--num-cases" -> numCases = Integer.parseInt(args[++i]);
-				case "--output", "-o" -> outputDir = Paths.get(args[++i]);
-			}
-		}
-
-		if (examPdf == null) {
-			System.err.println("Error: --exam <path> is required for --generate-tests.");
-			System.exit(1);
-		}
-
-		if (EnvLoader.get("OPENROUTER_API_KEY") == null) {
-			System.err.println("Error: OPENROUTER_API_KEY is not set (env var or .env file).");
-			System.exit(1);
-		}
-
-		if (testersDir == null) {
-			testersDir = Paths.get("is442-project-materials/Tester-Files");
-		}
-
-		LangChainService aiService = createLangChainService(config);
-		TesterFileWriter writer = new TesterFileWriter();
-		PdfParser pdfParser = new PdfParser(config.getDoclingServeUrl());
-		TestGenerationService service = new TestGenerationService(aiService, writer);
-
-		ConfigInferenceService inferenceService = new ConfigInferenceService();
-		InferredConfig inferred = inferenceService.inferConfig(null, config.getTemplateFolder(), testersDir.toString());
-
-		if (inferred.getQuestions().isEmpty()) {
-			System.err
-					.println("Error: No questions detected from testers dir. Check tester files and template folder.");
-			System.exit(1);
-		}
-
-		List<QuestionConfig> questions = inferred.getQuestions().stream().map(InferredQuestionConfig::toQuestionConfig)
-				.toList();
-
-		for (QuestionConfig qc : questions) {
-			System.out.println("Generating for " + qc.getQuestionId() + "...");
-			Path existingTester = testersDir.resolve(qc.getTesterClassName() + ".java");
-			if (!Files.exists(existingTester)) {
-				existingTester = null;
-			}
-
-			try {
-				// CLI mode: parse PDF on-the-fly (no DB cache)
-				String examContext = pdfParser.extractQuestionSection(examPdf, qc.getQuestionId());
-				GenerationResult result = service.generateForQuestion(qc, examContext, existingTester, numCases, null);
-
-				// Auto-save with equal weights (1.0 each)
-				List<GeneratedTestCase> cases = result.getCases();
-				String existingCode = existingTester != null ? Files.readString(existingTester) : null;
-				Path saved = writer.write(qc.getTesterClassName(), existingCode, result.getGeneratedCode(), cases,
-						testersDir, outputDir);
-
-				System.out
-						.println("  Saved: " + saved + " (compile: " + (result.isCompiledOk() ? "OK" : "FAILED") + ")");
-				if (!result.isCompiledOk()) {
-					System.err.println("  Compile errors:\n" + result.getCompileErrors());
-				}
-			} catch (Exception e) {
-				System.err.println("  Error for " + qc.getQuestionId() + ": " + e.getMessage());
-			}
 		}
 	}
 
@@ -254,15 +131,6 @@ public class App {
 		System.out.println("  --testers, -t <dir>        Directory containing tester .java files (required)");
 		System.out.println("  --scoresheet, -c <file>    Path to template CSV scoresheet (optional)");
 		System.out.println("  --output, -o <dir>         Output directory (default: ./output)");
-		System.out.println();
-		System.out.println("Generation options:");
-		System.out.println("  --generate-tests           Run AI test case generation (non-interactive)");
-		System.out.println("  --exam <path>              Path to exam PDF (required with --generate-tests)");
-		System.out.println(
-				"  --testers, -t <dir>        Tester files directory (default: is442-project-materials/Tester-Files)");
-		System.out.println("  --num-cases <n>            Cases per question (default from config)");
-		System.out.println("  --output, -o <dir>         Output directory (default: ./generated-testers)");
-		System.out.println("  API key read from OPENROUTER_API_KEY environment variable (required).");
 		System.out.println();
 		System.out.println("  --help, -h                 Show this help message");
 		System.out.println();

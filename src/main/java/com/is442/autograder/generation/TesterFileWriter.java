@@ -182,10 +182,7 @@ public class TesterFileWriter {
 
 		props.setProperty("questions.max.scores", String.join(",", scores));
 
-		// Write back preserving comments as best as possible
 		String content = Files.readString(configPath);
-		String oldScoresLine = props.getProperty("questions.max.scores");
-		// Rebuild the scores value
 		String newScoresValue = String.join(",", scores);
 		content = content.replaceFirst("(?m)^questions\\.max\\.scores=.*$", "questions.max.scores=" + newScoresValue);
 		Files.writeString(configPath, content);
