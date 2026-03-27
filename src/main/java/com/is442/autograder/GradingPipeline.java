@@ -46,6 +46,7 @@ public class GradingPipeline {
 	private final CSVExporter csvExporter;
 	private final ConsoleReporter consoleReporter;
 	private final ScoresheetEnricher scoresheetEnricher;
+	private List<QuestionConfig> inferredQuestionConfigs;
 
 	public GradingPipeline(AppConfig config) {
 		this.config = config;
@@ -56,6 +57,10 @@ public class GradingPipeline {
 		this.csvExporter = new CSVExporter();
 		this.consoleReporter = new ConsoleReporter();
 		this.scoresheetEnricher = new ScoresheetEnricher();
+	}
+
+	public void setInferredQuestionConfigs(List<QuestionConfig> configs) {
+		this.inferredQuestionConfigs = configs;
 	}
 
 	/**
@@ -113,7 +118,9 @@ public class GradingPipeline {
 			java.util.logging.LogManager.getLogManager().reset();
 			consoleReporter.startProgress(zipFiles.size());
 
-			List<QuestionConfig> questionConfigs = config.getQuestionConfigs();
+			List<QuestionConfig> questionConfigs = inferredQuestionConfigs != null
+					? inferredQuestionConfigs
+					: config.getQuestionConfigs();
 			List<StudentSubmission> submissions = new ArrayList<>();
 
 			// 2. Process each ZIP

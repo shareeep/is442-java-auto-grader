@@ -6,37 +6,50 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| **Web UI** | `./gradlew bootRun` | Spring Boot + React frontend (port 8080) |
-| **CLI grading** | `java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --submissions ...` | One-shot grading |
+| **CLI grading** | `java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --submissions ...` | One-shot grading (auto-infers questions) |
 | **Interactive CLI** | `java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --cli` | Step-by-step prompts |
-| **Docker** | `docker compose up` | Full stack: Docling (5001) + backend (8080) + frontend (80) |
+| **Web UI (Docker)** | `docker compose up` | Full stack: backend (8080) + frontend (5173) + Docling (5001) |
 
-## Quick Start
+## CLI Grading
 
-Requires **Java 25+** and a running **Docling Serve** instance (or `docker compose up`).
+Questions are **auto-inferred** from tester files at runtime — no config needed.
 
 ```bash
-# Build
-./gradlew clean build
+# Build the fat JAR
+./gradlew fatJar
 
-# Run web UI
-./gradlew bootRun
-
-# Grade submissions (CLI)
+# One-shot grading
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --submissions ./is442-project-materials/student-submission \
   --testers ./is442-project-materials/Tester-Files \
   --output ./output
 
-# Generate test cases (CLI)
-java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
-  --generate-tests --exam-pdf ./exam.pdf --template-dir ./template --tester-dir ./testers
+# Interactive CLI mode
+java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --cli
+```
 
+### Interactive CLI flow
+1. Enter submissions folder
+2. Enter testers folder
+3. Review inferred questions (auto-detected from tester files)
+4. Optionally add scoresheet CSV
+5. Choose output directory
+
+## Web UI
+
+Requires Docker:
+
+```bash
+docker compose up
+```
+
+Starts: backend (8080) + frontend (5173) + Docling (5001).
+
+## Dev
+
+```bash
 # Fix lint
 ./gradlew spotlessApply
-
-# Reset the SQLite session cache (clears parsed PDFs and inferred question configs)
-rm -f data/session.db
 ```
 
 ## Features
@@ -48,7 +61,7 @@ rm -f data/session.db
 - **PDF report generation** — instructor reports with charts (JFreeChart + OpenPDF)
 - **Dual CSV output** — LMS-compatible graded scoresheet + detailed per-question breakdown
 - **AI test generation** — LangChain4j + Docling; structured JSON output, code refinement loop
-- **Config inference** — auto-detects question structure from exam PDF markdown
+- **Config inference** — auto-detects question structure from tester files at runtime
 - **Web UI** — React + TypeScript + Vite; VS Code-themed 4-step wizard
 - **Live grading terminal** — SSE stream of grading progress
 - **Past runs viewer** — browse previous grading sessions
@@ -57,7 +70,7 @@ rm -f data/session.db
 
 ```
 src/main/java/com/is442/autograder/
-├── App.java                    # Entry point (--web, --cli, --generate-tests)
+├── App.java                    # Entry point (--web, --cli)
 ├── GradingPipeline.java        # Orchestrates grading flow (with SSE callbacks)
 ├── config/                     # AppConfig, EnvLoader
 ├── data/                       # SessionDatabase (SQLite)

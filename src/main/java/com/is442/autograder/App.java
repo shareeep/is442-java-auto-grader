@@ -2,6 +2,10 @@ package com.is442.autograder;
 
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.config.EnvLoader;
+import com.is442.autograder.generation.ConfigInferenceService;
+import com.is442.autograder.model.InferredConfig;
+import com.is442.autograder.model.InferredQuestionConfig;
+import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.generation.LangChainService;
 import com.is442.autograder.generation.PdfParser;
 import com.is442.autograder.generation.TestGenerationService;
@@ -56,7 +60,8 @@ public class App {
 				SpringApplication.run(App.class, args);
 			} else if (args.length == 1 && args[0].equals("--cli")) {
 				// Interactive mode
-				ConsoleUI ui = new ConsoleUI(config);
+				ConfigInferenceService configInferenceService = new ConfigInferenceService();
+				ConsoleUI ui = new ConsoleUI(config, configInferenceService);
 				ui.start();
 			} else if (hasFlag(args, "--generate-tests")) {
 				// CLI generation mode
@@ -119,7 +124,35 @@ public class App {
 		}
 
 		try {
+			ConfigInferenceService inferenceService = new ConfigInferenceService();
+			InferredConfig inferred = inferenceService.inferConfig(null, config.getTemplateFolder(),
+					testersDir.toString());
+
+			if (inferred.getQuestions().isEmpty()) {
+				System.err.println(
+						"Error: No questions detected from testers dir. Check tester files and template folder.");
+				System.exit(1);
+			}
+
+			List<QuestionConfig> inferredConfigs = inferred.getQuestions().stream()
+					.map(InferredQuestionConfig::toQuestionConfig)
+					.filter(qc -> qc.getMaxScore() > 0)
+					.map(qc -> {
+						if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
+							String parent = qc.getQuestionId().replaceFirst("([a-z])$", "");
+							return new QuestionConfig(qc.getQuestionId(), parent,
+									qc.getTesterClassName(), qc.getMaxScore(),
+									qc.getDependencyFolder(), qc.getDependencyFiles());
+						}
+						return qc;
+					})
+					.toList();
+
+			System.out.println("Inferred " + inferredConfigs.size() + " question(s): "
+					+ inferredConfigs.stream().map(QuestionConfig::getQuestionId).toList());
+
 			GradingPipeline pipeline = new GradingPipeline(config);
+			pipeline.setInferredQuestionConfigs(inferredConfigs);
 			pipeline.run(submissionsDir, testersDir, scoresheetPath, outputDir);
 		} catch (IOException e) {
 			System.err.println("Error during grading: " + e.getMessage());
@@ -164,7 +197,18 @@ public class App {
 		TesterFileWriter writer = new TesterFileWriter();
 		PdfParser pdfParser = new PdfParser(config.getDoclingServeUrl());
 		TestGenerationService service = new TestGenerationService(aiService, writer);
-		List<QuestionConfig> questions = config.getQuestionConfigs();
+
+		ConfigInferenceService inferenceService = new ConfigInferenceService();
+		InferredConfig inferred = inferenceService.inferConfig(null, config.getTemplateFolder(), testersDir.toString());
+
+		if (inferred.getQuestions().isEmpty()) {
+			System.err
+					.println("Error: No questions detected from testers dir. Check tester files and template folder.");
+			System.exit(1);
+		}
+
+		List<QuestionConfig> questions = inferred.getQuestions().stream().map(InferredQuestionConfig::toQuestionConfig)
+				.toList();
 
 		for (QuestionConfig qc : questions) {
 			System.out.println("Generating for " + qc.getQuestionId() + "...");

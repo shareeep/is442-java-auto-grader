@@ -170,7 +170,7 @@ public class ConfigInferenceService {
 		Map<String, List<String>> parentToSubMap = new HashMap<>();
 
 		// First, identify all sub-questions and create implicit parents if needed
-		for (String qid : qMap.keySet()) {
+		for (String qid : new ArrayList<>(qMap.keySet())) {
 			if (qid.length() > 2) {
 				String parent = extractQuestionPrefix(qid); // handles Q10a -> Q10
 				parentToSubMap.computeIfAbsent(parent, k -> new ArrayList<>()).add(qid);

@@ -87,4 +87,8 @@ public class InferredQuestionConfig {
 	public void setImplicitParent(boolean implicitParent) {
 		this.isImplicitParent = implicitParent;
 	}
+
+	public QuestionConfig toQuestionConfig() {
+		return new QuestionConfig(questionId, folder, tester, maxScore, dependencyFolder, dependencyFiles);
+	}
 }

@@ -15,19 +15,46 @@ import com.is442.autograder.model.QuestionConfig;
 
 /**
  * Loads and exposes externalized configuration from config.properties.
+ *
+ * Configuration priority: 1. ./config.properties (external, user-managed) —
+ * loaded first 2. config.properties on classpath (bundled defaults) — fallback
+ * only
  */
 public class AppConfig {
+
+	private static final Path EXTERNAL_CONFIG_PATH = Paths.get("config.properties");
 
 	private final Properties properties;
 
 	public AppConfig() throws IOException {
 		this.properties = new Properties();
-		try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
-			if (is == null) {
-				throw new IOException("config.properties not found on classpath");
+		loadConfig();
+	}
+
+	private void loadConfig() throws IOException {
+		properties.clear();
+
+		if (Files.exists(EXTERNAL_CONFIG_PATH)) {
+			try (InputStream is = Files.newInputStream(EXTERNAL_CONFIG_PATH)) {
+				properties.load(is);
 			}
-			properties.load(is);
+		} else {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+				if (is == null) {
+					throw new IOException("config.properties not found on classpath");
+				}
+				properties.load(is);
+			}
 		}
+	}
+
+	public void reload() throws IOException {
+		loadConfig();
+	}
+
+	public boolean hasQuestionsConfigured() {
+		String list = properties.getProperty("questions.list", "");
+		return !list.isEmpty();
 	}
 
 	/** Execution timeout in seconds (default 10). */
@@ -135,6 +162,9 @@ public class AppConfig {
 	 * Persist an InferredConfig to config.properties on disk and update the
 	 * in-memory properties so that subsequent calls to
 	 * {@link #getQuestionConfigs()} return the new values without a server restart.
+	 *
+	 * Writes to ./config.properties (external file in working directory). If the
+	 * file doesn't exist, it bootstraps from the classpath defaults.
 	 */
 	public void writeQuestionConfigs(InferredConfig inferredConfig) throws IOException {
 		List<String> ids = new ArrayList<>();
@@ -170,19 +200,39 @@ public class AppConfig {
 		properties.setProperty("questions.dependency.folders", depFoldersStr);
 		properties.setProperty("questions.dependency.files", depFilesStr);
 
-		// Persist to disk (best-effort; server must be run from project root)
-		Path configPath = Paths.get("src/main/resources/config.properties");
-		if (Files.exists(configPath)) {
-			String content = Files.readString(configPath);
-			content = content.replaceFirst("(?m)^questions\\.list=.*$", "questions.list=" + idsStr);
-			content = content.replaceFirst("(?m)^questions\\.folders=.*$", "questions.folders=" + foldersStr);
-			content = content.replaceFirst("(?m)^questions\\.testers=.*$", "questions.testers=" + testersStr);
-			content = content.replaceFirst("(?m)^questions\\.max\\.scores=.*$", "questions.max.scores=" + scoresStr);
-			content = content.replaceFirst("(?m)^questions\\.dependency\\.folders=.*$",
-					"questions.dependency.folders=" + depFoldersStr);
-			content = content.replaceFirst("(?m)^questions\\.dependency\\.files=.*$",
-					"questions.dependency.files=" + depFilesStr);
-			Files.writeString(configPath, content);
+		// Persist to external config file
+		if (!Files.exists(EXTERNAL_CONFIG_PATH)) {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+				if (is != null) {
+					Files.copy(is, EXTERNAL_CONFIG_PATH);
+				}
+			}
+		}
+
+		// Read existing content or create from scratch
+		String content;
+		if (Files.exists(EXTERNAL_CONFIG_PATH)) {
+			content = Files.readString(EXTERNAL_CONFIG_PATH);
+		} else {
+			content = "";
+		}
+
+		// Update only the question config lines
+		content = updatePropertyLine(content, "questions.list", idsStr);
+		content = updatePropertyLine(content, "questions.folders", foldersStr);
+		content = updatePropertyLine(content, "questions.testers", testersStr);
+		content = updatePropertyLine(content, "questions.max.scores", scoresStr);
+		content = updatePropertyLine(content, "questions.dependency.folders", depFoldersStr);
+		content = updatePropertyLine(content, "questions.dependency.files", depFilesStr);
+
+		Files.writeString(EXTERNAL_CONFIG_PATH, content);
+	}
+
+	private String updatePropertyLine(String content, String key, String value) {
+		if (content.contains(key + "=")) {
+			return content.replaceFirst("(?m)^" + java.util.regex.Pattern.quote(key) + "=.*$", key + "=" + value);
+		} else {
+			return content + "\n" + key + "=" + value;
 		}
 	}
 
