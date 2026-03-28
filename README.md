@@ -45,6 +45,8 @@ docker compose up
 
 Starts: backend (8080) + frontend (5173) + Docling (5001).
 
+**Swagger UI** (API docs): [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
 ## Dev
 
 ```bash
@@ -85,11 +87,15 @@ src/main/java/com/is442/autograder/
 └── util/                       # FileUtils
 
 frontend/
-├── src/components/wizard/      # 4-step wizard (ProjectSetup → InferenceReview → GenerationHub → FinalizeExport)
-├── src/components/             # GradingTerminal, FileTreeView, ui/ (shadcn)
-├── src/pages/                  # GraderWorkspace, PastRuns, RunResults, TestGenerator
-├── src/generated/              # HeyAPI-generated types, SDK, TanStack Query hooks
-└── openapi-spec.json           # Cached OpenAPI spec from backend
+├── src/components/test-generator/  # 4-step wizard (ProjectSetup → InferenceReview → GenerationHub → FinalizeExport)
+├── src/components/auto-grader/     # GradingTerminal, FileTreeView, FileUploadCard, ResultsTable, SubmissionDetails
+├── src/components/layout/          # Layout, Topbar
+├── src/components/ui/              # shadcn/ui primitives
+├── src/pages/                      # GraderWorkspace, PastRuns, RunResults, TestGenerator
+├── src/store/                      # Zustand stores (graderStore, wizardStore)
+├── src/api/                        # uploadTemplate (direct fetch helpers)
+├── src/generated/                  # HeyAPI-generated types, SDK, TanStack Query hooks
+└── openapi-spec.json               # Cached OpenAPI spec from backend
 ```
 
 ## API Type Generation

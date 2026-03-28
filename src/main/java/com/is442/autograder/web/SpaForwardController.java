@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 public class SpaForwardController {
 
-	@RequestMapping(value = {"/", "/{path:^(?!api|static|assets).*$}/**"})
+	@RequestMapping(value = {"/", "/{path:^(?!api|static|assets|swagger-ui|v3|webjars).*$}/**"})
 	public String forward() {
 		return "forward:/index.html";
 	}
