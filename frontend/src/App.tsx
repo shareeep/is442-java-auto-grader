@@ -14,7 +14,7 @@ const router = createBrowserRouter([
       { path: 'grader', element: <GraderWorkspace /> },
       { path: 'test-generator', element: <TestGenerator /> },
       { path: 'past-runs', element: <PastRuns /> },
-      { path: 'results/:runId', element: <RunResults /> },
+      { path: 'past-runs/:runId', element: <RunResults /> },
     ],
   },
 ]);

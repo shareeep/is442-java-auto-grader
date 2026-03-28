@@ -29,12 +29,23 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
   const setLocalCode = useWizardStore((s) => s.setLocalCode);
   const initLocalCode = useWizardStore((s) => s.initLocalCode);
   const setExportComplete = useWizardStore((s) => s.setExportComplete);
+  const reset = useWizardStore((s) => s.reset);
 
   const questionIds = Object.keys(results);
   const [activeQid, setActiveQid] = useState<string | null>(questionIds[0] || null);
   const [refinePrompt, setRefinePrompt] = useState('');
   const [refining, setRefining] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const handleStaleSession = (err: any) => {
+    if (err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')) {
+      reset();
+      setSessionError('Session expired — files were cleared (e.g. server restart). Please re-upload.');
+      return true;
+    }
+    return false;
+  };
 
   // Initialise localCode from results on first load (if not already set)
   useEffect(() => {
@@ -62,6 +73,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
       setLocalCode(activeQid, (res as any).refinedCode);
       setRefinePrompt('');
     } catch (err) {
+      if (handleStaleSession(err)) return;
       console.error('Refine failed:', err);
     } finally {
       setRefining(false);
@@ -92,6 +104,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
       });
       setExportComplete('generated-testers/');
     } catch (err: any) {
+      if (handleStaleSession(err)) return;
       console.error('Export failed:', err);
     } finally {
       setExporting(false);
@@ -100,6 +113,14 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
 
   const activeResult = activeQid ? results[activeQid] : null;
   const activeCode = activeQid ? (localCode[activeQid] || activeResult?.generatedCode || '') : '';
+
+  if (sessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-16 text-center gap-4">
+        <p className="text-destructive font-mono text-sm">{sessionError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-left-4">

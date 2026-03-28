@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   FolderArchive, FileCode2, FileSpreadsheet,
-  Play, History, ChevronDown, RotateCcw, Terminal,
+  Play, RotateCcw, Terminal,
   CheckCircle2, AlertCircle, Loader2, Users, ArrowRight,
   TrendingUp, BarChart2, TriangleAlert,
+  FileText, Download, Eye, History,
 } from 'lucide-react';
 import { useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -89,87 +90,85 @@ const UploadCard: React.FC<UploadCardProps> = ({
   );
 };
 
-const PastRunsDropdown: React.FC<{ runs: PastRun[]; loading: boolean; onLoad: (runId: string) => void; onViewAll: () => void }> = ({
-  runs, loading, onLoad, onViewAll,
-}) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-      >
-        <History size={14} />
-        Past Runs
-        {loading ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={12} />}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
-          <div className="px-3 py-2 border-b border-border">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recent Sessions</span>
-          </div>
-          {runs.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-muted-foreground">No past runs found</div>
-          ) : (
-            <div className="max-h-64 overflow-auto">
-              {runs.map(run => {
-
-                const failed = run.studentCount === 0;
-                return (
-                  <button
-                    key={run.id}
-                    onClick={() => { if (!failed) { onLoad(run.id); setOpen(false); } }}
-                    disabled={failed}
-                    className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left border-b border-border/50 last:border-0 ${
-                      failed
-                        ? 'opacity-40 cursor-not-allowed'
-                        : 'hover:bg-secondary'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{formatRunTimestamp(run.timestamp)}</p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        {failed
-                          ? <><AlertCircle size={10} className="text-destructive" /> Incomplete run</>
-                          : <><Users size={10} /> {run.studentCount} students</>
-                        }
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      {run.hasPdf && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>
-                      )}
-                      {run.hasCsv && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <button
-            onClick={() => { setOpen(false); onViewAll(); }}
-            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors border-t border-border"
-          >
-            View all past runs <ArrowRight size={11} />
-          </button>
-        </div>
-      )}
+const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: () => void; onDeepDive: (runId: string) => void }> = ({
+  runs, loading, onViewAll, onDeepDive,
+}) => (
+  <aside className="w-64 shrink-0 flex flex-col gap-3">
+    <div className="flex items-center gap-2">
+      <History size={13} className="text-muted-foreground" />
+      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recent Runs</span>
     </div>
-  );
-};
+    <div className="flex flex-col rounded-xl border border-border bg-card overflow-hidden">
+      {loading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 size={18} className="animate-spin text-primary/40" />
+        </div>
+      ) : runs.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-xs text-muted-foreground">No runs yet</p>
+        </div>
+      ) : (
+        runs.slice(0, 5).map((run, i) => {
+          const failed = run.studentCount === 0;
+          return (
+            <div
+              key={run.id}
+              className={`flex flex-col gap-1.5 px-3 py-3 border-b border-border/50 last:border-0 ${i === 0 ? '' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{formatRunTimestamp(run.timestamp)}</p>
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                    {failed
+                      ? <><AlertCircle size={9} className="text-destructive" /> Incomplete</>
+                      : <><Users size={9} /> {run.studentCount} students</>
+                    }
+                  </p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {run.hasPdf && <span className="text-[9px] px-1 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>}
+                  {run.hasCsv && <span className="text-[9px] px-1 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {run.hasPdf && (
+                  <button
+                    onClick={() => window.open(`/api/reports/${run.id}/pdf`, '_blank')}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
+                  >
+                    <Eye size={9} /> PDF
+                  </button>
+                )}
+                {run.hasCsv && (
+                  <button
+                    onClick={() => window.open(`/api/reports/${run.id}/csv`, '_blank')}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
+                  >
+                    <Download size={9} /> CSV
+                  </button>
+                )}
+                {!failed && (
+                  <button
+                    onClick={() => onDeepDive(run.id)}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors ml-auto"
+                  >
+                    <FileText size={9} /> View
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+      <button
+        onClick={onViewAll}
+        className="w-full flex items-center justify-center gap-1 px-3 py-2.5 text-[10px] font-semibold text-primary hover:bg-primary/5 transition-colors border-t border-border"
+      >
+        View all runs <ArrowRight size={9} />
+      </button>
+    </div>
+  </aside>
+);
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; sub?: string }> = ({ icon, label, value, sub }) => (
   <div className="flex items-center gap-4 px-5 py-4 rounded-xl border border-border bg-card">
@@ -258,8 +257,10 @@ const GraderWorkspace: React.FC = () => {
   const passCount = submissions.filter(x => x.maxPossibleScore > 0 && x.totalScore / x.maxPossibleScore >= 0.5).length;
   const anomalyCount = submissions.reduce((s, x) => s + (x.anomalies?.length ?? 0), 0);
 
+  const showSidebar = phase === 'upload';
+
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full px-8 py-6 pb-16">
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto w-full px-8 py-6 pb-16">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">Auto-Grader</h1>
@@ -268,7 +269,6 @@ const GraderWorkspace: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 mt-1">
-          <PastRunsDropdown runs={pastRuns} loading={runsLoading} onLoad={id => navigate(`/results/${id}`)} onViewAll={() => navigate('/past-runs')} />
           {phase === 'results' && !terminalOpen && (
             <button
               onClick={() => setTerminalOpen(true)}
@@ -325,95 +325,108 @@ const GraderWorkspace: React.FC = () => {
         </div>
       )}
 
-      {phase === 'upload' && (
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Required</span>
-            <UploadCard
-              label="Student Submissions"
-              hint="Select the student-submissions folder containing individual ZIP files"
-              icon={<FolderArchive size={20} />}
-              required isDirectory name="submissions"
-              count={submissionFiles.length}
-              onChange={files => { setSubmissionFiles(files.filter(f => f.name.toLowerCase().endsWith('.zip'))); setError(null); }}
-            />
-            <UploadCard
-              label="Test Cases (Testers)"
-              hint="Select the Tester-Files folder with JUnit test files"
-              icon={<FileCode2 size={20} />}
-              required isDirectory name="testers"
-              count={testerFiles.length}
-              onChange={files => { setTesterFiles(files); setError(null); }}
-            />
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
-            <UploadCard
-              label="Grade Mapping (CSV)"
-              hint="IS442-ScoreSheet.csv — maps student IDs to names"
-              icon={<FileSpreadsheet size={20} />}
-              accept=".csv" name="scoresheet"
-              count={scoresheetFiles.length}
-              onChange={files => { setScoresheetFiles(files); setError(null); }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            {!canRun && (
-              <p className="text-xs text-muted-foreground">Add submissions and testers to enable grading.</p>
-            )}
-            <button
-              onClick={handleRun}
-              disabled={!canRun}
-              className="flex items-center gap-2.5 px-6 py-3 bg-primary text-primary-foreground font-semibold text-sm rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ml-auto"
-            >
-              <Play size={16} fill="currentColor" />
-              Run Auto-Grader
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Terminal — mounted once grading starts */}
-      {streamFormData && (
-        <div className={phase === 'grading' ? '' : (terminalOpen ? 'mb-2' : 'hidden')}>
-          <GradingTerminal
-            formData={streamFormData}
-            onComplete={handleStreamComplete}
-            onError={handleStreamError}
-            onClose={phase === 'results' ? () => setTerminalOpen(false) : undefined}
+      <div className={showSidebar ? 'flex gap-6 items-start' : ''}>
+        {showSidebar && (
+          <RecentRunsPanel
+            runs={pastRuns}
+            loading={runsLoading}
+            onViewAll={() => navigate('/past-runs')}
+            onDeepDive={id => navigate(`/past-runs/${id}`)}
           />
-        </div>
-      )}
+        )}
 
-      {/* High-level results summary */}
-      {phase === 'results' && result && (
-        <div className="flex flex-col gap-4">
-          {/* Summary stats */}
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard icon={<TrendingUp size={20} />} label="Avg Score" value={`${avgPct}%`} sub={`${submissions.length} students`} />
-            <StatCard icon={<BarChart2 size={20} />} label="Pass Rate" value={`${passCount}/${submissions.length}`} sub="scored ≥ 50%" />
-            <StatCard icon={<TriangleAlert size={20} />} label="Anomalies" value={String(anomalyCount)} sub="across all students" />
-          </div>
+        <div className="flex-1 min-w-0">
+          {phase === 'upload' && (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Required</span>
+                <UploadCard
+                  label="Student Submissions"
+                  hint="Select the student-submissions folder containing individual ZIP files"
+                  icon={<FolderArchive size={20} />}
+                  required isDirectory name="submissions"
+                  count={submissionFiles.length}
+                  onChange={files => { setSubmissionFiles(files.filter(f => f.name.toLowerCase().endsWith('.zip'))); setError(null); }}
+                />
+                <UploadCard
+                  label="Test Cases (Testers)"
+                  hint="Select the Tester-Files folder with JUnit test files"
+                  icon={<FileCode2 size={20} />}
+                  required isDirectory name="testers"
+                  count={testerFiles.length}
+                  onChange={files => { setTesterFiles(files); setError(null); }}
+                />
+              </div>
 
-          {/* Score table */}
-          <ResultsTable data={result} />
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
+                <UploadCard
+                  label="Grade Mapping (CSV)"
+                  hint="IS442-ScoreSheet.csv — maps student IDs to names"
+                  icon={<FileSpreadsheet size={20} />}
+                  accept=".csv" name="scoresheet"
+                  count={scoresheetFiles.length}
+                  onChange={files => { setScoresheetFiles(files); setError(null); }}
+                />
+              </div>
 
-          {/* Deep-dive CTA */}
-          {runId && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => navigate(`/results/${runId}`)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:bg-primary/90 transition-colors"
-              >
-                View Full Results
-                <ArrowRight size={15} />
-              </button>
+              <div className="flex items-center justify-between pt-2">
+                {!canRun && (
+                  <p className="text-xs text-muted-foreground">Add submissions and testers to enable grading.</p>
+                )}
+                <button
+                  onClick={handleRun}
+                  disabled={!canRun}
+                  className="flex items-center gap-2.5 px-6 py-3 bg-primary text-primary-foreground font-semibold text-sm rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ml-auto"
+                >
+                  <Play size={16} fill="currentColor" />
+                  Run Auto-Grader
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Terminal — mounted once grading starts */}
+          {streamFormData && (
+            <div className={phase === 'grading' ? '' : (terminalOpen ? 'mb-2' : 'hidden')}>
+              <GradingTerminal
+                formData={streamFormData}
+                onComplete={handleStreamComplete}
+                onError={handleStreamError}
+                onClose={phase === 'results' ? () => setTerminalOpen(false) : undefined}
+              />
+            </div>
+          )}
+
+          {/* High-level results summary */}
+          {phase === 'results' && result && (
+            <div className="flex flex-col gap-4">
+              {/* Summary stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard icon={<TrendingUp size={20} />} label="Avg Score" value={`${avgPct}%`} sub={`${submissions.length} students`} />
+                <StatCard icon={<BarChart2 size={20} />} label="Pass Rate" value={`${passCount}/${submissions.length}`} sub="scored ≥ 50%" />
+                <StatCard icon={<TriangleAlert size={20} />} label="Anomalies" value={String(anomalyCount)} sub="across all students" />
+              </div>
+
+              {/* Score table */}
+              <ResultsTable data={result} />
+
+              {/* Deep-dive CTA */}
+              {runId && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => navigate(`/past-runs/${runId}`)}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:bg-primary/90 transition-colors"
+                  >
+                    View Full Results
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

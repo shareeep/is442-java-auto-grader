@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Beaker, History } from 'lucide-react';
+import { LayoutDashboard, Beaker } from 'lucide-react';
 import React from 'react';
 
 const Topbar: React.FC = () => {
@@ -29,10 +29,6 @@ const Topbar: React.FC = () => {
         <NavLink to="/test-generator" className={linkClass}>
           <Beaker size={13} />
           AI Test Generator
-        </NavLink>
-        <NavLink to="/past-runs" className={linkClass}>
-          <History size={13} />
-          Past Runs
         </NavLink>
       </nav>
 

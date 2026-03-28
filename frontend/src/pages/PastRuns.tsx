@@ -81,7 +81,7 @@ const PastRuns: React.FC = () => {
                   </button>
                 )}
                 <button
-                  onClick={() => navigate(`/results/${run.id}`)}
+                  onClick={() => navigate(`/past-runs/${run.id}`)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   Deep Dive <ArrowRight size={12} />

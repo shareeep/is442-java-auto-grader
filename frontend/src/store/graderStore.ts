@@ -53,7 +53,7 @@ export const useGraderStore = create<GraderStore>()(
     {
       name: 'grader-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         phase: state.phase,
         result: state.result,

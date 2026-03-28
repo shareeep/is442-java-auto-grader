@@ -94,7 +94,7 @@ export const useWizardStore = create<WizardStore>()(
     {
       name: 'wizard-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         currentStep: state.currentStep,
         examId: state.examId,

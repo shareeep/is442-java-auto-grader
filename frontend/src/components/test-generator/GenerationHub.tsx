@@ -25,6 +25,18 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
   const setSelectedQs = useWizardStore((s) => s.setSelectedQs);
   const setRecommendation = useWizardStore((s) => s.setRecommendation);
   const setResult = useWizardStore((s) => s.setResult);
+  const reset = useWizardStore((s) => s.reset);
+
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const handleStaleSession = (err: any) => {
+    if (err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')) {
+      reset();
+      setSessionError('Session expired — files were cleared (e.g. server restart). Please re-upload.');
+      return true;
+    }
+    return false;
+  };
 
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [loadingRec, setLoadingRec] = useState<string | null>(null);
@@ -41,7 +53,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
       const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
       setRecommendation(qid, rec);
     } catch (err) {
-      console.error(err);
+      if (!handleStaleSession(err)) console.error(err);
     } finally {
       setLoadingRec(null);
     }
@@ -59,13 +71,21 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
       });
       setResult(qid, result);
     } catch (err) {
-      console.error(err);
+      if (!handleStaleSession(err)) console.error(err);
     } finally {
       setGenerating(prev => ({ ...prev, [qid]: false }));
     }
   };
 
   const allQuestions = (inferredConfig?.questions || []).filter((q: any) => q.maxScore > 0);
+
+  if (sessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-16 text-center gap-4">
+        <p className="text-destructive font-mono text-sm">{sessionError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 pb-20 animate-in fade-in slide-in-from-right-4">
