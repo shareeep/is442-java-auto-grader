@@ -1,5 +1,5 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
+import Layout from './components/layout/Layout';
 import GraderWorkspace from './pages/GraderWorkspace';
 import TestGenerator from './pages/TestGenerator';
 import PastRuns from './pages/PastRuns';

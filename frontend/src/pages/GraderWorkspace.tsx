@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 import { useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import GradingTerminal from '../components/GradingTerminal';
-import ResultsTable from '../components/ResultsTable';
-import type { Submission } from '../components/SubmissionDetails';
+import GradingTerminal from '../components/auto-grader/GradingTerminal';
+import ResultsTable from '../components/auto-grader/ResultsTable';
+import type { Submission } from '../components/auto-grader/SubmissionDetails';
 import { listRunsOptions } from '../generated/@tanstack/react-query.gen';
 import { formatRunTimestamp } from '../lib/utils';
 import { useGraderStore } from '../store/graderStore';

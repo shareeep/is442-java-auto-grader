@@ -1,5 +1,5 @@
 import React from 'react';
-import Wizard from '../components/wizard/Wizard';
+import Wizard from '../components/test-generator/Wizard';
 
 const TestGenerator: React.FC = () => {
   return (
