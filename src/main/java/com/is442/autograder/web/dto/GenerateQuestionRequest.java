@@ -8,18 +8,38 @@ public class GenerateQuestionRequest {
 	private String questionId;
 	private int numCases;
 
-	public String getExamId() { return examId; }
-	public void setExamId(String examId) { this.examId = examId; }
+	public String getExamId() {
+		return examId;
+	}
+	public void setExamId(String examId) {
+		this.examId = examId;
+	}
 
-	public String getTesterId() { return testerId; }
-	public void setTesterId(String testerId) { this.testerId = testerId; }
+	public String getTesterId() {
+		return testerId;
+	}
+	public void setTesterId(String testerId) {
+		this.testerId = testerId;
+	}
 
-	public String getTemplateId() { return templateId; }
-	public void setTemplateId(String templateId) { this.templateId = templateId; }
+	public String getTemplateId() {
+		return templateId;
+	}
+	public void setTemplateId(String templateId) {
+		this.templateId = templateId;
+	}
 
-	public String getQuestionId() { return questionId; }
-	public void setQuestionId(String questionId) { this.questionId = questionId; }
+	public String getQuestionId() {
+		return questionId;
+	}
+	public void setQuestionId(String questionId) {
+		this.questionId = questionId;
+	}
 
-	public int getNumCases() { return numCases; }
-	public void setNumCases(int numCases) { this.numCases = numCases; }
+	public int getNumCases() {
+		return numCases;
+	}
+	public void setNumCases(int numCases) {
+		this.numCases = numCases;
+	}
 }
