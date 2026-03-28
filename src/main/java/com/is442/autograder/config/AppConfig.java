@@ -2,27 +2,59 @@ package com.is442.autograder.config;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import com.is442.autograder.model.InferredConfig;
+import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 
 /**
  * Loads and exposes externalized configuration from config.properties.
+ *
+ * Configuration priority: 1. ./config.properties (external, user-managed) —
+ * loaded first 2. config.properties on classpath (bundled defaults) — fallback
+ * only
  */
 public class AppConfig {
+
+	private static final Path EXTERNAL_CONFIG_PATH = Paths.get("config.properties");
 
 	private final Properties properties;
 
 	public AppConfig() throws IOException {
 		this.properties = new Properties();
-		try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
-			if (is == null) {
-				throw new IOException("config.properties not found on classpath");
+		loadConfig();
+	}
+
+	private void loadConfig() throws IOException {
+		properties.clear();
+
+		if (Files.exists(EXTERNAL_CONFIG_PATH)) {
+			try (InputStream is = Files.newInputStream(EXTERNAL_CONFIG_PATH)) {
+				properties.load(is);
 			}
-			properties.load(is);
+		} else {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+				if (is == null) {
+					throw new IOException("config.properties not found on classpath");
+				}
+				properties.load(is);
+			}
 		}
+	}
+
+	public void reload() throws IOException {
+		loadConfig();
+	}
+
+	public boolean hasQuestionsConfigured() {
+		String list = properties.getProperty("questions.list", "");
+		return !list.isEmpty();
 	}
 
 	/** Execution timeout in seconds (default 10). */
@@ -48,6 +80,15 @@ public class AppConfig {
 	/** The assessment name shown in the instructor report header. */
 	public String getAssessmentName() {
 		return properties.getProperty("assessment.name", "Assessment");
+	}
+
+	/** The URL of the local Docling Serve container for PDF parsing. */
+	public String getDoclingServeUrl() {
+		String envUrl = System.getenv("DOCLING_SERVE_URL");
+		if (envUrl != null && !envUrl.isBlank()) {
+			return envUrl;
+		}
+		return properties.getProperty("docling.serve.url", "http://localhost:5001");
 	}
 
 	/**
@@ -100,6 +141,99 @@ public class AppConfig {
 	 */
 	public String getTemplateFolder() {
 		return properties.getProperty("assessment.template.folder", "RenameToYourUsername");
+	}
+
+	/** AI model name (default: claude-sonnet-4-6). */
+	public String getAiModel() {
+		return properties.getProperty("ai.model", "claude-sonnet-4-6");
+	}
+
+	/** Max tokens for AI generation (default: 4096). */
+	public int getAiMaxTokens() {
+		return Integer.parseInt(properties.getProperty("ai.max.tokens", "4096"));
+	}
+
+	/** Default number of test cases to generate per question (default: 3). */
+	public int getAiDefaultCasesPerQuestion() {
+		return Integer.parseInt(properties.getProperty("ai.default.cases.per.question", "3"));
+	}
+
+	/**
+	 * Persist an InferredConfig to config.properties on disk and update the
+	 * in-memory properties so that subsequent calls to
+	 * {@link #getQuestionConfigs()} return the new values without a server restart.
+	 *
+	 * Writes to ./config.properties (external file in working directory). If the
+	 * file doesn't exist, it bootstraps from the classpath defaults.
+	 */
+	public void writeQuestionConfigs(InferredConfig inferredConfig) throws IOException {
+		List<String> ids = new ArrayList<>();
+		List<String> folders = new ArrayList<>();
+		List<String> testers = new ArrayList<>();
+		List<String> scores = new ArrayList<>();
+		List<String> depFolders = new ArrayList<>();
+		List<String> depFiles = new ArrayList<>();
+
+		for (InferredQuestionConfig q : inferredConfig.getQuestions()) {
+			ids.add(q.getQuestionId());
+			folders.add(q.getFolder() != null ? q.getFolder() : "");
+			testers.add(q.getTester() != null ? q.getTester() : "");
+			scores.add(String.valueOf(q.getMaxScore()));
+			depFolders.add(q.getDependencyFolder() != null ? q.getDependencyFolder() : "");
+			depFiles.add(q.getDependencyFiles() != null && !q.getDependencyFiles().isEmpty()
+					? String.join(";", q.getDependencyFiles())
+					: "");
+		}
+
+		String idsStr = String.join(",", ids);
+		String foldersStr = String.join(",", folders);
+		String testersStr = String.join(",", testers);
+		String scoresStr = String.join(",", scores);
+		String depFoldersStr = String.join(",", depFolders);
+		String depFilesStr = String.join(",", depFiles);
+
+		// Update in-memory properties
+		properties.setProperty("questions.list", idsStr);
+		properties.setProperty("questions.folders", foldersStr);
+		properties.setProperty("questions.testers", testersStr);
+		properties.setProperty("questions.max.scores", scoresStr);
+		properties.setProperty("questions.dependency.folders", depFoldersStr);
+		properties.setProperty("questions.dependency.files", depFilesStr);
+
+		// Persist to external config file
+		if (!Files.exists(EXTERNAL_CONFIG_PATH)) {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+				if (is != null) {
+					Files.copy(is, EXTERNAL_CONFIG_PATH);
+				}
+			}
+		}
+
+		// Read existing content or create from scratch
+		String content;
+		if (Files.exists(EXTERNAL_CONFIG_PATH)) {
+			content = Files.readString(EXTERNAL_CONFIG_PATH);
+		} else {
+			content = "";
+		}
+
+		// Update only the question config lines
+		content = updatePropertyLine(content, "questions.list", idsStr);
+		content = updatePropertyLine(content, "questions.folders", foldersStr);
+		content = updatePropertyLine(content, "questions.testers", testersStr);
+		content = updatePropertyLine(content, "questions.max.scores", scoresStr);
+		content = updatePropertyLine(content, "questions.dependency.folders", depFoldersStr);
+		content = updatePropertyLine(content, "questions.dependency.files", depFilesStr);
+
+		Files.writeString(EXTERNAL_CONFIG_PATH, content);
+	}
+
+	private String updatePropertyLine(String content, String key, String value) {
+		if (content.contains(key + "=")) {
+			return content.replaceFirst("(?m)^" + java.util.regex.Pattern.quote(key) + "=.*$", key + "=" + value);
+		} else {
+			return content + "\n" + key + "=" + value;
+		}
 	}
 
 	private String[] getArray(String key) {

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -70,24 +69,23 @@ public class ZipExtractor {
 					continue;
 				}
 
-				// 4. Check cumulative size
-				if (!entry.isDirectory()) {
-					long entrySize = entry.getSize();
-					if (entrySize > 0) {
-						totalSize += entrySize;
-						if (totalSize > MAX_TOTAL_SIZE) {
-							throw new SecurityException(
-									"Archive too large (exceeds " + (MAX_TOTAL_SIZE / 1024 / 1024) + " MB)");
-						}
-					}
-				}
-
-				// 5. Extract
+				// 4. Extract, counting actual bytes written for zip bomb protection
 				if (entry.isDirectory()) {
 					Files.createDirectories(destPath);
 				} else {
 					Files.createDirectories(destPath.getParent());
-					Files.copy(zis, destPath, StandardCopyOption.REPLACE_EXISTING);
+					byte[] buf = new byte[8192];
+					int n;
+					try (java.io.OutputStream out = Files.newOutputStream(destPath)) {
+						while ((n = zis.read(buf)) != -1) {
+							totalSize += n;
+							if (totalSize > MAX_TOTAL_SIZE) {
+								throw new SecurityException(
+										"Archive too large (exceeds " + (MAX_TOTAL_SIZE / 1024 / 1024) + " MB)");
+							}
+							out.write(buf, 0, n);
+						}
+					}
 				}
 
 				zis.closeEntry();
