@@ -37,9 +37,25 @@ export const streamGrading = <ThrowOnError extends boolean = false>(options: Opt
     }
 });
 
-export const uploadTesters = <ThrowOnError extends boolean = false>(options: Options<UploadTestersData, ThrowOnError>) => (options.client ?? client).post<UploadTestersResponses, unknown, ThrowOnError>({ url: '/api/generation/testers/upload', ...options });
+export const uploadTesters = <ThrowOnError extends boolean = false>(options?: Options<UploadTestersData, ThrowOnError>) => (options?.client ?? client).post<UploadTestersResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/generation/testers/upload',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options?.headers
+    }
+});
 
-export const uploadTemplate = <ThrowOnError extends boolean = false>(options: Options<UploadTemplateData, ThrowOnError>) => (options.client ?? client).post<UploadTemplateResponses, unknown, ThrowOnError>({ url: '/api/generation/template/upload', ...options });
+export const uploadTemplate = <ThrowOnError extends boolean = false>(options?: Options<UploadTemplateData, ThrowOnError>) => (options?.client ?? client).post<UploadTemplateResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/generation/template/upload',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options?.headers
+    }
+});
 
 export const save = <ThrowOnError extends boolean = false>(options: Options<SaveData, ThrowOnError>) => (options.client ?? client).post<SaveResponses, unknown, ThrowOnError>({
     url: '/api/generation/save',
@@ -114,10 +130,11 @@ export const execute = <ThrowOnError extends boolean = false>(options: Options<E
 });
 
 export const uploadExam = <ThrowOnError extends boolean = false>(options?: Options<UploadExamData, ThrowOnError>) => (options?.client ?? client).post<UploadExamResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
     url: '/api/generation/exam/upload',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': null,
         ...options?.headers
     }
 });

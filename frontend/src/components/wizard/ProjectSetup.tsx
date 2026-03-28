@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
-import { uploadExam, uploadTemplate, uploadTesters, analyzeSetup, preparsePdf } from '@/api/client';
+import { uploadTemplate } from '@/api/uploadTemplate';
+import { analyzeSetup, preparsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -140,12 +141,12 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
       setUploading(true);
       setParsingPdf(false);
       try {
-        const uploaded = await uploadExam(selectedFile);
-        setExamId(uploaded.examId);
+        const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
+        setExamId(uploaded!['examId']);
 
         setParsingPdf(true);
-        preparsePdf(uploaded.examId).then(result => {
-          if (result.status === 'error') {
+        preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
+          if ((result as any).status === 'error') {
             console.warn('PDF parsing failed, will retry on inference');
           }
           setParsingPdf(false);
@@ -167,8 +168,8 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   };
 
   const handleUploadTesters = async (files: File[]) => {
-    const result = await uploadTesters(files);
-    setTesterId(result.testerId);
+    const { data: result } = await uploadTesters({ body: { files }, throwOnError: true });
+    setTesterId((result as any).testerId);
   };
 
   const handleBeginInference = async () => {
@@ -179,7 +180,7 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
     setInferring(true);
     setInferError(null);
     try {
-      const inferredConfig = await analyzeSetup({ examId, templateId, testerId });
+      const { data: inferredConfig } = await analyzeSetup({ body: { examId, templateId: templateId ?? undefined, testerId: testerId ?? undefined }, throwOnError: true });
       setInferredConfig(inferredConfig);
       onNext();
     } catch (err: any) {

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { saveResults, refineCode } from '@/api/client';
+import { save, refine } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -55,13 +55,11 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     if (!activeQid || !refinePrompt.trim() || !localCode[activeQid]) return;
     setRefining(true);
     try {
-      const res = await refineCode({
-        examId: examId!,
-        questionId: activeQid,
-        currentCode: localCode[activeQid],
-        refinementPrompt: refinePrompt.trim(),
+      const { data: res } = await refine({
+        body: { examId: examId!, questionId: activeQid, currentCode: localCode[activeQid], refinementPrompt: refinePrompt.trim() },
+        throwOnError: true,
       });
-      setLocalCode(activeQid, res.refinedCode);
+      setLocalCode(activeQid, (res as any).refinedCode);
       setRefinePrompt('');
     } catch (err) {
       console.error('Refine failed:', err);
@@ -88,12 +86,9 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
         };
       });
 
-      await saveResults({
-        examId: examId!,
-        testerId: testerId ?? undefined,
-        outputDir: 'generated-testers',
-        results: entries,
-        updateMaxScores: true,
+      await save({
+        body: { examId: examId!, testerId: testerId ?? undefined, outputDir: 'generated-testers', results: entries, updateMaxScores: true },
+        throwOnError: true,
       });
       setExportComplete('generated-testers/');
     } catch (err: any) {

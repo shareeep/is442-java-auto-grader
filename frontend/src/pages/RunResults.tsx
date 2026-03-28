@@ -6,7 +6,7 @@ import {
   FileCode2, Loader2, AlertCircle, User, CheckCircle2,
   TriangleAlert, X, File as FileIcon, Plus, MessageSquare,
 } from 'lucide-react';
-import { getStudentCode } from '../api/client';
+import { getStudentCode } from '../generated/sdk.gen';
 import { getResultsOptions } from '../generated/@tanstack/react-query.gen';
 import { formatRunTimestamp } from '../lib/utils';
 
@@ -250,7 +250,7 @@ const RunResults: React.FC = () => {
     if (!studentCode[username] && !loadingCode.has(username)) {
       setLoadingCode(prev => new Set(prev).add(username));
       try {
-        const code = await getStudentCode(runId!, username);
+        const { data: code } = await getStudentCode({ path: { id: runId!, username }, throwOnError: true }) as { data: Record<string, string> };
         setStudentCode(prev => ({ ...prev, [username]: code }));
       } catch {
         setStudentCode(prev => ({ ...prev, [username]: {} }));

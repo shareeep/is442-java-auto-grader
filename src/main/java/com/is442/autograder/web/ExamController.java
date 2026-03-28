@@ -2,10 +2,11 @@ package com.is442.autograder.web;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,8 +38,8 @@ public class ExamController {
 	/** Maps testerId → directory containing uploaded Tester.java files. */
 	static final ConcurrentHashMap<String, Path> TESTER_DIRS = new ConcurrentHashMap<>();
 
-	@PostMapping("/exam/upload")
-	public ResponseEntity<Map<String, String>> uploadExam(@RequestParam("file") MultipartFile file) throws IOException {
+	@PostMapping(value = "/exam/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<Map<String, String>> uploadExam(@RequestPart("file") MultipartFile file) throws IOException {
 		if (file.isEmpty()) {
 			return ResponseEntity.badRequest().body(Map.of("error", "No file provided"));
 		}
@@ -67,8 +68,8 @@ public class ExamController {
 	 * Each file's relative path is encoded in its filename using "__SEP__" as the
 	 * directory separator so the server can reconstruct the folder structure.
 	 */
-	@PostMapping("/template/upload")
-	public ResponseEntity<Map<String, Object>> uploadTemplate(@RequestParam("files") MultipartFile[] files)
+	@PostMapping(value = "/template/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<Map<String, Object>> uploadTemplate(@RequestPart("files") MultipartFile[] files)
 			throws IOException {
 
 		String templateId = UUID.randomUUID().toString();
@@ -100,8 +101,8 @@ public class ExamController {
 	/**
 	 * Accepts tester .java files (flat directory — no subdirectories needed).
 	 */
-	@PostMapping("/testers/upload")
-	public ResponseEntity<Map<String, Object>> uploadTesters(@RequestParam("files") MultipartFile[] files)
+	@PostMapping(value = "/testers/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<Map<String, Object>> uploadTesters(@RequestPart("files") MultipartFile[] files)
 			throws IOException {
 
 		String testerId = UUID.randomUUID().toString();

@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Sparkles, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2 } from 'lucide-react';
-import { recommend as apiRecommend, executeQuestion } from '@/api/client';
+import { recommend, execute } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -38,7 +38,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
   const getRecommendation = async (qid: string) => {
     setLoadingRec(qid);
     try {
-      const rec = await apiRecommend({ examId: examId!, questionId: qid });
+      const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
       setRecommendation(qid, rec);
     } catch (err) {
       console.error(err);
@@ -53,12 +53,9 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     const rec = recommendations[qid];
 
     try {
-      const result = await executeQuestion({
-        examId: examId!,
-        testerId,
-        templateId,
-        numCases: rec?.recommendedCount || 3,
-        question: question!,
+      const { data: result } = await execute({
+        body: { examId: examId!, testerId: testerId ?? undefined, templateId: templateId ?? undefined, numCases: rec?.recommendedCount || 3, question: question! },
+        throwOnError: true,
       });
       setResult(qid, result);
     } catch (err) {

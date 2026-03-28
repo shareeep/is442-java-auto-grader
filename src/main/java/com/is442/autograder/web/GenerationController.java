@@ -12,12 +12,17 @@ import com.is442.autograder.model.InferredConfig;
 import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.TestCaseRecommendation;
+import com.is442.autograder.web.dto.AnalyzeSetupRequest;
+import com.is442.autograder.web.dto.ExecuteRequest;
+import com.is442.autograder.web.dto.GenerateQuestionRequest;
 import com.is442.autograder.web.dto.GenerateRequest;
+import com.is442.autograder.web.dto.PreparsePdfRequest;
+import com.is442.autograder.web.dto.RecommendRequest;
+import com.is442.autograder.web.dto.RefineRequest;
 import com.is442.autograder.web.dto.QuestionSelection;
 import com.is442.autograder.web.dto.SaveRequest;
 import com.is442.autograder.web.dto.SaveResponse;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -108,10 +113,10 @@ public class GenerationController {
 	 * directories to produce an InferredConfig.
 	 */
 	@PostMapping("/analyze-setup")
-	public ResponseEntity<?> analyzeSetup(@RequestBody Map<String, Object> request) {
-		String examId = (String) request.get("examId");
-		String templateId = (String) request.get("templateId");
-		String testerId = (String) request.get("testerId");
+	public ResponseEntity<?> analyzeSetup(@RequestBody AnalyzeSetupRequest request) {
+		String examId = request.getExamId();
+		String templateId = request.getTemplateId();
+		String testerId = request.getTesterId();
 
 		Path examPdf = ExamController.EXAM_FILES.get(examId);
 		if (examPdf == null || !Files.exists(examPdf)) {
@@ -152,8 +157,8 @@ public class GenerationController {
 	 * Pre-parse PDF in background after upload (non-blocking).
 	 */
 	@PostMapping("/preparse-pdf")
-	public ResponseEntity<?> preparsePdf(@RequestBody Map<String, Object> request) {
-		String examId = (String) request.get("examId");
+	public ResponseEntity<?> preparsePdf(@RequestBody PreparsePdfRequest request) {
+		String examId = request.getExamId();
 
 		Path examPdf = ExamController.EXAM_FILES.get(examId);
 		if (examPdf == null || !Files.exists(examPdf)) {
@@ -197,41 +202,16 @@ public class GenerationController {
 	 * exam context — never re-parses PDF.
 	 */
 	@PostMapping("/execute")
-	public ResponseEntity<?> execute(@RequestBody Map<String, Object> request) {
-		// Optional: Persist full config if provided in the same request
-		if (request.containsKey("config")) {
-			try {
-				@SuppressWarnings("unchecked")
-				Map<String, Object> configMap = (Map<String, Object>) request.get("config");
-				ObjectMapper mapper = new ObjectMapper();
-				InferredConfig inferredConfig = mapper.convertValue(configMap, InferredConfig.class);
-				appConfig.writeQuestionConfigs(inferredConfig);
-			} catch (Exception e) {
-				logger.warn("Failed to auto-persist config during execute: {}", e.getMessage());
-			}
-		}
+	public ResponseEntity<?> execute(@RequestBody ExecuteRequest request) {
+		String examId = request.getExamId();
+		String testerId = request.getTesterId();
+		String templateId = request.getTemplateId();
+		int numCases = request.getNumCases() > 0 ? request.getNumCases() : 3;
 
-		String examId = (String) request.get("examId");
-		String testerId = (String) request.get("testerId");
-		String templateId = (String) request.get("templateId");
-		int numCases = request.get("numCases") != null ? ((Number) request.get("numCases")).intValue() : 3;
-
-		// Deserialize InferredQuestionConfig from the nested "question" field
-		@SuppressWarnings("unchecked")
-		Map<String, Object> qMap = (Map<String, Object>) request.get("question");
-		if (qMap == null) {
+		InferredQuestionConfig iqc = request.getQuestion();
+		if (iqc == null) {
 			return ResponseEntity.badRequest().body(Map.of("error", "Missing 'question' field."));
 		}
-
-		InferredQuestionConfig iqc = new InferredQuestionConfig();
-		iqc.setQuestionId((String) qMap.get("questionId"));
-		iqc.setFolder((String) qMap.get("folder"));
-		iqc.setTester((String) qMap.get("tester"));
-		iqc.setMaxScore(qMap.get("maxScore") != null ? ((Number) qMap.get("maxScore")).doubleValue() : 0.0);
-		iqc.setDependencyFolder((String) qMap.get("dependencyFolder"));
-		@SuppressWarnings("unchecked")
-		List<String> deps = (List<String>) qMap.get("dependencyFiles");
-		iqc.setDependencyFiles(deps != null ? deps : new ArrayList<>());
 
 		// Load exam context from DB cache (no Docling call)
 		String examContext = loadExamContext(examId, iqc.getQuestionId());
@@ -267,10 +247,10 @@ public class GenerationController {
 	 * for exam context.
 	 */
 	@PostMapping("/recommend")
-	public ResponseEntity<?> recommend(@RequestBody Map<String, Object> request) {
-		String examId = (String) request.get("examId");
-		String questionId = (String) request.get("questionId");
-		String testerId = (String) request.get("testerId");
+	public ResponseEntity<?> recommend(@RequestBody RecommendRequest request) {
+		String examId = request.getExamId();
+		String questionId = request.getQuestionId();
+		String testerId = request.getTesterId();
 
 		try {
 			String examContext = loadExamContext(examId, questionId);
@@ -308,11 +288,11 @@ public class GenerationController {
 	 * and delegates to the shared LangChainService (no new client per request).
 	 */
 	@PostMapping("/refine")
-	public ResponseEntity<?> refine(@RequestBody Map<String, Object> request) {
-		String examId = (String) request.get("examId");
-		String questionId = (String) request.get("questionId");
-		String currentCode = (String) request.get("currentCode");
-		String refinementPrompt = (String) request.get("refinementPrompt");
+	public ResponseEntity<?> refine(@RequestBody RefineRequest request) {
+		String examId = request.getExamId();
+		String questionId = request.getQuestionId();
+		String currentCode = request.getCurrentCode();
+		String refinementPrompt = request.getRefinementPrompt();
 
 		if (currentCode == null || refinementPrompt == null) {
 			return ResponseEntity.badRequest().body(Map.of("error", "Missing currentCode or refinementPrompt."));
@@ -425,12 +405,12 @@ public class GenerationController {
 	 * Generate test cases for a single question using upload IDs. Uses DB cache.
 	 */
 	@PostMapping("/generate-question")
-	public ResponseEntity<?> generateQuestion(@RequestBody Map<String, Object> request) {
-		String examId = (String) request.get("examId");
-		String testerId = (String) request.get("testerId");
-		String templateId = (String) request.get("templateId");
-		String questionId = (String) request.get("questionId");
-		int numCases = request.get("numCases") != null ? ((Number) request.get("numCases")).intValue() : 3;
+	public ResponseEntity<?> generateQuestion(@RequestBody GenerateQuestionRequest request) {
+		String examId = request.getExamId();
+		String testerId = request.getTesterId();
+		String templateId = request.getTemplateId();
+		String questionId = request.getQuestionId();
+		int numCases = request.getNumCases() > 0 ? request.getNumCases() : 3;
 
 		// Load from DB cache instead of re-parsing PDF
 		String examContext = loadExamContext(examId, questionId);
