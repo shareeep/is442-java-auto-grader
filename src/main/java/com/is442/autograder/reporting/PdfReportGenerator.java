@@ -53,15 +53,11 @@ import com.lowagie.text.pdf.PdfWriter;
 public class PdfReportGenerator {
 
 	// ── Anomaly classification sets ──────────────────────────────────────────
-	private static final Set<Anomaly.Type> STRUCTURAL_TYPES = EnumSet.of(Anomaly.Type.FOLDER_NOT_RENAMED,
-			Anomaly.Type.STUDENT_ID_AS_FOLDER, Anomaly.Type.NO_PARENT_FOLDER, Anomaly.Type.EXTRA_NESTING,
-			Anomaly.Type.MISSING_QUESTION_FOLDER, Anomaly.Type.MISSING_JAVA_FILE, Anomaly.Type.IDENTITY_MISMATCH);
+	private static final Set<Anomaly.Type> STRUCTURAL_TYPES = PdfReportSupport.STRUCTURAL_TYPES;
 
-	private static final Set<Anomaly.Type> METADATA_TYPES = EnumSet.of(Anomaly.Type.MISSING_HEADER,
-			Anomaly.Type.INCOMPLETE_HEADER);
+	private static final Set<Anomaly.Type> METADATA_TYPES = PdfReportSupport.METADATA_TYPES;
 
-	private static final Set<Anomaly.Type> EXECUTION_TYPES = EnumSet.of(Anomaly.Type.COMPILATION_ERROR,
-			Anomaly.Type.RUNTIME_ERROR, Anomaly.Type.EXECUTION_TIMEOUT);
+	private static final Set<Anomaly.Type> EXECUTION_TYPES = PdfReportSupport.EXECUTION_TYPES;
 
 	// ── Layout constants ─────────────────────────────────────────────────────
 	private static final float MARGIN = 54f;
@@ -109,7 +105,8 @@ public class PdfReportGenerator {
 
 		double classMax = qcs.stream().mapToDouble(QuestionConfig::getMaxScore).sum();
 
-		Document doc = new Document(PageSize.A4, MARGIN, MARGIN, MARGIN, MARGIN);
+		Document doc = new Document(PageSize.A4, PdfReportSupport.MARGIN, PdfReportSupport.MARGIN,
+				PdfReportSupport.MARGIN, PdfReportSupport.MARGIN);
 		try (FileOutputStream fos = new FileOutputStream(outputPath.toFile())) {
 			PdfWriter.getInstance(doc, fos);
 			doc.open();
@@ -155,7 +152,8 @@ public class PdfReportGenerator {
 		content.add(new Phrase(timestamp + "   |   Submissions: " + submissionCount, valueFont));
 
 		PdfPCell cell = new PdfPCell(content);
-		cell.setBackgroundColor(new Color(HDR_BG.getRed(), HDR_BG.getGreen(), HDR_BG.getBlue()));
+		cell.setBackgroundColor(new Color(PdfReportSupport.HEADER_BACKGROUND.getRed(),
+				PdfReportSupport.HEADER_BACKGROUND.getGreen(), PdfReportSupport.HEADER_BACKGROUND.getBlue()));
 		cell.setPadding(10f);
 		cell.setBorder(Rectangle.NO_BORDER);
 		tbl.addCell(cell);
@@ -894,104 +892,35 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 
 	private PdfPTable newTable(float[] widths) throws IOException {
-		PdfPTable tbl = new PdfPTable(widths.length);
-		tbl.setWidthPercentage(100);
-		tbl.setWidths(widths);
-		tbl.setSpacingBefore(4f);
-		tbl.setSpacingAfter(4f);
-		return tbl;
+		return PdfReportSupport.newTable(widths);
 	}
 
 	private void addHeaderRow(PdfPTable tbl, String... headers) {
-		Font hFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Font.BOLD, new Color(40, 55, 80));
-		for (String h : headers) {
-			PdfPCell cell = new PdfPCell(new Phrase(h, hFont));
-			cell.setBackgroundColor(new Color(TBL_HDR_BG.getRed(), TBL_HDR_BG.getGreen(), TBL_HDR_BG.getBlue()));
-			cell.setPadding(5f);
-			cell.setBorderColor(new Color(180, 200, 225));
-			cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-			tbl.addCell(cell);
-		}
+		PdfReportSupport.addHeaderRow(tbl, headers);
 	}
 
 	private void addDataRow(PdfPTable tbl, boolean alt, String... values) {
-		Font dFont = FontFactory.getFont(FontFactory.HELVETICA, 9);
-		Color rowBg = alt ? ROW_ALT : Color.WHITE;
-		for (int i = 0; i < values.length; i++) {
-			PdfPCell cell = new PdfPCell(new Phrase(values[i] != null ? values[i] : "", dFont));
-			cell.setBackgroundColor(new Color(rowBg.getRed(), rowBg.getGreen(), rowBg.getBlue()));
-			cell.setPadding(4.5f);
-			cell.setBorderColor(new Color(210, 210, 210));
-			cell.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
-			cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-			tbl.addCell(cell);
-		}
+		PdfReportSupport.addDataRow(tbl, alt, values);
 	}
 
 	private void addTwoColumnTable(Document doc, String col1, String col2, String[][] rows) throws IOException {
-		PdfPTable tbl = newTable(new float[]{250, 240});
-		addHeaderRow(tbl, col1, col2);
-		boolean alt = false;
-		for (String[] row : rows) {
-			addDataRow(tbl, alt, row[0], row[1]);
-			alt = !alt;
-		}
-		doc.add(tbl);
+		PdfReportSupport.addTwoColumnTable(doc, col1, col2, rows);
 	}
 
 	private void addRawCell(PdfPTable tbl, String text, Color bg, Font font, int hAlign) {
-		PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "", font));
-		cell.setBackgroundColor(new Color(bg.getRed(), bg.getGreen(), bg.getBlue()));
-		cell.setHorizontalAlignment(hAlign);
-		cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		cell.setPadding(4.5f);
-		cell.setBorderColor(new Color(180, 200, 225));
-		tbl.addCell(cell);
+		PdfReportSupport.addRawCell(tbl, text, bg, font, hAlign);
 	}
 
 	private PdfPCell styledCell(String text, Font font, Color bg, int hAlign) {
-		PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "", font));
-		cell.setBackgroundColor(new Color(bg.getRed(), bg.getGreen(), bg.getBlue()));
-		cell.setHorizontalAlignment(hAlign);
-		cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		cell.setPadding(4.5f);
-		cell.setBorderColor(new Color(210, 210, 210));
-		return cell;
+		return PdfReportSupport.styledCell(text, font, bg, hAlign);
 	}
 
 	private void addDetailRow(PdfPTable tbl, Font kFont, Font vFont, String key, String value) {
-		PdfPCell k = new PdfPCell(new Phrase(key, kFont));
-		k.setBorderColor(new Color(200, 200, 200));
-		k.setPadding(4f);
-		k.setBackgroundColor(new Color(245, 247, 252));
-		tbl.addCell(k);
-		PdfPCell v = new PdfPCell(new Phrase(value != null ? value : "", vFont));
-		v.setBorderColor(new Color(200, 200, 200));
-		v.setPadding(4f);
-		tbl.addCell(v);
+		PdfReportSupport.addDetailRow(tbl, kFont, vFont, key, value);
 	}
 
 	private void addStudentDetailBlock(Document doc, StudentSubmission sub, List<String> lines) throws IOException {
-		PdfPTable tbl = newTable(new float[]{490});
-		tbl.setSpacingBefore(3f);
-		tbl.setSpacingAfter(6f);
-		Font hFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f, Font.BOLD, new Color(26, 58, 92));
-		Font bFont = FontFactory.getFont(FontFactory.HELVETICA, 8.5f, WARN_STATUS);
-
-		PdfPCell hCell = new PdfPCell(new Phrase(sub.getDisplayName(), hFont));
-		hCell.setBackgroundColor(new Color(235, 243, 255));
-		hCell.setPadding(5f);
-		hCell.setBorderColor(new Color(180, 210, 240));
-		tbl.addCell(hCell);
-
-		for (String line : lines) {
-			PdfPCell bCell = new PdfPCell(new Phrase("  ⚠ " + line, bFont));
-			bCell.setBackgroundColor(Color.WHITE);
-			bCell.setPadding(4f);
-			bCell.setBorderColor(new Color(220, 220, 220));
-			tbl.addCell(bCell);
-		}
-		doc.add(tbl);
+		PdfReportSupport.addStudentDetailBlock(doc, sub, lines);
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════
@@ -999,43 +928,19 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 
 	private void addSectionHeading(Document doc, String num, String title) throws IOException {
-		Font secFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, Font.BOLD, new Color(255, 255, 255));
-		Paragraph p = new Paragraph("Section " + num + ": " + title, secFont);
-		p.setSpacingBefore(8f);
-		p.setSpacingAfter(10f);
-
-		PdfPTable banner = new PdfPTable(1);
-		banner.setWidthPercentage(100);
-		banner.setSpacingBefore(4f);
-		banner.setSpacingAfter(8f);
-		PdfPCell cell = new PdfPCell(p);
-		cell.setBackgroundColor(new Color(SECTION_BAR.getRed(), SECTION_BAR.getGreen(), SECTION_BAR.getBlue()));
-		cell.setPadding(8f);
-		cell.setBorder(Rectangle.NO_BORDER);
-		banner.addCell(cell);
-		doc.add(banner);
+		PdfReportSupport.addSectionHeading(doc, num, title);
 	}
 
 	private void addSubHeading(Document doc, String text) throws IOException {
-		Font f = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, new Color(60, 80, 110));
-		Paragraph p = new Paragraph(text, f);
-		p.setSpacingBefore(10f);
-		p.setSpacingAfter(4f);
-		doc.add(p);
+		PdfReportSupport.addSubHeading(doc, text);
 	}
 
 	private void addBodyText(Document doc, String text) throws IOException {
-		Font f = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(80, 80, 80));
-		Paragraph p = new Paragraph(text, f);
-		p.setSpacingBefore(4f);
-		p.setSpacingAfter(4f);
-		doc.add(p);
+		PdfReportSupport.addBodyText(doc, text);
 	}
 
 	private void gap(Document doc) throws IOException {
-		Paragraph p = new Paragraph(" ");
-		p.setSpacingAfter(4f);
-		doc.add(p);
+		PdfReportSupport.gap(doc);
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════
@@ -1043,47 +948,15 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 
 	private String scoreStatus(QuestionResult qr) {
-		if (!qr.isCompiled()) {
-			return "Question files not found".equals(qr.getErrorMessage()) ? "MISSING" : "ERR-COMP";
-		}
-		if (!qr.isExecuted()) {
-			return qr.getErrorMessage() != null && qr.getErrorMessage().contains("timed out") ? "TIMEOUT" : "RUN-ERR";
-		}
-		if (qr.getScore() >= qr.getMaxScore()) {
-			return "PASS";
-		}
-		return qr.getScore() > 0 ? "PARTIAL" : "FAIL";
+		return PdfReportSupport.scoreStatus(qr);
 	}
 
 	private Color statusColor(String status) {
-		return switch (status) {
-			case "PASS" -> PASS_COLOR;
-			case "PARTIAL" -> PARTIAL_COLOR;
-			case "FAIL", "ERR-COMP", "RUN-ERR" -> FAIL_COLOR;
-			case "TIMEOUT" -> TIMEOUT_COLOR;
-			case "MISSING" -> MISSING_COLOR;
-			default -> Color.WHITE;
-		};
+		return PdfReportSupport.statusColor(status);
 	}
 
 	private String buildCompileErrorText(String errorMessage) {
-		if (errorMessage == null || errorMessage.isBlank()) {
-			return "Compilation failed.";
-		}
-		StringBuilder sb = new StringBuilder("Compilation failed:\n");
-		int printed = 0;
-		for (String line : errorMessage.split("\n")) {
-			String t = line.trim();
-			if (t.isEmpty() || t.startsWith("Note:")) {
-				continue;
-			}
-			sb.append(t).append("\n");
-			if (++printed >= 6) {
-				sb.append("[... see logs for full error]");
-				break;
-			}
-		}
-		return sb.toString();
+		return PdfReportSupport.buildCompileErrorText(errorMessage);
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════
@@ -1095,13 +968,12 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 
 	private String fmt(double v) {
-		if (v == Math.floor(v)) {
-			return String.valueOf((int) v);
-		}
-		return String.format("%.1f", v);
+		return PdfReportSupport.fmt(v);
 	}
 
 	private String pct(double ratio) {
-		return (int) Math.round(ratio * 100) + "%";
+		return PdfReportSupport.pct(ratio);
 	}
 }
+
+
