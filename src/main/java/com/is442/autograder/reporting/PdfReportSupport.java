@@ -56,7 +56,8 @@ final class PdfReportSupport {
 			return "Question files not found".equals(result.getErrorMessage()) ? "MISSING" : "ERR-COMP";
 		}
 		if (!result.isExecuted()) {
-			return result.getErrorMessage() != null && result.getErrorMessage().contains("timed out") ? "TIMEOUT"
+			return result.getErrorMessage() != null && result.getErrorMessage().contains("timed out")
+					? "TIMEOUT"
 					: "RUN-ERR";
 		}
 		if (result.getScore() >= result.getMaxScore()) {
@@ -194,8 +195,7 @@ final class PdfReportSupport {
 		PdfPTable table = newTable(new float[]{490});
 		table.setSpacingBefore(3f);
 		table.setSpacingAfter(6f);
-		Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f, Font.BOLD,
-				new Color(26, 58, 92));
+		Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f, Font.BOLD, new Color(26, 58, 92));
 		Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 8.5f, WARN_STATUS);
 
 		PdfPCell headerCell = new PdfPCell(new Phrase(submission.getDisplayName(), headerFont));
