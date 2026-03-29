@@ -57,7 +57,7 @@ public class CSVExporter {
 		// Build one row per student from the template (preserves all students,
 		// sorted alphabetically by Name)
 		List<List<String>> dataRows = new java.util.ArrayList<>();
-		for (ScoresheetRow scoresheetRow : ScoresheetParser.parse(templateCsvPath)) {
+		for (ScoresheetParser.ScoresheetRow scoresheetRow : ScoresheetParser.parse(templateCsvPath)) {
 			StudentSubmission sub = subMap.get(scoresheetRow.username().toLowerCase());
 
 			List<String> row = new java.util.ArrayList<>();

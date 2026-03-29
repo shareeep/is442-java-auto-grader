@@ -40,7 +40,7 @@ public final class ChartGenerator {
 
 	/** Score distribution bar chart (vertical). */
 	public static byte[] scoreDistributionChart(List<StudentSubmission> submissions, double maxPossible) {
-		DefaultCategoryDataset dataset = ChartDatasetFactory.scoreDistributionDataset(submissions, maxPossible);
+		DefaultCategoryDataset dataset = scoreDistributionDataset(submissions, maxPossible);
 		JFreeChart chart = ChartFactory.createBarChart("Score Distribution", "Score Range", "Students", dataset,
 				PlotOrientation.VERTICAL, false, false, false);
 		applyStyle(chart, BLUE);
@@ -49,7 +49,7 @@ public final class ChartGenerator {
 
 	/** Pass rate per question horizontal bar chart (%). */
 	public static byte[] passRateChart(List<StudentSubmission> submissions, List<QuestionConfig> questions) {
-		DefaultCategoryDataset dataset = ChartDatasetFactory.passRateDataset(submissions, questions);
+		DefaultCategoryDataset dataset = passRateDataset(submissions, questions);
 		JFreeChart chart = ChartFactory.createBarChart("Full-Pass Rate by Question", "Question", "Pass Rate (%)",
 				dataset, PlotOrientation.HORIZONTAL, false, true, false);
 		applyStyle(chart, GREEN);
@@ -61,7 +61,7 @@ public final class ChartGenerator {
 
 	/** Anomaly frequency horizontal bar chart (top 8 types). */
 	public static byte[] anomalyFrequencyChart(Map<Anomaly.Type, Long> typeCounts) {
-		DefaultCategoryDataset dataset = ChartDatasetFactory.anomalyFrequencyDataset(typeCounts);
+		DefaultCategoryDataset dataset = anomalyFrequencyDataset(typeCounts);
 		JFreeChart chart = ChartFactory.createBarChart("Anomaly Frequency", "Issue Type", "Occurrences", dataset,
 				PlotOrientation.HORIZONTAL, false, true, false);
 		applyStyle(chart, RED);
@@ -101,6 +101,49 @@ public final class ChartGenerator {
 			throw new RuntimeException("Chart PNG generation failed", e);
 		}
 		return output.toByteArray();
+	}
+
+	private static DefaultCategoryDataset scoreDistributionDataset(List<StudentSubmission> submissions,
+			double maxPossible) {
+		DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+		int binWidth = Math.max(1, (int) Math.ceil(maxPossible / 5.0));
+		for (int low = 0; low < (int) maxPossible; low += binWidth) {
+			int high = (int) Math.min(low + binWidth - 1, (int) maxPossible - 1);
+			final double lowerBound = low;
+			final double upperBound = high;
+			long count = submissions.stream().filter(
+					submission -> submission.getTotalScore() >= lowerBound && submission.getTotalScore() <= upperBound)
+					.count();
+			String label = low == high ? String.valueOf(low) : low + "â€“" + high;
+			dataset.addValue(count, "Students", label);
+		}
+
+		long perfectCount = submissions.stream().filter(submission -> submission.getTotalScore() >= maxPossible)
+				.count();
+		dataset.addValue(perfectCount, "Students", (int) maxPossible + " (full)");
+		return dataset;
+	}
+
+	private static DefaultCategoryDataset passRateDataset(List<StudentSubmission> submissions,
+			List<QuestionConfig> questions) {
+		DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+		int totalSubmissions = submissions.size();
+		for (QuestionConfig question : questions) {
+			long passed = submissions.stream().flatMap(submission -> submission.getResults().stream())
+					.filter(result -> result.getQuestionId().equals(question.getQuestionId())
+							&& result.getScore() >= result.getMaxScore())
+					.count();
+			double passRate = totalSubmissions == 0 ? 0 : (double) passed / totalSubmissions * 100.0;
+			dataset.addValue(passRate, "Pass Rate", question.getQuestionId());
+		}
+		return dataset;
+	}
+
+	private static DefaultCategoryDataset anomalyFrequencyDataset(Map<Anomaly.Type, Long> typeCounts) {
+		DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+		typeCounts.entrySet().stream().sorted(Map.Entry.<Anomaly.Type, Long>comparingByValue().reversed()).limit(8)
+				.forEach(entry -> dataset.addValue(entry.getValue(), "Occurrences", friendlyName(entry.getKey())));
+		return dataset;
 	}
 
 	static String friendlyName(Anomaly.Type type) {

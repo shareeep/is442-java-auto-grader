@@ -37,7 +37,7 @@ public class ScoresheetEnricher {
 	 */
 	public void enrich(Path scoresheetPath, List<StudentSubmission> submissions) throws IOException {
 		Map<String, StudentSubmission> byUsername = buildUsernameIndex(submissions);
-		for (ScoresheetRow row : ScoresheetParser.parse(scoresheetPath)) {
+		for (ScoresheetParser.ScoresheetRow row : ScoresheetParser.parse(scoresheetPath)) {
 			StudentSubmission sub = byUsername.get(row.username().toLowerCase());
 			if (sub == null) {
 				continue;
