@@ -70,4 +70,4 @@ frontend/dist/
 pdf-diagnostic/
 
 # database
-data/
+/data/
