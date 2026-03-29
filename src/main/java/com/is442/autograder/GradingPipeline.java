@@ -17,6 +17,7 @@ import com.is442.autograder.execution.ProcessRunner;
 import com.is442.autograder.extraction.IdentityResolver;
 import com.is442.autograder.extraction.StructureNormalizer;
 import com.is442.autograder.extraction.ZipExtractor;
+import com.is442.autograder.model.Anomaly;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.CSVExporter;
@@ -95,137 +96,155 @@ public class GradingPipeline {
 	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir,
 			Consumer<StudentSubmission> onStudentGraded, Consumer<String> onStudentStarted) throws IOException {
 
-		ConsoleLogCapture logCapture = null;
-		Path runOutputDir = outputDir;
-		if (outputDir != null) {
-			runOutputDir = createRunOutputDir(outputDir);
-			logCapture = ConsoleLogCapture.start(runOutputDir);
-		}
-
-		QuestionLogWriter logWriter = runOutputDir != null ? new QuestionLogWriter(runOutputDir) : null;
-		GradingEngine gradingEngine = new GradingEngine(new ProcessRunner(config.getTimeoutSeconds()), logWriter,
-				consoleReporter, config.getTemplateFolder());
+		RunContext runContext = initializeRun(outputDir);
 
 		try {
-			// 1. Find all ZIP files
 			List<Path> zipFiles = findZipFiles(submissionsDir);
 			if (zipFiles.isEmpty()) {
 				System.out.println("No ZIP files found in " + submissionsDir);
 				return List.of();
 			}
 
-			System.out.println("\nFound " + zipFiles.size() + " submission(s) to grade.\n");
-			java.util.logging.LogManager.getLogManager().reset();
-			consoleReporter.startProgress(zipFiles.size());
+			List<QuestionConfig> questionConfigs = resolveQuestionConfigs();
+			List<StudentSubmission> submissions = gradeSubmissions(zipFiles, testerFilesDir, questionConfigs,
+					onStudentGraded, onStudentStarted, runContext.gradingEngine());
 
-			List<QuestionConfig> questionConfigs = inferredQuestionConfigs != null
-					? inferredQuestionConfigs
-					: config.getQuestionConfigs();
-			List<StudentSubmission> submissions = new ArrayList<>();
-
-			// 2. Process each ZIP
-			for (int i = 0; i < zipFiles.size(); i++) {
-				// Honour a stop request (user pressed 'q' during grading)
-				if (consoleReporter.isStopRequested()) {
-					break;
-				}
-
-				Path zipFile = zipFiles.get(i);
-				String zipName = zipFile.getFileName().toString();
-
-				StudentSubmission submission = new StudentSubmission(zipName);
-				consoleReporter.updateCurrentStudent(submission.getDisplayName());
-
-				if (onStudentStarted != null) {
-					onStudentStarted.accept(submission.getDisplayName());
-				}
-
-				try {
-					// Extract to temp directory
-					Path tempDir = FileUtils.createTempDir("autograder-" + zipName.replace(".zip", ""));
-					Path extractedRoot = zipExtractor.extract(zipFile, tempDir);
-					// Normalize structure + resolve identity
-					Path submissionRoot = structureNormalizer.normalize(extractedRoot, submission);
-					submission.setRootPath(submissionRoot);
-
-					// Validate
-					submissionValidator.validate(submissionRoot, questionConfigs, submission);
-
-					// Log structural/validation anomalies immediately so the instructor
-					// sees them live (compilation/runtime anomalies are logged by GradingEngine)
-					consoleReporter.beginStudentLog(submission.getDisplayName());
-					for (com.is442.autograder.model.Anomaly a : submission.getAnomalies()) {
-						if (a.getSeverity() == com.is442.autograder.model.Anomaly.Severity.ERROR) {
-							consoleReporter.logError(a.getDescription());
-						} else {
-							consoleReporter.logWarning(a.getDescription());
-						}
-					}
-
-					// Grade
-					gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
-
-				} catch (SecurityException e) {
-					LOGGER.warning("Security issue with " + zipName + ": " + e.getMessage());
-					System.err.println("  ⚠ Skipping " + zipName + " (security issue): " + e.getMessage());
-				} catch (Exception e) {
-					LOGGER.warning("Error processing " + zipName + ": " + e.getMessage());
-					System.err.println("  ✖ Error processing " + zipName + ": " + e.getMessage());
-				}
-
-				// Fill missing name immediately so callback and later enrichment both have it
-				if ((submission.getName() == null || submission.getName().isEmpty())
-						&& submission.getUsername() != null) {
-					submission.setName(identityResolver.deriveNameFromUsername(submission.getUsername()));
-				}
-
-				consoleReporter.printProgress(i + 1, zipFiles.size(), submission.getDisplayName());
-				submissions.add(submission);
-
-				if (onStudentGraded != null) {
-					onStudentGraded.accept(submission);
-				}
-			}
-
-			consoleReporter.endProgress();
-			System.out.println();
-
-			if (consoleReporter.isStopRequested()) {
-				System.out.println(
-						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
-			}
-
-			// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
-			if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
-				scoresheetEnricher.enrich(scoresheetPath, submissions);
-			}
-
-			// 5. Print summary
-			consoleReporter.printSummary(submissions, questionConfigs);
-
-			// 6. Export scoresheet (if template provided)
-			if (!consoleReporter.isStopRequested() && scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
-				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
-				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
-				System.out.println("\nScoresheet exported to: " + outputCsv);
-			}
-
-			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
-			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
-
-			// 7. Export PDF report
-			if (!consoleReporter.isStopRequested()) {
-				Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
-				new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
-				System.out.println("PDF report exported to: " + pdfReport);
-			}
-
+			completeRun(submissions, questionConfigs, scoresheetPath, runContext.runOutputDir());
 			return submissions;
 		} finally {
-			if (logCapture != null) {
-				logCapture.close();
+			if (runContext.logCapture() != null) {
+				runContext.logCapture().close();
 			}
 		}
+	}
+
+	private RunContext initializeRun(Path outputDir) throws IOException {
+		Path runOutputDir = outputDir != null ? createRunOutputDir(outputDir) : null;
+		ConsoleLogCapture logCapture = runOutputDir != null ? ConsoleLogCapture.start(runOutputDir) : null;
+		QuestionLogWriter logWriter = runOutputDir != null ? new QuestionLogWriter(runOutputDir) : null;
+		GradingEngine gradingEngine = new GradingEngine(new ProcessRunner(config.getTimeoutSeconds()), logWriter,
+				consoleReporter, config.getTemplateFolder());
+		return new RunContext(runOutputDir, logCapture, gradingEngine);
+	}
+
+	private List<QuestionConfig> resolveQuestionConfigs() {
+		return inferredQuestionConfigs != null ? inferredQuestionConfigs : config.getQuestionConfigs();
+	}
+
+	private List<StudentSubmission> gradeSubmissions(List<Path> zipFiles, Path testerFilesDir,
+			List<QuestionConfig> questionConfigs, Consumer<StudentSubmission> onStudentGraded,
+			Consumer<String> onStudentStarted, GradingEngine gradingEngine) throws IOException {
+		System.out.println("\nFound " + zipFiles.size() + " submission(s) to grade.\n");
+		java.util.logging.LogManager.getLogManager().reset();
+		consoleReporter.startProgress(zipFiles.size());
+
+		List<StudentSubmission> submissions = new ArrayList<>();
+		for (int i = 0; i < zipFiles.size(); i++) {
+			if (consoleReporter.isStopRequested()) {
+				break;
+			}
+
+			StudentSubmission submission = gradeSingleSubmission(zipFiles.get(i), testerFilesDir, questionConfigs,
+					onStudentStarted, gradingEngine);
+			finalizeSubmission(submission);
+
+			consoleReporter.printProgress(i + 1, zipFiles.size(), submission.getDisplayName());
+			submissions.add(submission);
+
+			if (onStudentGraded != null) {
+				onStudentGraded.accept(submission);
+			}
+		}
+
+		consoleReporter.endProgress();
+		System.out.println();
+		return submissions;
+	}
+
+	private StudentSubmission gradeSingleSubmission(Path zipFile, Path testerFilesDir,
+			List<QuestionConfig> questionConfigs, Consumer<String> onStudentStarted, GradingEngine gradingEngine)
+			throws IOException {
+		String zipName = zipFile.getFileName().toString();
+		StudentSubmission submission = new StudentSubmission(zipName);
+
+		consoleReporter.updateCurrentStudent(submission.getDisplayName());
+		if (onStudentStarted != null) {
+			onStudentStarted.accept(submission.getDisplayName());
+		}
+
+		try {
+			Path tempDir = FileUtils.createTempDir("autograder-" + zipName.replace(".zip", ""));
+			Path extractedRoot = zipExtractor.extract(zipFile, tempDir);
+			Path submissionRoot = structureNormalizer.normalize(extractedRoot, submission);
+			submission.setRootPath(submissionRoot);
+
+			submissionValidator.validate(submissionRoot, questionConfigs, submission);
+			logSubmissionAnomalies(submission);
+			gradingEngine.grade(submissionRoot, testerFilesDir, questionConfigs, submission);
+		} catch (SecurityException e) {
+			LOGGER.warning("Security issue with " + zipName + ": " + e.getMessage());
+			System.err.println("  Skipping " + zipName + " (security issue): " + e.getMessage());
+		} catch (Exception e) {
+			LOGGER.warning("Error processing " + zipName + ": " + e.getMessage());
+			System.err.println("  Error processing " + zipName + ": " + e.getMessage());
+		}
+
+		return submission;
+	}
+
+	private void logSubmissionAnomalies(StudentSubmission submission) {
+		consoleReporter.beginStudentLog(submission.getDisplayName());
+		for (Anomaly anomaly : submission.getAnomalies()) {
+			if (anomaly.getSeverity() == Anomaly.Severity.ERROR) {
+				consoleReporter.logError(anomaly.getDescription());
+			} else {
+				consoleReporter.logWarning(anomaly.getDescription());
+			}
+		}
+	}
+
+	private void finalizeSubmission(StudentSubmission submission) {
+		if ((submission.getName() == null || submission.getName().isEmpty()) && submission.getUsername() != null) {
+			submission.setName(identityResolver.deriveNameFromUsername(submission.getUsername()));
+		}
+	}
+
+	private void completeRun(List<StudentSubmission> submissions, List<QuestionConfig> questionConfigs,
+			Path scoresheetPath, Path runOutputDir) throws IOException {
+		if (consoleReporter.isStopRequested()) {
+			System.out.println(
+					"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
+		}
+
+		if (scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+			scoresheetEnricher.enrich(scoresheetPath, submissions);
+		}
+
+		consoleReporter.printSummary(submissions, questionConfigs);
+
+		if (!consoleReporter.isStopRequested() && scoresheetPath != null && Files.isRegularFile(scoresheetPath)
+				&& runOutputDir != null) {
+			Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
+			csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
+			System.out.println("\nScoresheet exported to: " + outputCsv);
+		}
+
+		printRunArtifacts(runOutputDir);
+
+		if (!consoleReporter.isStopRequested() && runOutputDir != null) {
+			Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
+			new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
+			System.out.println("PDF report exported to: " + pdfReport);
+		}
+	}
+
+	private void printRunArtifacts(Path runOutputDir) {
+		if (runOutputDir == null) {
+			return;
+		}
+
+		System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
+		System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 	}
 
 	private Path createRunOutputDir(Path baseOutputDir) throws IOException {
@@ -247,5 +266,8 @@ public class GradingPipeline {
 			stream.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".zip")).sorted().forEach(zips::add);
 		}
 		return zips;
+	}
+
+	private record RunContext(Path runOutputDir, ConsoleLogCapture logCapture, GradingEngine gradingEngine) {
 	}
 }
