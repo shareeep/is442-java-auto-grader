@@ -17,6 +17,9 @@ public class ZipExtractor {
 	private static final long MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100 MB
 	private static final int MAX_ENTRIES = 1000;
 	private static final int MAX_PATH_LENGTH = 255;
+	private static final int BUFFER_SIZE = 8192;
+	private static final String MAC_METADATA_PREFIX = "__MACOSX";
+	private static final String DS_STORE = ".DS_Store";
 
 	/**
 	 * Extract a ZIP file to the given target directory.
@@ -51,7 +54,7 @@ public class ZipExtractor {
 				String entryName = entry.getName();
 
 				// Skip macOS metadata
-				if (entryName.startsWith("__MACOSX") || entryName.contains(".DS_Store")) {
+				if (isMacMetadata(entryName)) {
 					zis.closeEntry();
 					continue;
 				}
@@ -64,35 +67,50 @@ public class ZipExtractor {
 
 				// 3. Resolve and verify target path
 				Path destPath = targetDir.resolve(entryName).normalize();
-				if (!destPath.startsWith(targetDir)) {
+				if (!isWithinTargetDir(destPath, targetDir)) {
 					zis.closeEntry();
 					continue;
 				}
 
 				// 4. Extract, counting actual bytes written for zip bomb protection
-				if (entry.isDirectory()) {
-					Files.createDirectories(destPath);
-				} else {
-					Files.createDirectories(destPath.getParent());
-					byte[] buf = new byte[8192];
-					int n;
-					try (java.io.OutputStream out = Files.newOutputStream(destPath)) {
-						while ((n = zis.read(buf)) != -1) {
-							totalSize += n;
-							if (totalSize > MAX_TOTAL_SIZE) {
-								throw new SecurityException(
-										"Archive too large (exceeds " + (MAX_TOTAL_SIZE / 1024 / 1024) + " MB)");
-							}
-							out.write(buf, 0, n);
-						}
-					}
-				}
+				totalSize = extractEntry(zis, entry, destPath, totalSize);
 
 				zis.closeEntry();
 			}
 		}
 
 		return targetDir;
+	}
+
+	private boolean isMacMetadata(String entryName) {
+		return entryName.startsWith(MAC_METADATA_PREFIX) || entryName.contains(DS_STORE);
+	}
+
+	private boolean isWithinTargetDir(Path destination, Path targetDir) {
+		return destination.startsWith(targetDir);
+	}
+
+	private long extractEntry(ZipInputStream zis, ZipEntry entry, Path destPath, long currentSize) throws IOException {
+		if (entry.isDirectory()) {
+			Files.createDirectories(destPath);
+			return currentSize;
+		}
+
+		Files.createDirectories(destPath.getParent());
+		byte[] buffer = new byte[BUFFER_SIZE];
+		int read;
+		long totalSize = currentSize;
+		try (java.io.OutputStream out = Files.newOutputStream(destPath)) {
+			while ((read = zis.read(buffer)) != -1) {
+				totalSize += read;
+				if (totalSize > MAX_TOTAL_SIZE) {
+					throw new SecurityException(
+							"Archive too large (exceeds " + (MAX_TOTAL_SIZE / 1024 / 1024) + " MB)");
+				}
+				out.write(buffer, 0, read);
+			}
+		}
+		return totalSize;
 	}
 
 	private boolean isSafeEntryName(String name) {

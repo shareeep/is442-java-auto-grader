@@ -16,6 +16,13 @@ import java.util.Properties;
  * test cases. Backs up the original tester before writing.
  */
 public class TesterFileWriter {
+	private static final String JAVA_SUFFIX = ".java";
+	private static final String BACKUP_SUFFIX = ".java.bak";
+	private static final String GENERATED_SUFFIX = "_generated";
+	private static final String TESTER_SUFFIX = "Tester";
+	private static final String WEIGHT_PLACEHOLDER_PATTERN = "WEIGHT_\\d+";
+	private static final String DEFAULT_WEIGHT = "1.0";
+	private static final String GRADER_METHOD_MARKER = "    public static void grade() {\n";
 
 	/**
 	 * Write a generated tester file to the output folder.
@@ -41,22 +48,22 @@ public class TesterFileWriter {
 
 		// Back up original if it exists
 		if (originalTesterDir != null) {
-			Path originalFile = originalTesterDir.resolve(testerClassName + ".java");
+			Path originalFile = originalTesterDir.resolve(testerClassName + JAVA_SUFFIX);
 			if (Files.exists(originalFile)) {
-				Files.copy(originalFile, originalFile.resolveSibling(testerClassName + ".java.bak"),
+				Files.copy(originalFile, originalFile.resolveSibling(testerClassName + BACKUP_SUFFIX),
 						StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
 
-		String generatedClassName = testerClassName + "_generated";
-		String parentClass = testerClassName.replace("Tester", "");
+		String generatedClassName = testerClassName + GENERATED_SUFFIX;
+		String parentClass = testerClassName.replace(TESTER_SUFFIX, "");
 
 		// Substitute WEIGHT_N placeholders with actual weights
 		String codeWithWeights = substituteWeights(generatedCode, cases);
 
 		String fileContent = buildFileContent(generatedClassName, parentClass, originalCode, codeWithWeights);
 
-		Path outputFile = outputDir.resolve(generatedClassName + ".java");
+		Path outputFile = outputDir.resolve(generatedClassName + JAVA_SUFFIX);
 		Files.writeString(outputFile, fileContent);
 		return outputFile;
 	}
@@ -194,7 +201,7 @@ public class TesterFileWriter {
 			result = result.replace("WEIGHT_" + (i + 1), String.valueOf(cases.get(i).weight()));
 		}
 		// Replace any remaining WEIGHT_N placeholders with 1.0
-		result = result.replaceAll("WEIGHT_\\d+", "1.0");
+		result = result.replaceAll(WEIGHT_PLACEHOLDER_PATTERN, DEFAULT_WEIGHT);
 		return result;
 	}
 
@@ -239,7 +246,7 @@ public class TesterFileWriter {
 		// Balance any unclosed braces from the generated code so the file always
 		// compiles. We track depth starting after the grade() opening brace (depth=0
 		// means we are at grade-body level).
-		int depth = countBraceDepth(sb, "    public static void grade() {\n");
+		int depth = countBraceDepth(sb, GRADER_METHOD_MARKER);
 		for (int i = 0; i < depth; i++) {
 			sb.append("        }\n");
 		}

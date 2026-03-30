@@ -9,6 +9,8 @@ import java.util.List;
  * extracted path, per-question results, and anomalies.
  */
 public class StudentSubmission {
+	private static final String ZIP_SUFFIX = ".zip";
+	private static final String UNKNOWN_DISPLAY_NAME = "(unknown)";
 
 	private String username; // resolved email ID (e.g. "ping.lee.2023")
 	private String name; // resolved name (e.g. "Ping Lee")
@@ -104,7 +106,14 @@ public class StudentSubmission {
 		if (username != null && !username.isEmpty()) {
 			return username;
 		}
-		return zipFileName != null ? zipFileName.replace(".zip", "") : "(unknown)";
+		return deriveDisplayNameFromZip();
+	}
+
+	private String deriveDisplayNameFromZip() {
+		if (zipFileName == null) {
+			return UNKNOWN_DISPLAY_NAME;
+		}
+		return zipFileName.replace(ZIP_SUFFIX, "");
 	}
 
 	@Override

@@ -23,6 +23,17 @@ import com.is442.autograder.model.QuestionConfig;
 public class AppConfig {
 
 	private static final Path EXTERNAL_CONFIG_PATH = Paths.get("config.properties");
+	private static final String CLASSPATH_CONFIG = "config.properties";
+	private static final String DOCLING_SERVE_URL_ENV = "DOCLING_SERVE_URL";
+	private static final String COMMA = ",";
+	private static final String SEMICOLON = ";";
+
+	private static final String QUESTIONS_LIST = "questions.list";
+	private static final String QUESTIONS_FOLDERS = "questions.folders";
+	private static final String QUESTIONS_TESTERS = "questions.testers";
+	private static final String QUESTIONS_MAX_SCORES = "questions.max.scores";
+	private static final String QUESTIONS_DEPENDENCY_FOLDERS = "questions.dependency.folders";
+	private static final String QUESTIONS_DEPENDENCY_FILES = "questions.dependency.files";
 
 	private final Properties properties;
 
@@ -39,9 +50,9 @@ public class AppConfig {
 				properties.load(is);
 			}
 		} else {
-			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream(CLASSPATH_CONFIG)) {
 				if (is == null) {
-					throw new IOException("config.properties not found on classpath");
+					throw new IOException(CLASSPATH_CONFIG + " not found on classpath");
 				}
 				properties.load(is);
 			}
@@ -84,7 +95,7 @@ public class AppConfig {
 
 	/** The URL of the local Docling Serve container for PDF parsing. */
 	public String getDoclingServeUrl() {
-		String envUrl = System.getenv("DOCLING_SERVE_URL");
+		String envUrl = System.getenv(DOCLING_SERVE_URL_ENV);
 		if (envUrl != null && !envUrl.isBlank()) {
 			return envUrl;
 		}
@@ -109,12 +120,12 @@ public class AppConfig {
 	 * within a single entry are delimited by {@code ;}.
 	 */
 	public List<QuestionConfig> getQuestionConfigs() {
-		String[] ids = getArray("questions.list");
-		String[] folders = getArray("questions.folders");
-		String[] testers = getArray("questions.testers");
-		String[] maxScores = getArray("questions.max.scores");
-		String[] depFolders = getOptionalArray("questions.dependency.folders", ids.length);
-		String[] depFiles = getOptionalArray("questions.dependency.files", ids.length);
+		String[] ids = getArray(QUESTIONS_LIST);
+		String[] folders = getArray(QUESTIONS_FOLDERS);
+		String[] testers = getArray(QUESTIONS_TESTERS);
+		String[] maxScores = getArray(QUESTIONS_MAX_SCORES);
+		String[] depFolders = getOptionalArray(QUESTIONS_DEPENDENCY_FOLDERS, ids.length);
+		String[] depFiles = getOptionalArray(QUESTIONS_DEPENDENCY_FILES, ids.length);
 
 		if (ids.length != folders.length || ids.length != testers.length || ids.length != maxScores.length) {
 			throw new IllegalStateException("Question configuration arrays must all be the same length. " + "Got: list="
@@ -124,10 +135,8 @@ public class AppConfig {
 
 		List<QuestionConfig> configs = new ArrayList<>();
 		for (int i = 0; i < ids.length; i++) {
-			String depFolder = depFolders[i].trim().isEmpty() ? null : depFolders[i].trim();
-			List<String> depFileList = depFiles[i].trim().isEmpty()
-					? java.util.Collections.emptyList()
-					: java.util.Arrays.asList(depFiles[i].trim().split(";"));
+			String depFolder = toNullableValue(depFolders[i]);
+			List<String> depFileList = toDependencyFileList(depFiles[i]);
 			configs.add(new QuestionConfig(ids[i].trim(), folders[i].trim(), testers[i].trim(),
 					Double.parseDouble(maxScores[i].trim()), depFolder, depFileList));
 		}
@@ -185,24 +194,24 @@ public class AppConfig {
 					: "");
 		}
 
-		String idsStr = String.join(",", ids);
-		String foldersStr = String.join(",", folders);
-		String testersStr = String.join(",", testers);
-		String scoresStr = String.join(",", scores);
-		String depFoldersStr = String.join(",", depFolders);
-		String depFilesStr = String.join(",", depFiles);
+		String idsStr = String.join(COMMA, ids);
+		String foldersStr = String.join(COMMA, folders);
+		String testersStr = String.join(COMMA, testers);
+		String scoresStr = String.join(COMMA, scores);
+		String depFoldersStr = String.join(COMMA, depFolders);
+		String depFilesStr = String.join(COMMA, depFiles);
 
 		// Update in-memory properties
-		properties.setProperty("questions.list", idsStr);
-		properties.setProperty("questions.folders", foldersStr);
-		properties.setProperty("questions.testers", testersStr);
-		properties.setProperty("questions.max.scores", scoresStr);
-		properties.setProperty("questions.dependency.folders", depFoldersStr);
-		properties.setProperty("questions.dependency.files", depFilesStr);
+		properties.setProperty(QUESTIONS_LIST, idsStr);
+		properties.setProperty(QUESTIONS_FOLDERS, foldersStr);
+		properties.setProperty(QUESTIONS_TESTERS, testersStr);
+		properties.setProperty(QUESTIONS_MAX_SCORES, scoresStr);
+		properties.setProperty(QUESTIONS_DEPENDENCY_FOLDERS, depFoldersStr);
+		properties.setProperty(QUESTIONS_DEPENDENCY_FILES, depFilesStr);
 
 		// Persist to external config file
 		if (!Files.exists(EXTERNAL_CONFIG_PATH)) {
-			try (InputStream is = getClass().getClassLoader().getResourceAsStream("config.properties")) {
+			try (InputStream is = getClass().getClassLoader().getResourceAsStream(CLASSPATH_CONFIG)) {
 				if (is != null) {
 					Files.copy(is, EXTERNAL_CONFIG_PATH);
 				}
@@ -218,12 +227,12 @@ public class AppConfig {
 		}
 
 		// Update only the question config lines
-		content = updatePropertyLine(content, "questions.list", idsStr);
-		content = updatePropertyLine(content, "questions.folders", foldersStr);
-		content = updatePropertyLine(content, "questions.testers", testersStr);
-		content = updatePropertyLine(content, "questions.max.scores", scoresStr);
-		content = updatePropertyLine(content, "questions.dependency.folders", depFoldersStr);
-		content = updatePropertyLine(content, "questions.dependency.files", depFilesStr);
+		content = updatePropertyLine(content, QUESTIONS_LIST, idsStr);
+		content = updatePropertyLine(content, QUESTIONS_FOLDERS, foldersStr);
+		content = updatePropertyLine(content, QUESTIONS_TESTERS, testersStr);
+		content = updatePropertyLine(content, QUESTIONS_MAX_SCORES, scoresStr);
+		content = updatePropertyLine(content, QUESTIONS_DEPENDENCY_FOLDERS, depFoldersStr);
+		content = updatePropertyLine(content, QUESTIONS_DEPENDENCY_FILES, depFilesStr);
 
 		Files.writeString(EXTERNAL_CONFIG_PATH, content);
 	}
@@ -241,7 +250,7 @@ public class AppConfig {
 		if (value.isEmpty()) {
 			return new String[0];
 		}
-		return value.split(",", -1);
+		return value.split(COMMA, -1);
 	}
 
 	/**
@@ -253,7 +262,7 @@ public class AppConfig {
 		if (value.isEmpty()) {
 			return new String[expectedLength];
 		}
-		String[] parts = value.split(",", -1);
+		String[] parts = value.split(COMMA, -1);
 		if (parts.length == expectedLength) {
 			return parts;
 		}
@@ -263,5 +272,18 @@ public class AppConfig {
 			result[i] = i < parts.length ? parts[i] : "";
 		}
 		return result;
+	}
+
+	private String toNullableValue(String value) {
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private List<String> toDependencyFileList(String depFilesValue) {
+		String trimmed = depFilesValue.trim();
+		if (trimmed.isEmpty()) {
+			return java.util.Collections.emptyList();
+		}
+		return java.util.Arrays.asList(trimmed.split(SEMICOLON));
 	}
 }

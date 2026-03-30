@@ -1,8 +1,16 @@
 package com.is442.autograder.model;
 
 /**
- * Identity resolved from Java file header comments. Parsed from patterns like:
- * /* Name: Ping Lee * Email ID: ping.lee.2023
+ * Identity resolved from Java file header comments.
+ *
+ * <p>
+ * Parsed from patterns like:
+ * </p>
+ *
+ * <pre>
+ * Name: Ping Lee
+ * Email ID: ping.lee.2023
+ * </pre>
  */
 public class StudentIdentity {
 

@@ -19,6 +19,27 @@ import org.slf4j.LoggerFactory;
 public class SessionDatabase {
 
 	private static final Logger logger = LoggerFactory.getLogger(SessionDatabase.class);
+	private static final String INSERT_EXAM_SQL = "INSERT INTO exams (id, original_filename, parsed_markdown, created_at) VALUES (?, ?, ?, ?)";
+	private static final String UPSERT_EXAM_SQL = "INSERT OR REPLACE INTO exams (id, original_filename, parsed_markdown, created_at) VALUES (?, ?, ?, ?)";
+	private static final String UPSERT_QUESTION_SQL = """
+			INSERT OR REPLACE INTO questions (exam_id, question_id, markdown, folder, tester, max_score, inferred_from_pdf)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+			""";
+	private static final String SELECT_QUESTIONS_SQL = """
+			SELECT question_id, markdown, folder, tester, max_score, inferred_from_pdf
+			FROM questions WHERE exam_id = ?
+			""";
+	private static final String SELECT_QUESTION_SQL = """
+			SELECT question_id, markdown, folder, tester, max_score, inferred_from_pdf
+			FROM questions WHERE exam_id = ? AND question_id = ?
+			""";
+	private static final String UPSERT_CONFIG_SQL = """
+			INSERT OR REPLACE INTO exam_configs (exam_id, config_json, updated_at)
+			VALUES (?, ?, ?)
+			""";
+	private static final String SELECT_CONFIG_SQL = """
+			SELECT config_json FROM exam_configs WHERE exam_id = ? ORDER BY updated_at DESC LIMIT 1
+			""";
 
 	private final String dbPath;
 
@@ -80,9 +101,7 @@ public class SessionDatabase {
 
 	public String createExam(String originalFilename, String parsedMarkdown) {
 		String examId = UUID.randomUUID().toString();
-		try (Connection conn = getConnection();
-				PreparedStatement ps = conn.prepareStatement(
-						"INSERT INTO exams (id, original_filename, parsed_markdown, created_at) VALUES (?, ?, ?, ?)")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(INSERT_EXAM_SQL)) {
 			ps.setString(1, examId);
 			ps.setString(2, originalFilename);
 			ps.setString(3, parsedMarkdown);
@@ -96,9 +115,7 @@ public class SessionDatabase {
 	}
 
 	public void saveParsedExam(String examId, String originalFilename, String parsedMarkdown) {
-		try (Connection conn = getConnection();
-				PreparedStatement ps = conn.prepareStatement(
-						"INSERT OR REPLACE INTO exams (id, original_filename, parsed_markdown, created_at) VALUES (?, ?, ?, ?)")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(UPSERT_EXAM_SQL)) {
 			ps.setString(1, examId);
 			ps.setString(2, originalFilename);
 			ps.setString(3, parsedMarkdown);
@@ -112,12 +129,7 @@ public class SessionDatabase {
 
 	public void saveQuestion(String examId, String questionId, String markdown, String folder, String tester,
 			double maxScore, boolean inferredFromPdf) {
-		try (Connection conn = getConnection();
-				PreparedStatement ps = conn.prepareStatement(
-						"""
-								INSERT OR REPLACE INTO questions (exam_id, question_id, markdown, folder, tester, max_score, inferred_from_pdf)
-								VALUES (?, ?, ?, ?, ?, ?, ?)
-								""")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(UPSERT_QUESTION_SQL)) {
 			ps.setString(1, examId);
 			ps.setString(2, questionId);
 			ps.setString(3, markdown);
@@ -148,16 +160,11 @@ public class SessionDatabase {
 
 	public List<QuestionEntry> getQuestions(String examId) {
 		List<QuestionEntry> results = new ArrayList<>();
-		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("""
-				SELECT question_id, markdown, folder, tester, max_score, inferred_from_pdf
-				FROM questions WHERE exam_id = ?
-				""")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(SELECT_QUESTIONS_SQL)) {
 			ps.setString(1, examId);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next()) {
-				results.add(new QuestionEntry(rs.getString("question_id"), rs.getString("markdown"),
-						rs.getString("folder"), rs.getString("tester"), rs.getDouble("max_score"),
-						rs.getInt("inferred_from_pdf") == 1));
+				results.add(toQuestionEntry(rs));
 			}
 		} catch (SQLException e) {
 			logger.error("[DB] Failed to get questions", e);
@@ -166,16 +173,12 @@ public class SessionDatabase {
 	}
 
 	public QuestionEntry getQuestion(String examId, String questionId) {
-		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("""
-				SELECT question_id, markdown, folder, tester, max_score, inferred_from_pdf
-				FROM questions WHERE exam_id = ? AND question_id = ?
-				""")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(SELECT_QUESTION_SQL)) {
 			ps.setString(1, examId);
 			ps.setString(2, questionId);
 			ResultSet rs = ps.executeQuery();
 			if (rs.next()) {
-				return new QuestionEntry(rs.getString("question_id"), rs.getString("markdown"), rs.getString("folder"),
-						rs.getString("tester"), rs.getDouble("max_score"), rs.getInt("inferred_from_pdf") == 1);
+				return toQuestionEntry(rs);
 			}
 		} catch (SQLException e) {
 			logger.error("[DB] Failed to get question", e);
@@ -184,10 +187,7 @@ public class SessionDatabase {
 	}
 
 	public void saveConfig(String examId, String configJson) {
-		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("""
-				INSERT OR REPLACE INTO exam_configs (exam_id, config_json, updated_at)
-				VALUES (?, ?, ?)
-				""")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(UPSERT_CONFIG_SQL)) {
 			ps.setString(1, examId);
 			ps.setString(2, configJson);
 			ps.setLong(3, System.currentTimeMillis());
@@ -199,9 +199,7 @@ public class SessionDatabase {
 	}
 
 	public String getConfig(String examId) {
-		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement("""
-				SELECT config_json FROM exam_configs WHERE exam_id = ? ORDER BY updated_at DESC LIMIT 1
-				""")) {
+		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(SELECT_CONFIG_SQL)) {
 			ps.setString(1, examId);
 			ResultSet rs = ps.executeQuery();
 			if (rs.next()) {
@@ -222,6 +220,11 @@ public class SessionDatabase {
 		} catch (SQLException e) {
 			logger.error("[DB] Failed to delete exam", e);
 		}
+	}
+
+	private QuestionEntry toQuestionEntry(ResultSet rs) throws SQLException {
+		return new QuestionEntry(rs.getString("question_id"), rs.getString("markdown"), rs.getString("folder"),
+				rs.getString("tester"), rs.getDouble("max_score"), rs.getInt("inferred_from_pdf") == 1);
 	}
 
 	public record QuestionEntry(String questionId, String markdown, String folder, String tester, double maxScore,

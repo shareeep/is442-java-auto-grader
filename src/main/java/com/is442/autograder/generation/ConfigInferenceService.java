@@ -6,8 +6,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -25,6 +27,10 @@ import com.is442.autograder.model.QuestionConfig;
 public class ConfigInferenceService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ConfigInferenceService.class);
+	private static final String QUESTION_PREFIX = "Q";
+	private static final String TESTER_SUFFIX = "Tester";
+	private static final String TESTER_FILE_SUFFIX = "Tester.java";
+	private static final String JAVA_FILE_SUFFIX = ".java";
 
 	// Pattern to find all ## Question X headers in markdown
 	private static final Pattern QUESTION_HEADER_FINDER = Pattern
@@ -133,15 +139,15 @@ public class ConfigInferenceService {
 		} else {
 			logger.info("[INFER] Step 3 — Tester dir: scanning  path={}", testerDir.toAbsolutePath());
 			try (Stream<Path> stream = Files.list(testerDir)) {
-				List<Path> testerFiles = stream.filter(p -> p.toString().endsWith("Tester.java"))
+				List<Path> testerFiles = stream.filter(p -> p.toString().endsWith(TESTER_FILE_SUFFIX))
 						.collect(Collectors.toList());
 				logger.info("[INFER] Step 3 — Found {} Tester.java file(s): {}", testerFiles.size(),
 						testerFiles.stream().map(p -> p.getFileName().toString()).collect(Collectors.toList()));
 
 				for (Path tFile : testerFiles) {
 					String filename = tFile.getFileName().toString();
-					String testerClassName = filename.replace(".java", "");
-					String inferredQid = testerClassName.replace("Tester", "");
+					String testerClassName = filename.replace(JAVA_FILE_SUFFIX, "");
+					String inferredQid = testerClassName.replace(TESTER_SUFFIX, "");
 
 					boolean isNew = !qMap.containsKey(inferredQid);
 					InferredQuestionConfig qc = qMap.computeIfAbsent(inferredQid, k -> {
@@ -227,10 +233,10 @@ public class ConfigInferenceService {
 			// LIKELY_FALSE check: has folder but no PDF presence AND no tester - skip
 			// entirely
 			boolean hasPdfPresence = qc.isInferredFromPdf() || pdfQuestionIds.contains(qc.getQuestionId());
-			boolean hasTester = qc.getTester() != null && !qc.getTester().isEmpty();
-			boolean hasFolder = qc.getFolder() != null && !qc.getFolder().isEmpty();
+			boolean hasTester = hasText(qc.getTester());
+			boolean hasFolder = hasText(qc.getFolder());
 
-			if (hasFolder && !hasPdfPresence && !hasTester && !qc.isImplicitParent()) {
+			if (isLikelyFalsePositive(qc, hasPdfPresence, hasTester, hasFolder)) {
 				logger.warn("[INFER] Step 4 — LIKELY_FALSE: {} has folder but no PDF/tester - skipping",
 						qc.getQuestionId());
 				continue; // Don't add to config
@@ -255,7 +261,7 @@ public class ConfigInferenceService {
 			}
 
 			// MISSING_TESTER: flag if from PDF and has NO sub-questions with testers
-			if (qc.getTester() == null || qc.getTester().isEmpty()) {
+			if (!hasText(qc.getTester())) {
 				// Skip if implicit parent
 				if (qc.isImplicitParent()) {
 					logger.info("[INFER] Step 4 — Skipping MISSING_TESTER for implicit parent {}", qc.getQuestionId());
@@ -296,9 +302,9 @@ public class ConfigInferenceService {
 	}
 
 	private List<String> extractQuestionsFromMarkdown(String markdown) {
-		List<String> questions = new ArrayList<>();
+		Set<String> questions = new LinkedHashSet<>();
 		if (markdown == null)
-			return questions;
+			return new ArrayList<>();
 
 		logger.debug("[INFER] Sample markdown (first 500 chars): {}",
 				markdown.substring(0, Math.min(500, markdown.length())));
@@ -307,15 +313,16 @@ public class ConfigInferenceService {
 		for (Matcher m = QUESTION_HEADER_FINDER.matcher(markdown); m.find();) {
 			String mainNum = m.group(1);
 			String subLetter = m.group(2);
-			String qId = subLetter != null ? "Q" + mainNum + subLetter.toLowerCase() : "Q" + mainNum;
-			if (!questions.contains(qId)) {
-				questions.add(qId);
+			String qId = subLetter != null
+					? QUESTION_PREFIX + mainNum + subLetter.toLowerCase()
+					: QUESTION_PREFIX + mainNum;
+			if (questions.add(qId)) {
 				logger.debug("[INFER] Detected question: {}", qId);
 			}
 		}
 
 		logger.info("[INFER] PDF questions found: {}", questions);
-		return questions;
+		return new ArrayList<>(questions);
 	}
 
 	private List<String> getDependencies(Path folderPath) {
@@ -416,9 +423,18 @@ public class ConfigInferenceService {
 				i++;
 			}
 			if (i > 0) {
-				return "Q" + rest.substring(0, i);
+				return QUESTION_PREFIX + rest.substring(0, i);
 			}
 		}
 		return questionId;
+	}
+
+	private boolean isLikelyFalsePositive(InferredQuestionConfig qc, boolean hasPdfPresence, boolean hasTester,
+			boolean hasFolder) {
+		return hasFolder && !hasPdfPresence && !hasTester && !qc.isImplicitParent();
+	}
+
+	private boolean hasText(String value) {
+		return value != null && !value.isEmpty();
 	}
 }

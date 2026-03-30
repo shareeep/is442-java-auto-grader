@@ -23,6 +23,7 @@ import java.util.stream.Stream;
  * </pre>
  */
 public class IdentityResolver {
+	private static final int HEADER_SCAN_LENGTH = 500;
 
 	private static final Pattern NAME_PATTERN = Pattern.compile("\\*\\s*Name\\s*:\\s*([^*\\n]+)",
 			Pattern.CASE_INSENSITIVE);
@@ -57,22 +58,9 @@ public class IdentityResolver {
 	 * Parse a single Java file for Name and Email ID in the header comment.
 	 */
 	public Optional<StudentIdentity> resolveFromFile(Path javaFile) throws IOException {
-		String content = Files.readString(javaFile);
-
-		// Only look in the first 500 chars (header area)
-		String header = content.substring(0, Math.min(content.length(), 500));
-
-		Matcher nameMatcher = NAME_PATTERN.matcher(header);
-		Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
-
-		if (nameMatcher.find() && emailMatcher.find()) {
-			String name = toTitleCase(nameMatcher.group(1).trim());
-			String email = emailMatcher.group(1).trim();
-
-			// Only return if both fields are non-empty
-			if (!name.isEmpty() && !email.isEmpty()) {
-				return Optional.of(new StudentIdentity(name, email));
-			}
+		HeaderParseResult parsed = parseHeader(javaFile);
+		if (parsed.isComplete()) {
+			return Optional.of(new StudentIdentity(parsed.name(), parsed.emailId()));
 		}
 
 		return Optional.empty();
@@ -105,8 +93,7 @@ public class IdentityResolver {
 	 *         found
 	 */
 	public HeaderParseResult parseHeader(Path javaFile) throws IOException {
-		String content = Files.readString(javaFile);
-		String header = content.substring(0, Math.min(content.length(), 500));
+		String header = readHeader(javaFile);
 
 		Matcher nameMatcher = NAME_PATTERN.matcher(header);
 		Matcher emailMatcher = EMAIL_PATTERN.matcher(header);
@@ -115,6 +102,11 @@ public class IdentityResolver {
 		String emailId = emailMatcher.find() ? emailMatcher.group(1).trim() : "";
 
 		return new HeaderParseResult(name, emailId);
+	}
+
+	private String readHeader(Path javaFile) throws IOException {
+		String content = Files.readString(javaFile);
+		return content.substring(0, Math.min(content.length(), HEADER_SCAN_LENGTH));
 	}
 
 	/**

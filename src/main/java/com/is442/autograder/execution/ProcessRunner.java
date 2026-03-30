@@ -17,6 +17,10 @@ import java.util.concurrent.TimeUnit;
  * Uses separate threads for stdout/stderr to prevent deadlocks.
  */
 public class ProcessRunner {
+	private static final String CMD_JAVAC = "javac";
+	private static final String CMD_JAVA = "java";
+	private static final String[] JAVA_RUNTIME_ARGS = {"-cp", "."};
+	private static final long READER_JOIN_TIMEOUT_MS = 2000;
 
 	private final int timeoutSeconds;
 
@@ -40,7 +44,7 @@ public class ProcessRunner {
 
 		// Build javac command: javac *.java
 		List<String> command = new java.util.ArrayList<>();
-		command.add("javac");
+		command.add(CMD_JAVAC);
 		command.add("-Xlint:none");
 		for (File f : javaFiles) {
 			command.add(f.getName());
@@ -59,7 +63,8 @@ public class ProcessRunner {
 	 * @return ProcessResult with execution output
 	 */
 	public ProcessResult run(Path workDir, String className) {
-		List<String> command = Arrays.asList("java", "-cp", ".", className);
+		List<String> command = new java.util.ArrayList<>(
+				Arrays.asList(CMD_JAVA, JAVA_RUNTIME_ARGS[0], JAVA_RUNTIME_ARGS[1], className));
 		return execute(workDir, command);
 	}
 
@@ -68,12 +73,7 @@ public class ProcessRunner {
 	 */
 	private ProcessResult execute(Path workDir, List<String> command) {
 		try {
-			ProcessBuilder pb = new ProcessBuilder(command);
-			pb.directory(workDir.toFile());
-			// Don't redirect error stream — capture separately
-			pb.redirectErrorStream(false);
-
-			Process process = pb.start();
+			Process process = startProcess(workDir, command);
 
 			// Capture stdout and stderr in separate threads to avoid deadlocks
 			StringBuilder stdout = new StringBuilder();
@@ -95,8 +95,8 @@ public class ProcessRunner {
 			}
 
 			// Wait for readers to finish
-			stdoutReader.join(2000);
-			stderrReader.join(2000);
+			stdoutReader.join(READER_JOIN_TIMEOUT_MS);
+			stderrReader.join(READER_JOIN_TIMEOUT_MS);
 
 			int exitCode = process.exitValue();
 
@@ -104,8 +104,7 @@ public class ProcessRunner {
 				return ProcessResult.success(stdout.toString(), stderr.toString());
 			} else {
 				// Determine if this was a compile error or runtime error
-				String cmd = command.get(0);
-				if (cmd.equals("javac")) {
+				if (CMD_JAVAC.equals(command.get(0))) {
 					return ProcessResult.compileError(stdout.toString(), stderr.toString());
 				} else {
 					return ProcessResult.runtimeError(exitCode, stdout.toString(), stderr.toString());
@@ -117,6 +116,14 @@ public class ProcessRunner {
 			Thread.currentThread().interrupt();
 			return ProcessResult.timeout("Process interrupted");
 		}
+	}
+
+	private Process startProcess(Path workDir, List<String> command) throws IOException {
+		ProcessBuilder pb = new ProcessBuilder(command);
+		pb.directory(workDir.toFile());
+		// Don't redirect error stream — capture separately
+		pb.redirectErrorStream(false);
+		return pb.start();
 	}
 
 	private void readStream(InputStream is, StringBuilder sb) {

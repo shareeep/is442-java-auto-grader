@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
 public class TestGenerationService {
 
 	private static final Logger logger = LoggerFactory.getLogger(TestGenerationService.class);
+	private static final int DEFAULT_RECOMMENDED_COUNT = 3;
+	private static final double DEFAULT_WEIGHT = 1.0;
+	private static final Pattern TXT_FILENAME_PATTERN = Pattern.compile("\"([^\"]+\\.txt)\"");
 
 	private final LangChainService langChainService;
 	private final TesterFileWriter testerFileWriter;
@@ -64,15 +67,7 @@ public class TestGenerationService {
 		logger.info("[GEN] Starting generation  questionId={} numCases={}", question.getQuestionId(), numCases);
 
 		// 1. Read existing tester if provided
-		String existingCode = null;
-		if (existingTesterFile != null && Files.exists(existingTesterFile)) {
-			existingCode = Files.readString(existingTesterFile);
-			logger.debug("[GEN] Loaded existing tester  file={} chars={}", existingTesterFile.getFileName(),
-					existingCode.length());
-		} else {
-			logger.debug("[GEN] No existing tester file — generating from scratch  questionId={}",
-					question.getQuestionId());
-		}
+		String existingCode = loadExistingTesterCode(question, existingTesterFile);
 
 		// 2. Build additional context from template dir and data files
 		String additionalContext = buildAdditionalContext(question, existingCode, existingTesterFile, templateDir);
@@ -102,11 +97,7 @@ public class TestGenerationService {
 		String generatedCode = testerFileWriter.buildCodeFromStructured(structured);
 
 		// 6. Convert to GeneratedTestCase for the API response
-		List<GeneratedTestCase> cases = structured.stream()
-				.map(tc -> new GeneratedTestCase(tc.description(),
-						tc.setup() != null ? tc.setup() + "; " + tc.methodCall() : tc.methodCall(),
-						tc.expected() != null ? tc.expected() : "", tc.weight()))
-				.collect(Collectors.toList());
+		List<GeneratedTestCase> cases = structured.stream().map(this::toGeneratedTestCase).collect(Collectors.toList());
 
 		logger.info("[GEN] Generation complete  questionId={} codeChars={}", question.getQuestionId(),
 				generatedCode.length());
@@ -213,7 +204,7 @@ public class TestGenerationService {
 			for (Map<String, Object> m : raw) {
 				cases.add(new StructuredTestCase(str(m, "description"), str(m, "conceptCovered"), str(m, "setup"),
 						str(m, "methodCall"), str(m, "expected"), str(m, "assertion"),
-						m.get("weight") instanceof Number n ? n.doubleValue() : 1.0,
+						m.get("weight") instanceof Number n ? n.doubleValue() : DEFAULT_WEIGHT,
 						Boolean.TRUE.equals(m.get("expectsException")), str(m, "exceptionType")));
 			}
 			return cases;
@@ -222,7 +213,7 @@ public class TestGenerationService {
 			List<StructuredTestCase> fallback = new ArrayList<>();
 			for (int i = 1; i <= numCases; i++) {
 				fallback.add(new StructuredTestCase("Generated test " + i, "Uncategorised", null, "/* TODO: fill in */",
-						"/* TODO */", null, 1.0, false, null));
+						"/* TODO */", null, DEFAULT_WEIGHT, false, null));
 			}
 			return fallback;
 		}
@@ -234,7 +225,7 @@ public class TestGenerationService {
 			String cleaned = stripMarkdownFences(json);
 			Map<String, Object> m = objectMapper.readValue(cleaned, new TypeReference<>() {
 			});
-			int count = m.get("recommendedCount") instanceof Number n ? n.intValue() : 3;
+			int count = m.get("recommendedCount") instanceof Number n ? n.intValue() : DEFAULT_RECOMMENDED_COUNT;
 			List<String> concepts = m.get("conceptsToCover") instanceof List<?> l ? (List<String>) l : List.of();
 			List<String> existingConcepts = m.get("existingConcepts") instanceof List<?> l
 					? (List<String>) l
@@ -246,7 +237,7 @@ public class TestGenerationService {
 		} catch (Exception e) {
 			logger.warn("[AI] Recommendation parse failed, using defaults  questionId={}: {}", questionId,
 					e.getMessage());
-			return new TestCaseRecommendation(questionId, 3,
+			return new TestCaseRecommendation(questionId, DEFAULT_RECOMMENDED_COUNT,
 					List.of("Normal: valid input", "Boundary: edge case", "Exception: error handling"));
 		}
 	}
@@ -317,8 +308,7 @@ public class TestGenerationService {
 		// Extract referenced .txt filenames from the existing tester code
 		if (existingCode != null) {
 			Set<String> filenames = new LinkedHashSet<>();
-			Pattern p = Pattern.compile("\"([^\"]+\\.txt)\"");
-			Matcher m = p.matcher(existingCode);
+			Matcher m = TXT_FILENAME_PATTERN.matcher(existingCode);
 			while (m.find()) {
 				filenames.add(m.group(1));
 			}
@@ -360,5 +350,25 @@ public class TestGenerationService {
 		}
 
 		return ctx.toString();
+	}
+
+	private String loadExistingTesterCode(QuestionConfig question, Path existingTesterFile) throws IOException {
+		if (existingTesterFile != null && Files.exists(existingTesterFile)) {
+			String existingCode = Files.readString(existingTesterFile);
+			logger.debug("[GEN] Loaded existing tester  file={} chars={}", existingTesterFile.getFileName(),
+					existingCode.length());
+			return existingCode;
+		}
+		logger.debug("[GEN] No existing tester file — generating from scratch  questionId={}",
+				question.getQuestionId());
+		return null;
+	}
+
+	private GeneratedTestCase toGeneratedTestCase(StructuredTestCase testCase) {
+		String inputArgs = testCase.setup() != null
+				? testCase.setup() + "; " + testCase.methodCall()
+				: testCase.methodCall();
+		String expectedOutput = testCase.expected() != null ? testCase.expected() : "";
+		return new GeneratedTestCase(testCase.description(), inputArgs, expectedOutput, testCase.weight());
 	}
 }
