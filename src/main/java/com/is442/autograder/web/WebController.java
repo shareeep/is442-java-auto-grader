@@ -22,6 +22,12 @@ import com.is442.autograder.model.StudentSubmission;
 @RequestMapping("/api/grade")
 public class WebController {
 
+	private final AppConfig appConfig;
+
+	public WebController(AppConfig appConfig) {
+		this.appConfig = appConfig;
+	}
+
 	@PostMapping(consumes = {"multipart/form-data"})
 	public Map<String, Object> runGrading(@RequestParam("submissions") MultipartFile[] submissionsFiles,
 			@RequestParam("testers") MultipartFile[] testersFiles,
@@ -30,8 +36,7 @@ public class WebController {
 
 		try {
 			// Setup pipeline
-			AppConfig config = new AppConfig();
-			GradingPipeline pipeline = new GradingPipeline(config);
+			GradingPipeline pipeline = new GradingPipeline(appConfig);
 
 			// Create temp directories
 			Path submissionsDir = Files.createTempDirectory("autograder-submissions-");

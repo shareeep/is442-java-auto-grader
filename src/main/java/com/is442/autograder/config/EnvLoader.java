@@ -17,6 +17,7 @@ import java.util.Map;
  */
 public class EnvLoader {
 
+	private static final Path DEFAULT_ENV_PATH = Paths.get(".env");
 	private static final Map<String, String> values = new HashMap<>();
 
 	/**
@@ -24,7 +25,7 @@ public class EnvLoader {
 	 * not exist. Lines starting with # are comments; blank lines are ignored.
 	 */
 	public static void load() {
-		load(Paths.get(".env"));
+		load(DEFAULT_ENV_PATH);
 	}
 
 	/**
@@ -36,22 +37,18 @@ public class EnvLoader {
 		}
 		try {
 			for (String line : Files.readAllLines(envFile)) {
-				line = line.trim();
-				if (line.isEmpty() || line.startsWith("#")) {
+				String trimmedLine = line.trim();
+				if (trimmedLine.isEmpty() || trimmedLine.startsWith("#")) {
 					continue;
 				}
-				int eq = line.indexOf('=');
-				if (eq < 1) {
+
+				ParsedEntry parsedEntry = parseLine(trimmedLine);
+				if (parsedEntry == null) {
 					continue;
 				}
-				String key = line.substring(0, eq).trim();
-				String value = line.substring(eq + 1).trim();
-				// Strip optional surrounding quotes
-				if (value.length() >= 2 && ((value.startsWith("\"") && value.endsWith("\""))
-						|| (value.startsWith("'") && value.endsWith("'")))) {
-					value = value.substring(1, value.length() - 1);
-				}
-				values.put(key, value);
+
+				values.put(parsedEntry.key(), parsedEntry.value());
+				System.setProperty(parsedEntry.key(), parsedEntry.value());
 			}
 		} catch (IOException e) {
 			System.err.println("Warning: could not read .env file: " + e.getMessage());
@@ -67,5 +64,26 @@ public class EnvLoader {
 	public static String get(String key) {
 		String v = values.get(key);
 		return v != null ? v : System.getenv(key);
+	}
+
+	private static ParsedEntry parseLine(String line) {
+		int eq = line.indexOf('=');
+		if (eq < 1) {
+			return null;
+		}
+		String key = line.substring(0, eq).trim();
+		String value = stripOptionalQuotes(line.substring(eq + 1).trim());
+		return new ParsedEntry(key, value);
+	}
+
+	private static String stripOptionalQuotes(String value) {
+		if (value.length() >= 2 && ((value.startsWith("\"") && value.endsWith("\""))
+				|| (value.startsWith("'") && value.endsWith("'")))) {
+			return value.substring(1, value.length() - 1);
+		}
+		return value;
+	}
+
+	private record ParsedEntry(String key, String value) {
 	}
 }

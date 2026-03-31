@@ -1,21 +1,124 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-background text-charcoal font-sans antialiased overflow-x-hidden;
-    /* Hide scrollbar for a cleaner look */
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+  :root {
+    /* VS Code Dark Plus Theme */
+    --background: oklch(1 0 0);     /* #0D1117 */
+    --foreground: oklch(0.145 0 0);    /* #C9D1D9 */
+
+    --card: oklch(1 0 0);          /* #161B22 */
+    --card-foreground: oklch(0.145 0 0);
+
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+
+    --primary: oklch(0.205 0 0);      /* #58A6FF — VS Code blue */
+    --primary-foreground: oklch(0.985 0 0);
+
+    --secondary: oklch(0.97 0 0);     /* #21262D */
+    --secondary-foreground: oklch(0.205 0 0);
+
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);  /* #8B949E */
+
+    --accent: oklch(0.97 0 0);         /* #F78166 — warm accent */
+    --accent-foreground: oklch(0.205 0 0);
+
+    --destructive: oklch(0.577 0.245 27.325);     /* #F85149 */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: oklch(0.922 0 0);        /* #30363D */
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+
+    --radius: 0.625rem;             /* 8px — sharp edges */
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
   }
-  
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Satoshi', sans-serif;
+  }
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+  }
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.22 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.22 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.93 0.008 85);
+    --primary-foreground: oklch(0.15 0 0);
+    --secondary: oklch(0.29 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.29 0 0);
+    --muted-foreground: oklch(0.65 0 0);
+    --accent: oklch(0.68 0.18 32);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 18%);
+    --input: oklch(1 0 0 / 18%);
+    --ring: oklch(0.93 0.008 85);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   body::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply text-charcoal tracking-tight font-outfit;
+    @apply text-foreground tracking-tight font-outfit;
   }
 }
 
@@ -25,20 +128,39 @@
     inset: 0;
     z-index: 9999;
     pointer-events: none;
-    opacity: 0.03;
+    opacity: 0.015;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
 
   .glass-card {
-    @apply bg-white/40 backdrop-blur-md border border-primary/10 shadow-sm rounded-2xl;
+    @apply bg-card/80 backdrop-blur-md border border-border shadow-sm rounded-lg;
   }
 
   .btn-magnetic {
     @apply relative overflow-hidden transition-all duration-300 transform;
-    /* We'll handle the GSAP logic in React for real magnetic effect, but keeping this for fallback scale */
   }
-  
+
   .input-field {
-    @apply w-full bg-white/60 border border-primary/20 backdrop-blur-sm rounded-xl px-4 py-3 text-charcoal font-sans outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all duration-300 placeholder:text-charcoal/40;
+    @apply w-full bg-secondary border border-border rounded-md px-4 py-3 text-foreground font-sans outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 placeholder:text-muted-foreground;
+  }
+
+  /* Custom scrollbar for dark theme */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  /* Glow effects for VS Code aesthetic */
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(232, 227, 213, 0.12);
+  }
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(247, 129, 102, 0.15);
   }
 }

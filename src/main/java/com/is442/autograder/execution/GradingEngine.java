@@ -23,6 +23,12 @@ import com.is442.autograder.util.StringUtils;
 public class GradingEngine {
 
 	private static final Logger LOGGER = Logger.getLogger(GradingEngine.class.getName());
+	private static final String PHASE_COMPILE = "compile";
+	private static final String PHASE_RUN = "run";
+	private static final String PHASE_TIMEOUT = "timeout";
+	private static final String PHASE_COMPILE_ERROR = "compile-error";
+	private static final String PHASE_RUNTIME_ERROR = "runtime-error";
+	private static final String PASSED_LINE = "Passed";
 
 	private final ProcessRunner processRunner;
 	private final QuestionLogWriter questionLogWriter;
@@ -78,14 +84,12 @@ public class GradingEngine {
 		String questionId = qc.getQuestionId();
 		Path questionFolder = submissionRoot.resolve(qc.getFolder());
 
-		// 1. Check if question folder exists
 		if (!Files.isDirectory(questionFolder)) {
 			LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": question folder not found");
 			logWarning(questionId + "  │  Question folder not found");
 			return QuestionResult.missing(questionId, qc.getMaxScore());
 		}
 
-		// 2. Copy tester file into question folder
 		Path testerSource = testerFilesDir.resolve(qc.getTesterClassName() + ".java");
 		Path testerDest = questionFolder.resolve(qc.getTesterClassName() + ".java");
 
@@ -102,29 +106,19 @@ public class GradingEngine {
 					"Failed to copy tester: " + e.getMessage());
 		}
 
-		// 2.5. Copy any pre-compiled dependency files declared in the question config
 		if (qc.getDependencyFolder() != null && !qc.getDependencyFiles().isEmpty()) {
 			copyDependencies(questionFolder, testerFilesDir, qc);
 		}
 
 		try {
-			// 3. Compile all .java files
 			ProcessResult compileResult = processRunner.compile(questionFolder);
-			writeLogIfAvailable(submission, questionId, "compile", compileResult.getStdout(),
+			writeLogIfAvailable(submission, questionId, PHASE_COMPILE, compileResult.getStdout(),
 					compileResult.getStderr());
 
 			if (!compileResult.isSuccess()) {
-				String error = compileResult.getStderr().isEmpty()
-						? compileResult.getStdout()
-						: compileResult.getStderr();
+				String error = chooseErrorOutput(compileResult);
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": compilation failed");
-				String singleLineError = cleanCompilerMessage(firstRelevantLine(error));
-				String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  Compile error: "
-						+ singleLineError;
-				logError(questionId + "  │  Compile error: " + singleLineError);
-				appendErrorSummary(summaryLine);
-				String filteredError = filterNoteLines(error);
-				writeLogIfAvailable(submission, questionId, "compile-error", filteredError, "");
+				reportProcessError(submission, questionId, "Compile error", error, PHASE_COMPILE_ERROR);
 				submission.addAnomaly(new Anomaly(Anomaly.Type.COMPILATION_ERROR,
 						"Compilation error in " + questionId + ": " + StringUtils.truncate(error, 200),
 						Anomaly.Severity.ERROR, questionId));
@@ -132,9 +126,8 @@ public class GradingEngine {
 						StringUtils.truncate(error, 500));
 			}
 
-			// 4. Run tester
 			ProcessResult runResult = processRunner.run(questionFolder, qc.getTesterClassName());
-			writeLogIfAvailable(submission, questionId, "run", runResult.getStdout(), runResult.getStderr());
+			writeLogIfAvailable(submission, questionId, PHASE_RUN, runResult.getStdout(), runResult.getStderr());
 
 			if (runResult.isTimedOut()) {
 				LOGGER.warning(submission.getDisplayName() + " - " + questionId + ": execution timed out");
@@ -144,7 +137,8 @@ public class GradingEngine {
 				// Parse partial score from stdout before the hang
 				// Each tester prints "Passed" per successful test (score += 1 each)
 				double partialScore = parsePartialScore(runResult.getStdout());
-				writeLogIfAvailable(submission, questionId, "timeout", runResult.getStdout(), runResult.getStderr());
+				writeLogIfAvailable(submission, questionId, PHASE_TIMEOUT, runResult.getStdout(),
+						runResult.getStderr());
 				submission.addAnomaly(new Anomaly(Anomaly.Type.EXECUTION_TIMEOUT,
 						"Execution timed out for " + questionId
 								+ (partialScore > 0 ? " (partial score: " + partialScore + ")" : ""),
@@ -154,27 +148,19 @@ public class GradingEngine {
 			}
 
 			if (!runResult.isSuccess()) {
-				String error = runResult.getStderr().isEmpty() ? runResult.getStdout() : runResult.getStderr();
-				String singleLineError = cleanCompilerMessage(firstRelevantLine(error));
-				String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  Runtime error: "
-						+ singleLineError;
-				logError(questionId + "  │  Runtime error: " + singleLineError);
-				appendErrorSummary(summaryLine);
-				String filteredError = filterNoteLines(error);
-				writeLogIfAvailable(submission, questionId, "runtime-error", filteredError, "");
+				String error = chooseErrorOutput(runResult);
+				reportProcessError(submission, questionId, "Runtime error", error, PHASE_RUNTIME_ERROR);
 				submission.addAnomaly(new Anomaly(Anomaly.Type.RUNTIME_ERROR,
 						"Runtime error in " + questionId + ": " + StringUtils.truncate(error, 200),
 						Anomaly.Severity.ERROR, questionId));
 			}
 
-			// 5. Parse score from last line of stdout
 			double score = parseScore(runResult.getStdout());
 
 			return new QuestionResult(questionId, score, qc.getMaxScore(), true, true, runResult.getStdout(),
 					runResult.getStderr());
 
 		} finally {
-			// 6. Clean up: remove tester file and compiled classes
 			cleanupTester(questionFolder, qc.getTesterClassName());
 		}
 	}
@@ -258,6 +244,21 @@ public class GradingEngine {
 		return filtered.toString().trim();
 	}
 
+	private String chooseErrorOutput(ProcessResult result) {
+		return result.getStderr().isEmpty() ? result.getStdout() : result.getStderr();
+	}
+
+	private void reportProcessError(StudentSubmission submission, String questionId, String errorLabel, String error,
+			String logPhase) {
+		String singleLineError = cleanCompilerMessage(firstRelevantLine(error));
+		String summaryLine = submission.getDisplayName() + "  │  " + questionId + "  │  " + errorLabel + ": "
+				+ singleLineError;
+		logError(questionId + "  │  " + errorLabel + ": " + singleLineError);
+		appendErrorSummary(summaryLine);
+		String filteredError = filterNoteLines(error);
+		writeLogIfAvailable(submission, questionId, logPhase, filteredError, "");
+	}
+
 	private void appendErrorSummary(String summaryLine) {
 		if (questionLogWriter == null) {
 			return;
@@ -310,7 +311,7 @@ public class GradingEngine {
 		}
 
 		// Fallback: count "Passed" occurrences
-		long passedCount = stdout.lines().map(String::trim).filter(line -> line.equals("Passed")).count();
+		long passedCount = stdout.lines().map(String::trim).filter(line -> line.equals(PASSED_LINE)).count();
 
 		return (double) passedCount;
 	}

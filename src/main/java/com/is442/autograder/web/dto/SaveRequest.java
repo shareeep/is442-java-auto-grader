@@ -5,7 +5,7 @@ import java.util.List;
 public class SaveRequest {
 
 	private String examId;
-	private String testersDir;
+	private String testerId;
 	private String outputDir;
 	private List<ResultEntry> results;
 	private boolean updateMaxScores;
@@ -18,12 +18,12 @@ public class SaveRequest {
 		this.examId = examId;
 	}
 
-	public String getTestersDir() {
-		return testersDir;
+	public String getTesterId() {
+		return testerId;
 	}
 
-	public void setTestersDir(String testersDir) {
-		this.testersDir = testersDir;
+	public void setTesterId(String testerId) {
+		this.testerId = testerId;
 	}
 
 	public String getOutputDir() {

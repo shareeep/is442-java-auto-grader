@@ -3,7 +3,6 @@ package com.is442.autograder.reporting;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,11 +44,8 @@ public class CSVExporter {
 			}
 		}
 
-		// Read the template to get OrgDefinedId / Username / Name for each student
-		List<String> inputLines = Files.readAllLines(templateCsvPath);
-
 		// Header: OrgDefinedId,Username,Name,Q1a,Q1b,...,Total
-		List<String> headerList = new ArrayList<>();
+		List<String> headerList = new java.util.ArrayList<>();
 		headerList.add("OrgDefinedId");
 		headerList.add("Username");
 		headerList.add("Name");
@@ -60,32 +56,14 @@ public class CSVExporter {
 
 		// Build one row per student from the template (preserves all students,
 		// sorted alphabetically by Name)
-		List<List<String>> dataRows = new ArrayList<>();
-		for (int i = 1; i < inputLines.size(); i++) {
-			String line = inputLines.get(i);
-			if (line.trim().isEmpty()) {
-				continue;
-			}
-			String[] parts = line.split(",", -1);
-			if (parts.length < 5) {
-				continue;
-			}
+		List<List<String>> dataRows = new java.util.ArrayList<>();
+		for (ScoresheetRow scoresheetRow : ScoresheetParser.parse(templateCsvPath)) {
+			StudentSubmission sub = subMap.get(scoresheetRow.username().toLowerCase());
 
-			// Template columns: [0]=OrgDefinedId [1]=Username [2]=Last Name [3]=First Name
-			String orgId = parts[0].trim();
-			String rawUsername = parts[1].trim();
-			// Name = First Name + Last Name (cols 3 then 2); last name is "_" placeholder
-			String lastName = parts[2].trim().equals("_") ? "" : parts[2].trim();
-			String firstName = parts[3].trim();
-			String name = (firstName + (lastName.isEmpty() ? "" : " " + lastName)).trim();
-
-			String username = rawUsername.startsWith("#") ? rawUsername.substring(1) : rawUsername;
-			StudentSubmission sub = subMap.get(username.toLowerCase());
-
-			List<String> row = new ArrayList<>();
-			row.add(orgId);
-			row.add(rawUsername);
-			row.add(name);
+			List<String> row = new java.util.ArrayList<>();
+			row.add(scoresheetRow.orgDefinedId());
+			row.add(scoresheetRow.rawUsername());
+			row.add(scoresheetRow.displayName());
 			for (QuestionConfig qc : questionConfigs) {
 				double score = sub != null
 						? sub.getResults().stream().filter(r -> r.getQuestionId().equals(qc.getQuestionId()))
@@ -101,7 +79,7 @@ public class CSVExporter {
 		// Sort alphabetically by Name (col 2)
 		dataRows.sort((a, b) -> a.get(2).compareToIgnoreCase(b.get(2)));
 
-		List<String> outputLines = new ArrayList<>();
+		List<String> outputLines = new java.util.ArrayList<>();
 		outputLines.add(String.join(",", headerList));
 		for (List<String> row : dataRows) {
 			outputLines.add(String.join(",", row));

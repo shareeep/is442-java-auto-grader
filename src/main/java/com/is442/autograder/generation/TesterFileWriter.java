@@ -1,6 +1,7 @@
 package com.is442.autograder.generation;
 
 import com.is442.autograder.model.GeneratedTestCase;
+import com.is442.autograder.model.StructuredTestCase;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +16,13 @@ import java.util.Properties;
  * test cases. Backs up the original tester before writing.
  */
 public class TesterFileWriter {
+	private static final String JAVA_SUFFIX = ".java";
+	private static final String BACKUP_SUFFIX = ".java.bak";
+	private static final String GENERATED_SUFFIX = "_generated";
+	private static final String TESTER_SUFFIX = "Tester";
+	private static final String WEIGHT_PLACEHOLDER_PATTERN = "WEIGHT_\\d+";
+	private static final String DEFAULT_WEIGHT = "1.0";
+	private static final String GRADER_METHOD_MARKER = "    public static void grade() {\n";
 
 	/**
 	 * Write a generated tester file to the output folder.
@@ -40,24 +48,113 @@ public class TesterFileWriter {
 
 		// Back up original if it exists
 		if (originalTesterDir != null) {
-			Path originalFile = originalTesterDir.resolve(testerClassName + ".java");
+			Path originalFile = originalTesterDir.resolve(testerClassName + JAVA_SUFFIX);
 			if (Files.exists(originalFile)) {
-				Files.copy(originalFile, originalFile.resolveSibling(testerClassName + ".java.bak"),
+				Files.copy(originalFile, originalFile.resolveSibling(testerClassName + BACKUP_SUFFIX),
 						StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
 
-		String generatedClassName = testerClassName + "_generated";
-		String parentClass = testerClassName.replace("Tester", "");
+		String generatedClassName = testerClassName + GENERATED_SUFFIX;
+		String parentClass = testerClassName.replace(TESTER_SUFFIX, "");
 
 		// Substitute WEIGHT_N placeholders with actual weights
 		String codeWithWeights = substituteWeights(generatedCode, cases);
 
 		String fileContent = buildFileContent(generatedClassName, parentClass, originalCode, codeWithWeights);
 
-		Path outputFile = outputDir.resolve(generatedClassName + ".java");
+		Path outputFile = outputDir.resolve(generatedClassName + JAVA_SUFFIX);
 		Files.writeString(outputFile, fileContent);
 		return outputFile;
+	}
+
+	/**
+	 * Build Java test case blocks from a list of structured test cases. The
+	 * returned string contains the inner content of the grade() method — it does
+	 * NOT include the class wrapper or the method signature. Each block is a
+	 * standalone {@code { ... }} statement that follows the existing tester
+	 * convention (tcNum++, score +=, printed pass/fail).
+	 *
+	 * @param cases
+	 *            list of structured test cases
+	 * @return Java source fragment ready to embed inside grade()
+	 */
+	public String buildCodeFromStructured(List<StructuredTestCase> cases) {
+		StringBuilder sb = new StringBuilder();
+		for (StructuredTestCase tc : cases) {
+			sb.append("        {\n");
+			// Comment header
+			String concept = tc.conceptCovered() != null ? tc.conceptCovered() : "";
+			String desc = tc.description() != null ? tc.description() : "";
+			if (!concept.isBlank()) {
+				sb.append("            // ").append(concept).append(": ").append(desc).append("\n");
+			} else {
+				sb.append("            // ").append(desc).append("\n");
+			}
+			sb.append("            System.out.println(\"Test \" + tcNum + \": ").append(desc.replace("\"", "'"))
+					.append("\");\n");
+
+			if (tc.expectsException()) {
+				// Exception path
+				String exType = tc.exceptionType() != null ? tc.exceptionType() : "Exception";
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  => Expected ").append(exType)
+						.append(" but none thrown — Failed\");\n");
+				sb.append("            } catch (").append(exType).append(" e) {\n");
+				sb.append("                System.out.println(\"  => Caught expected ").append(exType)
+						.append(" — Passed\");\n");
+				sb.append("                score += ").append(tc.weight()).append(";\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Wrong exception: \" + e.getClass().getSimpleName() + \" — Failed\");\n");
+				sb.append("            }\n");
+			} else if (tc.assertion() == null || tc.assertion().isBlank()) {
+				// Void method path (no assertion)
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  => Passed\");\n");
+				sb.append("                score += ").append(tc.weight()).append(";\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Exception: \" + e.getMessage() + \" — Failed\");\n");
+				sb.append("            }\n");
+			} else {
+				// Non-void path — compare result using LLM-provided assertion
+				String expected = tc.expected() != null ? tc.expected().replace("\"", "'") : "";
+				sb.append("            try {\n");
+				appendSetup(sb, tc.setup());
+				sb.append("                var result = ").append(tc.methodCall()).append(";\n");
+				sb.append("                System.out.println(\"  Expected: ").append(expected).append("\");\n");
+				sb.append("                System.out.println(\"  Actual:   \" + result);\n");
+				sb.append("                if (").append(tc.assertion()).append(") {\n");
+				sb.append("                    System.out.println(\"  => Passed\");\n");
+				sb.append("                    score += ").append(tc.weight()).append(";\n");
+				sb.append("                } else {\n");
+				sb.append("                    System.out.println(\"  => Failed\");\n");
+				sb.append("                }\n");
+				sb.append("            } catch (Exception e) {\n");
+				sb.append(
+						"                System.out.println(\"  => Exception: \" + e.getMessage() + \" — Failed\");\n");
+				sb.append("            }\n");
+			}
+			sb.append("            tcNum++;\n");
+			sb.append("        }\n\n");
+		}
+		return sb.toString();
+	}
+
+	private void appendSetup(StringBuilder sb, String setup) {
+		if (setup != null && !setup.isBlank()) {
+			for (String line : setup.split(";")) {
+				String trimmed = line.trim();
+				if (!trimmed.isBlank()) {
+					sb.append("                ").append(trimmed).append(";\n");
+				}
+			}
+		}
 	}
 
 	/**
@@ -92,10 +189,7 @@ public class TesterFileWriter {
 
 		props.setProperty("questions.max.scores", String.join(",", scores));
 
-		// Write back preserving comments as best as possible
 		String content = Files.readString(configPath);
-		String oldScoresLine = props.getProperty("questions.max.scores");
-		// Rebuild the scores value
 		String newScoresValue = String.join(",", scores);
 		content = content.replaceFirst("(?m)^questions\\.max\\.scores=.*$", "questions.max.scores=" + newScoresValue);
 		Files.writeString(configPath, content);
@@ -107,7 +201,7 @@ public class TesterFileWriter {
 			result = result.replace("WEIGHT_" + (i + 1), String.valueOf(cases.get(i).weight()));
 		}
 		// Replace any remaining WEIGHT_N placeholders with 1.0
-		result = result.replaceAll("WEIGHT_\\d+", "1.0");
+		result = result.replaceAll(WEIGHT_PLACEHOLDER_PATTERN, DEFAULT_WEIGHT);
 		return result;
 	}
 
@@ -152,7 +246,7 @@ public class TesterFileWriter {
 		// Balance any unclosed braces from the generated code so the file always
 		// compiles. We track depth starting after the grade() opening brace (depth=0
 		// means we are at grade-body level).
-		int depth = countBraceDepth(sb, "    public static void grade() {\n");
+		int depth = countBraceDepth(sb, GRADER_METHOD_MARKER);
 		for (int i = 0; i < depth; i++) {
 			sb.append("        }\n");
 		}

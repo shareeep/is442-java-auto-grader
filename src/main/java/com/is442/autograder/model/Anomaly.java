@@ -4,6 +4,8 @@ package com.is442.autograder.model;
  * Represents an anomaly detected during the grading process.
  */
 public class Anomaly {
+	private static final String ERROR_SYMBOL = "✖";
+	private static final String NON_ERROR_SYMBOL = "⚠";
 
 	public enum Type {
 		FOLDER_NOT_RENAMED, // Folder still "RenameToYourStudentID" or "RenameToYourUsername"
@@ -58,7 +60,7 @@ public class Anomaly {
 
 	@Override
 	public String toString() {
-		String prefix = severity == Severity.ERROR ? "✖" : "⚠";
+		String prefix = severity == Severity.ERROR ? ERROR_SYMBOL : NON_ERROR_SYMBOL;
 		String qInfo = questionId != null ? " [" + questionId + "]" : "";
 		return prefix + qInfo + " " + description;
 	}
