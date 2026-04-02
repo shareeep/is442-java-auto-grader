@@ -293,13 +293,13 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
           </Button>
           <Button
             onClick={handleExport}
-            disabled={exporting || exportComplete || questionIds.length === 0}
+            disabled={exporting || questionIds.length === 0}
             className={`rounded-md px-6 ${exportComplete ? 'bg-vsc-green hover:bg-vsc-green/90' : 'glow-accent bg-accent hover:bg-accent/90'}`}
           >
             {exporting ? (
               <><Loader2 size={14} className="mr-1.5 animate-spin" /> Exporting...</>
             ) : exportComplete ? (
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Exported</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Re-export</span>
             ) : (
               <><Download size={16} className="mr-1.5" /> Export Project</>
             )}
