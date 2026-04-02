@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, ListChecks, FileSearch, FolderSearch } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, ListChecks, FileSearch, FolderSearch, Info } from 'lucide-react';
 
 interface InferenceReviewProps {
   onNext: () => void;
@@ -16,6 +16,8 @@ interface QuestionGroup {
 
 const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => {
   const config = useWizardStore((s) => s.inferredConfig);
+  const testerId = useWizardStore((s) => s.testerId);
+  const hasTestersDir = !!testerId;
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const groups = useMemo(() => {
@@ -68,6 +70,16 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
     return result;
   }, [config]);
 
+  // Auto-expand all parent groups so sub-questions are immediately visible
+  useEffect(() => {
+    const parentIds = groups
+      .filter(g => g.children.length > 0 && g.parent)
+      .map(g => g.parent!.questionId);
+    if (parentIds.length > 0) {
+      setExpandedParents(new Set(parentIds));
+    }
+  }, [groups]);
+
   const toggleParent = (parentId: string) => {
     setExpandedParents(prev => {
       const next = new Set(prev);
@@ -91,15 +103,24 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
     );
   }
 
-  const conflicts = config.conflicts || [];
+  const allConflicts = config.conflicts || [];
   const questions = config.questions || [];
+
+  // When no tester dir was provided, MISSING_TESTER is expected — show as warnings not errors
+  const hardConflicts = hasTestersDir
+    ? allConflicts
+    : allConflicts.filter((c: any) => c.type !== 'MISSING_TESTER');
+  // Derive from questions directly so sub-questions found via file scanning are included
+  const testerWarnings = !hasTestersDir
+    ? questions.filter((q: any) => !q.implicitParent && !q.tester).map((q: any) => ({ questionId: q.questionId }))
+    : [];
 
   // Count stats (exclude parent questions from ready count)
   const nonParentQuestions = questions.filter((q: any) => !q.implicitParent);
   const fromPdf = questions.filter((q: any) => q.inferredFromPdf).length;
   const withTester = nonParentQuestions.filter((q: any) => q.tester).length;
   const withFolder = nonParentQuestions.filter((q: any) => q.folder).length;
-  const ready = nonParentQuestions.filter((q: any) => q.folder && q.tester).length;
+  const ready = nonParentQuestions.filter((q: any) => hasTestersDir ? (q.folder && q.tester) : q.folder).length;
   const totalMarks = questions.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0);
 
   const renderQuestionCard = (q: any, isChild: boolean = false) => {
@@ -132,20 +153,26 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
           </div>
           <div>
             <p className="text-[9px] uppercase font-mono text-muted-foreground">Tester</p>
-            <p className="font-mono text-sm text-foreground">{q.tester ? `${q.tester}.java` : 'MISSING'}</p>
+            <p className={`font-mono text-sm ${q.tester ? 'text-foreground' : 'text-muted-foreground'}`}>
+              {q.tester ? `${q.tester}.java` : (hasTestersDir ? 'MISSING' : '—')}
+            </p>
           </div>
           <div>
             <p className="text-[9px] uppercase font-mono text-muted-foreground">Max Score</p>
             <p className="font-mono text-sm text-foreground">{q.maxScore || 0}</p>
           </div>
           <div className="flex items-center gap-2">
-            {q.folder && q.tester ? (
+            {q.folder && (q.tester || !hasTestersDir) ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-vsc-green/10 text-vsc-green rounded text-[10px] font-mono font-bold">
                 <CheckCircle2 size={10} /> Ready
               </div>
-            ) : (
+            ) : !q.folder ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-vsc-yellow/10 text-vsc-yellow rounded text-[10px] font-mono font-bold">
                 <AlertCircle size={10} /> Action Needed
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-secondary text-muted-foreground rounded text-[10px] font-mono font-bold">
+                <Info size={10} /> No Tester
               </div>
             )}
           </div>
@@ -185,7 +212,7 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
     // Parent with children (accordion)
     const isExpanded = expandedParents.has(group.parent.questionId);
     const totalScore = group.children.reduce((sum: number, c: any) => sum + (c.maxScore || 0), 0);
-    const childrenReady = group.children.filter((c: any) => c.folder && c.tester).length;
+    const childrenReady = group.children.filter((c: any) => hasTestersDir ? (c.folder && c.tester) : c.folder).length;
     const allChildrenReady = childrenReady === group.children.length;
 
     return (
@@ -290,14 +317,20 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
             </div>
             <div className="h-4 w-px bg-border self-center" />
             <div className="flex items-center gap-2 text-sm">
-              <span className="font-mono font-bold text-foreground">{withTester}/{nonParentQuestions.length}</span>
-              <span className="text-muted-foreground">testers matched</span>
+              {hasTestersDir ? (
+                <>
+                  <span className="font-mono font-bold text-foreground">{withTester}/{nonParentQuestions.length}</span>
+                  <span className="text-muted-foreground">testers matched</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground italic">no testers (from scratch)</span>
+              )}
             </div>
             <div className="h-4 w-px bg-border self-center" />
-            <div className={`flex items-center gap-2 text-sm ${ready === nonParentQuestions.length ? 'text-vsc-green' : 'text-vsc-yellow'}`}>
+            <div className={`flex items-center gap-2 text-sm ${ready === nonParentQuestions.length ? 'text-vsc-green' : hasTestersDir ? 'text-vsc-yellow' : 'text-muted-foreground'}`}>
               {ready === nonParentQuestions.length
                 ? <CheckCircle2 size={14} />
-                : <AlertCircle size={14} />}
+                : hasTestersDir ? <AlertCircle size={14} /> : <Info size={14} />}
               <span className="font-mono font-bold">{ready}/{nonParentQuestions.length}</span>
               <span className={ready === nonParentQuestions.length ? 'text-vsc-green' : 'text-muted-foreground'}>ready</span>
             </div>
@@ -305,17 +338,17 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
         </CardContent>
       </Card>
 
-      {conflicts.length > 0 && (
+      {hardConflicts.length > 0 && (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 text-destructive">
               <AlertCircle size={18} />
-              <CardTitle className="text-base">Detected {conflicts.length} Issues</CardTitle>
+              <CardTitle className="text-base">Detected {hardConflicts.length} {hardConflicts.length === 1 ? 'Issue' : 'Issues'}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {conflicts.map((c: any, i: number) => (
+              {hardConflicts.map((c: any, i: number) => (
                 <div key={i} className="flex flex-col gap-1 p-3 bg-card rounded-md border border-destructive/10">
                   <p className="text-sm font-bold text-destructive flex items-center gap-2">
                     <span className="bg-destructive/10 px-2 py-0.5 rounded text-[9px] uppercase font-mono">{c.type}</span>
@@ -326,6 +359,32 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
               ))}
             </div>
           </CardContent>
+        </Card>
+      )}
+
+      {(!hasTestersDir) && (
+        <Card className="border-border bg-secondary/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Info size={16} />
+              <CardTitle className="text-sm font-medium">
+                No tester directory provided — generating from scratch
+                {testerWarnings.length > 0 && <span className="ml-2 text-[10px] font-mono bg-secondary px-2 py-0.5 rounded">{testerWarnings.length} noted</span>}
+              </CardTitle>
+            </div>
+          </CardHeader>
+          {testerWarnings.length > 0 && (
+            <CardContent className="pt-0">
+              <div className="space-y-1.5">
+                {testerWarnings.map((c: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2 p-2.5 bg-card rounded-md border border-border text-xs">
+                    <span className="bg-secondary px-1.5 py-0.5 rounded text-[9px] uppercase font-mono text-muted-foreground shrink-0">{c.questionId}</span>
+                    <span className="text-muted-foreground">no tester — will be generated</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
 

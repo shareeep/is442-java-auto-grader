@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Topbar from './Topbar';
+import { Toaster } from '@/components/ui/toast';
 
 const Layout: React.FC = () => {
   return (
@@ -10,6 +11,7 @@ const Layout: React.FC = () => {
       <main className="flex-1 h-0 overflow-y-auto relative z-10 custom-scrollbar">
         <Outlet />
       </main>
+      <Toaster />
     </div>
   );
 };

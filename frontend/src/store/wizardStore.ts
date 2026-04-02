@@ -11,8 +11,10 @@ interface WizardStore {
   inferredConfig: InferredConfig | null;
   selectedQs: string[];
   recommendations: Record<string, any>;
+  customSuggestions: Record<string, string[]>;
   results: Record<string, any>;
   localCode: Record<string, string>;
+  localCases: Record<string, any[]>;
   exportComplete: boolean;
   exportPath: string | null;
 
@@ -23,9 +25,15 @@ interface WizardStore {
   setInferredConfig: (config: InferredConfig) => void;
   setSelectedQs: (qs: string[]) => void;
   setRecommendation: (qid: string, rec: any) => void;
+  deleteRecommendedConcept: (qid: string, idx: number) => void;
+  addCustomSuggestion: (qid: string, text: string) => void;
+  deleteCustomSuggestion: (qid: string, idx: number) => void;
   setResult: (qid: string, result: any) => void;
+  resetQuestion: (qid: string) => void;
   setLocalCode: (qid: string, code: string) => void;
   initLocalCode: (code: Record<string, string>) => void;
+  setLocalCases: (qid: string, cases: any[]) => void;
+  initLocalCases: (cases: Record<string, any[]>) => void;
   setExportComplete: (path: string) => void;
   reset: () => void;
 }
@@ -38,8 +46,10 @@ const initialState = {
   inferredConfig: null,
   selectedQs: [] as string[],
   recommendations: {} as Record<string, any>,
+  customSuggestions: {} as Record<string, string[]>,
   results: {} as Record<string, any>,
   localCode: {} as Record<string, string>,
+  localCases: {} as Record<string, any[]>,
   exportComplete: false,
   exportPath: null,
 };
@@ -71,14 +81,51 @@ export const useWizardStore = create<WizardStore>()(
         setRecommendation: (qid, rec) =>
           set((s) => { s.recommendations[qid] = rec; }, undefined, 'wizard/setRecommendation'),
 
+        deleteRecommendedConcept: (qid, idx) =>
+          set((s) => {
+            const rec = s.recommendations[qid];
+            if (rec?.conceptsToCover) {
+              rec.conceptsToCover.splice(idx, 1);
+              rec.recommendedCount = rec.conceptsToCover.length;
+            }
+          }, undefined, 'wizard/deleteRecommendedConcept'),
+
+        addCustomSuggestion: (qid, text) =>
+          set((s) => {
+            if (!s.customSuggestions[qid]) s.customSuggestions[qid] = [];
+            s.customSuggestions[qid].push(text);
+          }, undefined, 'wizard/addCustomSuggestion'),
+
+        deleteCustomSuggestion: (qid, idx) =>
+          set((s) => {
+            if (s.customSuggestions[qid]) {
+              s.customSuggestions[qid].splice(idx, 1);
+            }
+          }, undefined, 'wizard/deleteCustomSuggestion'),
+
         setResult: (qid, result) =>
           set((s) => { s.results[qid] = result; }, undefined, 'wizard/setResult'),
+
+        resetQuestion: (qid) =>
+          set((s) => {
+            delete s.recommendations[qid];
+            delete s.customSuggestions[qid];
+            delete s.results[qid];
+            delete s.localCode[qid];
+            delete s.localCases[qid];
+          }, undefined, 'wizard/resetQuestion'),
 
         setLocalCode: (qid, code) =>
           set((s) => { s.localCode[qid] = code; }, undefined, 'wizard/setLocalCode'),
 
         initLocalCode: (code) =>
           set((s) => { s.localCode = { ...s.localCode, ...code }; }, undefined, 'wizard/initLocalCode'),
+
+        setLocalCases: (qid, cases) =>
+          set((s) => { s.localCases[qid] = cases; }, undefined, 'wizard/setLocalCases'),
+
+        initLocalCases: (cases) =>
+          set((s) => { s.localCases = { ...s.localCases, ...cases }; }, undefined, 'wizard/initLocalCases'),
 
         setExportComplete: (path) =>
           set((s) => { s.exportComplete = true; s.exportPath = path; }, undefined, 'wizard/setExportComplete'),
@@ -94,7 +141,7 @@ export const useWizardStore = create<WizardStore>()(
     {
       name: 'wizard-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 4,
       partialize: (state) => ({
         currentStep: state.currentStep,
         examId: state.examId,
@@ -103,8 +150,10 @@ export const useWizardStore = create<WizardStore>()(
         inferredConfig: state.inferredConfig,
         selectedQs: state.selectedQs,
         recommendations: state.recommendations,
+        customSuggestions: state.customSuggestions,
         results: state.results,
         localCode: state.localCode,
+        localCases: state.localCases,
         exportComplete: state.exportComplete,
         exportPath: state.exportPath,
       }),

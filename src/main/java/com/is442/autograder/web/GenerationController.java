@@ -231,9 +231,12 @@ public class GenerationController {
 			}
 		}
 
+		List<String> conceptsToCover = request.getConceptsToCover() != null ? request.getConceptsToCover() : List.of();
+		List<String> customSuggestions = request.getCustomSuggestions() != null ? request.getCustomSuggestions() : List.of();
+
 		try {
 			GenerationResult result = generationService.generateForInferredQuestion(iqc, examContext, existingTester,
-					numCases, templateDir);
+					numCases, templateDir, conceptsToCover, customSuggestions);
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
 			String qid = iqc.getQuestionId() != null ? iqc.getQuestionId() : "unknown";
@@ -390,7 +393,7 @@ public class GenerationController {
 
 			try {
 				GenerationResult result = generationService.generateForQuestion(qc, examContext, existingTester,
-						sel.getNumCases(), templateDir);
+						sel.getNumCases(), templateDir, List.of(), List.of());
 				results.add(result);
 			} catch (Exception e) {
 				results.add(new GenerationResult(sel.getQuestionId(), List.of(), false,
@@ -440,7 +443,7 @@ public class GenerationController {
 
 		try {
 			GenerationResult result = generationService.generateForQuestion(qc, examContext, existingTester, numCases,
-					templateDir);
+					templateDir, List.of(), List.of());
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
 			return ResponseEntity
@@ -478,6 +481,7 @@ public class GenerationController {
 
 		List<String> savedPaths = new ArrayList<>();
 		List<String> errors = new ArrayList<>();
+		Map<String, String> fileContents = new java.util.LinkedHashMap<>();
 
 		for (SaveRequest.ResultEntry entry : request.getResults()) {
 			try {
@@ -497,6 +501,7 @@ public class GenerationController {
 				Path saved = testerFileWriter.write(entry.getTesterClassName(), existingCode, entry.getGeneratedCode(),
 						cases, testersDir, outputDir);
 				savedPaths.add(saved.toString());
+				fileContents.put(entry.getTesterClassName(), Files.readString(saved));
 
 				if (request.isUpdateMaxScores()) {
 					double totalWeight = cases.stream().mapToDouble(GeneratedTestCase::weight).sum();
@@ -511,6 +516,6 @@ public class GenerationController {
 			}
 		}
 
-		return ResponseEntity.ok(new SaveResponse(savedPaths, errors));
+		return ResponseEntity.ok(new SaveResponse(savedPaths, errors, fileContents));
 	}
 }

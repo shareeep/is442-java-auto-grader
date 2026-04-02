@@ -64,6 +64,7 @@ public class ConfigInferenceService {
 
 		// 2. Scan Template Directory
 		List<Path> allFolders = new ArrayList<>();
+		List<String> uniqueFolderNames = new ArrayList<>();
 		if (templateDir == null) {
 			logger.info("[INFER] Step 2 — Template dir: not provided, skipping folder matching");
 		} else if (!Files.exists(templateDir)) {
@@ -76,7 +77,7 @@ public class ConfigInferenceService {
 
 			// Filter to unique folder names only (dedupe - don't process same folder
 			// multiple times)
-			List<String> uniqueFolderNames = allFolders.stream().map(p -> p.getFileName().toString())
+			uniqueFolderNames = allFolders.stream().map(p -> p.getFileName().toString())
 					.filter(name -> name.matches("(?i)Q\\d+[a-z]?")).distinct().collect(Collectors.toList());
 
 			logger.info("[INFER] Step 2 — Unique question folders: {}", uniqueFolderNames);
@@ -112,21 +113,70 @@ public class ConfigInferenceService {
 			}
 		}
 
-		// 2b. Smart folder assignment: if no folder matched, try to infer
+		// 2c. No tester directory: scan ALL source files in the template for names like
+		// Q1a.java, Q1b.py, Q3.js — these are the student submission files and are
+		// the definitive source of question IDs when no tester files are provided.
+		// Language-agnostic: any file with an extension whose stem matches Q\d+[a-z]?
+		// This runs BEFORE 2b so that new entries get folder assignment in 2b.
+		if (testerDir == null && templateDir != null && Files.exists(templateDir)) {
+			logger.info("[INFER] Step 2c — No tester dir: scanning template source files for question IDs");
+			try (Stream<Path> walk = Files.walk(templateDir)) {
+				walk.filter(p -> !Files.isDirectory(p))
+						.filter(p -> {
+							String name = p.getFileName().toString();
+							return name.contains(".") && !name.startsWith(".");
+						})
+						.forEach(p -> {
+							String filename = p.getFileName().toString();
+							int dotIdx = filename.lastIndexOf('.');
+							String nameWithoutExt = filename.substring(0, dotIdx);
+							// Only match names that look like a question ID: Q1, Q1a, Q2b, Q10a …
+							if (nameWithoutExt.matches("(?i)Q\\d+[a-z]?")) {
+								String normalizedId = "Q" + nameWithoutExt.substring(1);
+								boolean alreadyPresent = qMap.keySet().stream()
+										.anyMatch(k -> k.equalsIgnoreCase(normalizedId));
+								if (!alreadyPresent) {
+									InferredQuestionConfig qc = new InferredQuestionConfig();
+									qc.setQuestionId(normalizedId);
+									// Folder will be resolved in Step 2b below
+									qMap.put(normalizedId, qc);
+									logger.info("[INFER] Step 2c — Discovered question {} from file {}", normalizedId,
+											filename);
+								}
+							}
+						});
+			} catch (IOException e) {
+				logger.warn("[INFER] Step 2c — Could not scan template source files: {}", e.getMessage());
+			}
+		}
+
+		// 2b. Smart folder assignment: for any entry still without a folder, infer
+		// from allFolders (runs after 2c so newly-discovered questions also get assigned)
 		for (InferredQuestionConfig qc : qMap.values()) {
 			if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
-				String qIdPrefix = extractQuestionPrefix(qc.getQuestionId());
+				String qIdLower = qc.getQuestionId().toLowerCase();
+				String qIdPrefix = extractQuestionPrefix(qc.getQuestionId()).toLowerCase();
 
-				// Look for folder matching prefix (e.g., Q1a -> look for Q1)
+				// Prefer exact folder match first (Q1a folder for Q1a question)
+				// then parent folder match (Q1 folder for Q1a question)
+				Path bestFolder = null;
 				for (Path folder : allFolders) {
 					String fname = folder.getFileName().toString().toLowerCase();
-					if (fname.equals(qIdPrefix) || fname.startsWith(qIdPrefix.toLowerCase())) {
-						qc.setFolder(folder.getFileName().toString());
-						qc.setDependencyFolder(folder.getFileName().toString());
-						logger.info("[INFER] Step 2b — Inferred folder '{}' for {}", qc.getFolder(),
-								qc.getQuestionId());
-						break;
+					if (fname.equals(qIdLower)) {
+						bestFolder = folder;
+						break; // exact match wins
 					}
+					if (bestFolder == null && (fname.equals(qIdPrefix) || fname.startsWith(qIdPrefix))) {
+						bestFolder = folder;
+					}
+				}
+				if (bestFolder != null) {
+					qc.setFolder(bestFolder.getFileName().toString());
+					qc.setDependencyFolder(bestFolder.getFileName().toString());
+					List<String> deps = getDependencies(bestFolder);
+					qc.getDependencyFiles().addAll(deps);
+					logger.info("[INFER] Step 2b — Assigned folder '{}' for {}", qc.getFolder(),
+							qc.getQuestionId());
 				}
 			}
 		}
@@ -218,10 +268,14 @@ public class ConfigInferenceService {
 					if ((subQc.getFolder() == null || subQc.getFolder().isEmpty()) && parentQc.getFolder() != null) {
 						subQc.setFolder(parentQc.getFolder());
 						subQc.setDependencyFolder(parentQc.getDependencyFolder());
-						logger.info("[INFER] Step 3b — Sub-question {} inherited folder from parent {}", sub, parent);
-						subQc.setDependencyFolder(qMap.get(parent).getDependencyFolder());
 						logger.info("[INFER] Step 3b — Sub-question {} inherited folder '{}' from parent {}", sub,
 								subQc.getFolder(), parent);
+					}
+					// Inherit dependency files from parent if sub has none
+					if (subQc.getDependencyFiles().isEmpty() && !parentQc.getDependencyFiles().isEmpty()) {
+						subQc.getDependencyFiles().addAll(parentQc.getDependencyFiles());
+						logger.info("[INFER] Step 3b — Sub-question {} inherited {} dependency file(s) from parent {}",
+								sub, parentQc.getDependencyFiles().size(), parent);
 					}
 				}
 			}
@@ -236,7 +290,9 @@ public class ConfigInferenceService {
 			boolean hasTester = hasText(qc.getTester());
 			boolean hasFolder = hasText(qc.getFolder());
 
-			if (isLikelyFalsePositive(qc, hasPdfPresence, hasTester, hasFolder)) {
+			// Only apply false-positive filter when a tester dir was provided —
+			// without testers every template folder is a legitimate question entry
+			if (testerDir != null && isLikelyFalsePositive(qc, hasPdfPresence, hasTester, hasFolder)) {
 				logger.warn("[INFER] Step 4 — LIKELY_FALSE: {} has folder but no PDF/tester - skipping",
 						qc.getQuestionId());
 				continue; // Don't add to config

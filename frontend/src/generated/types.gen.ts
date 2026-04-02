@@ -33,6 +33,7 @@ export type TestCaseEntry = {
 export type SaveResponse = {
     savedPaths?: Array<string>;
     errors?: Array<string>;
+    fileContents?: Record<string, string>;
 };
 
 export type ConfigConflict = {
@@ -103,6 +104,8 @@ export type ExecuteRequest = {
     templateId?: string;
     numCases?: number;
     question?: InferredQuestionConfig;
+    conceptsToCover?: Array<string>;
+    customSuggestions?: Array<string>;
 };
 
 export type AnalyzeSetupRequest = {
