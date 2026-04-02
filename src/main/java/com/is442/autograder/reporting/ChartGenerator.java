@@ -97,7 +97,8 @@ public final class ChartGenerator {
 		BufferedImage image = new BufferedImage(baseWidth * scale, baseHeight * scale, BufferedImage.TYPE_INT_ARGB);
 		java.awt.Graphics2D g2 = image.createGraphics();
 		g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+				java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g2.scale(scale, scale);
 		chart.draw(g2, new java.awt.geom.Rectangle2D.Double(0, 0, baseWidth, baseHeight));
 		g2.dispose();
