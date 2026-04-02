@@ -10,9 +10,15 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.nio.file.StandardCopyOption;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.execution.GradingEngine;
+import com.is442.autograder.execution.PlagiarismChecker;
 import com.is442.autograder.execution.ProcessRunner;
 import com.is442.autograder.extraction.IdentityResolver;
 import com.is442.autograder.extraction.StructureNormalizer;
@@ -220,6 +226,15 @@ public class GradingPipeline {
 				System.out.println("PDF report exported to: " + pdfReport);
 			}
 
+			// 8. Output artifacts and run Plagiarism checks
+			if (runOutputDir != null && !consoleReporter.isStopRequested()) {
+				persistRunArtifacts(runOutputDir, submissions);
+				Path codeDir = runOutputDir.resolve("code");
+				Path plagiarismReport = runOutputDir.resolve("plagiarism-report.jplag");
+				new PlagiarismChecker().runChecks(codeDir, testerFilesDir, plagiarismReport);
+				System.out.println("Plagiarism report exported to: " + plagiarismReport + ".jplag");
+			}
+
 			return submissions;
 		} finally {
 			if (logCapture != null) {
@@ -236,6 +251,65 @@ public class GradingPipeline {
 		Path runDir = baseOutputDir.resolve(runId);
 		Files.createDirectories(runDir);
 		return runDir;
+	}
+
+	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
+		try {
+			List<Map<String, Object>> payloads = submissions.stream().map(this::buildStudentPayload).toList();
+			String json = new ObjectMapper().writeValueAsString(payloads);
+			Files.writeString(runDir.resolve("results.json"), json);
+		} catch (Exception e) {
+			LOGGER.warning("Failed to write results.json: " + e.getMessage());
+		}
+
+		for (StudentSubmission sub : submissions) {
+			Path root = sub.getRootPath();
+			if (root == null || !Files.exists(root))
+				continue;
+			String username = sub.getUsername() != null ? sub.getUsername() : sub.getDisplayName();
+			String safeUser = username.replaceAll("[^a-zA-Z0-9._-]", "_");
+			Path codeDir = runDir.resolve("code").resolve(safeUser);
+			try {
+				Files.createDirectories(codeDir);
+				try (Stream<Path> walk = Files.walk(root)) {
+					walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).forEach(src -> {
+						try {
+							Path dest = codeDir.resolve(root.relativize(src));
+							Files.createDirectories(dest.getParent());
+							Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+						} catch (IOException e) {
+							LOGGER.warning("Failed to copy " + src + " : " + e.getMessage());
+						}
+					});
+				}
+			} catch (IOException e) {
+				LOGGER.warning("Failed to copy code for " + safeUser + " : " + e.getMessage());
+			}
+		}
+	}
+
+	private Map<String, Object> buildStudentPayload(StudentSubmission sub) {
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("username", sub.getUsername());
+		data.put("name", sub.getName());
+		data.put("displayName", sub.getDisplayName());
+		data.put("totalScore", sub.getTotalScore());
+		data.put("maxPossibleScore", sub.getMaxPossibleScore());
+
+		List<Map<String, Object>> results = new ArrayList<>();
+		for (var res : sub.getResults()) {
+			results.add(
+					Map.of("questionId", res.getQuestionId(), "score", res.getScore(), "maxScore", res.getMaxScore()));
+		}
+		data.put("results", results);
+
+		List<Map<String, Object>> anomalies = new ArrayList<>();
+		for (var ano : sub.getAnomalies()) {
+			anomalies.add(Map.of("severity", ano.getSeverity().name(), "description", ano.getDescription()));
+		}
+		data.put("anomalies", anomalies);
+
+		return data;
 	}
 
 	/**

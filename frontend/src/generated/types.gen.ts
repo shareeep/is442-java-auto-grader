@@ -410,6 +410,24 @@ export type GetResultsResponses = {
 
 export type GetResultsResponse = GetResultsResponses[keyof GetResultsResponses];
 
+export type GetPlagiarismReportData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/plagiarism';
+};
+
+export type GetPlagiarismReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type GetPlagiarismReportResponse = GetPlagiarismReportResponses[keyof GetPlagiarismReportResponses];
+
 export type GetPdfData = {
     body?: never;
     path: {

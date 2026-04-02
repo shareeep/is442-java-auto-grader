@@ -1,0 +1,7 @@
+{
+  "*.ts": ["npx prettier --write", "npx eslint --max-warnings 0 --no-warn-ignored"],
+  "*.vue": ["npx prettier --write", "npx eslint --max-warnings 0"],
+  "*.js": ["npx prettier --write", "npx eslint --max-warnings 0"],
+  "*.html": ["npx prettier --write", "npx eslint --max-warnings 0"],
+  "*.json": ["npx prettier --write"]
+}

@@ -23,8 +23,16 @@ services:
 
   frontend:
     build: ./frontend
-    ports: 
+    ports:
       - "5173:80"
+    depends_on:
+      - backend
+    restart: always
+
+  plagiarism-viewer:
+    build: ./plagiarism-viewer
+    ports:
+      - "1996:80"
     depends_on:
       - backend
     restart: always
