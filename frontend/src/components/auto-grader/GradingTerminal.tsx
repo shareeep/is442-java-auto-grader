@@ -13,9 +13,10 @@ interface GradingTerminalProps {
   onComplete: (submissions: any[], runId?: string) => void;
   onError: (error: string) => void;
   onClose?: () => void;
+  onCancel?: () => void;
 }
 
-const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete, onError, onClose }) => {
+const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete, onError, onClose, onCancel }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [studentCount, setStudentCount] = useState(0);
   const [phase, setPhase] = useState('Connecting...');
@@ -23,6 +24,8 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
   const termRef = useRef<HTMLDivElement>(null);
   const allStudents = useRef<any[]>([]);
   const completedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const now = () => {
     const d = new Date();
@@ -42,6 +45,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
     allStudents.current = [];
     completedRef.current = false;
     const controller = new AbortController();
+    controllerRef.current = controller;
 
     const runStream = async () => {
       addLog({ type: 'info', timestamp: now(), message: 'Connecting to grading stream...' });
@@ -112,6 +116,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
     const handleEvent = (name: string, data: any) => {
       switch (name) {
         case 'session':
+          sessionIdRef.current = data.sessionId;
           addLog({ type: 'info', timestamp: now(), message: `Session: ${data.sessionId}` });
           break;
         case 'status':
@@ -146,6 +151,19 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
     return () => controller.abort();
   }, []);
 
+  const handleCancel = async () => {
+    const sessionId = sessionIdRef.current;
+    if (sessionId) {
+      try {
+        await fetch(`/api/grade/stop/${sessionId}`, { method: 'POST' });
+      } catch {
+        // ignore — abort below will clean up regardless
+      }
+    }
+    controllerRef.current?.abort();
+    onCancel?.();
+  };
+
   // Auto-scroll
   useEffect(() => {
     if (termRef.current) {
@@ -175,6 +193,15 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
           <span className="flex items-center gap-1">
             <User size={10} /> {studentCount}
           </span>
+          {!done && onCancel && (
+            <button
+              onClick={handleCancel}
+              className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-red-400/80 border border-red-400/30 hover:bg-red-400/10 transition-colors"
+              title="Cancel grading"
+            >
+              <X size={10} /> Cancel
+            </button>
+          )}
           {onClose && (
             <button
               onClick={onClose}
