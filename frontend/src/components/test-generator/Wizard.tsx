@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, GraduationCap, LayoutPanelLeft, ListChecks, FileCheck, RotateCcw } from 'lucide-react';
 
@@ -20,8 +20,15 @@ const Wizard: React.FC = () => {
   const setStep = useWizardStore((s) => s.setStep);
   const reset = useWizardStore((s) => s.reset);
 
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
   const nextStep = () => setStep(Math.min(currentStep + 1, STEPS.length));
   const prevStep = () => setStep(Math.max(currentStep - 1, 1));
+
+  const handleReset = () => {
+    reset();
+    setConfirmingReset(false);
+  };
 
   const renderStep = () => {
     switch (currentStep) {
@@ -45,14 +52,36 @@ const Wizard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={reset}
-            className="text-muted-foreground hover:text-foreground gap-1.5"
-          >
-            <RotateCcw size={13} /> Start Over
-          </Button>
+          {confirmingReset ? (
+            <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-md px-3 py-1.5">
+              <span className="text-xs text-destructive font-medium">All progress will be lost. Are you sure?</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/20"
+              >
+                Yes, reset
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmingReset(false)}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingReset(true)}
+              className="text-muted-foreground hover:text-foreground gap-1.5"
+            >
+              <RotateCcw size={13} /> Start Over
+            </Button>
+          )}
           <div className="flex items-center gap-2 text-xs font-mono text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
             Step {currentStep} of {STEPS.length}
           </div>
