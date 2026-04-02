@@ -33,7 +33,9 @@ export type TestCaseEntry = {
 export type SaveResponse = {
     savedPaths?: Array<string>;
     errors?: Array<string>;
-    fileContents?: Record<string, string>;
+    fileContents?: {
+        [key: string]: string;
+    };
 };
 
 export type ConfigConflict = {
@@ -392,6 +394,24 @@ export type AnalyzeSetupResponses = {
 };
 
 export type AnalyzeSetupResponse = AnalyzeSetupResponses[keyof AnalyzeSetupResponses];
+
+export type GetBootIdData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/system/boot';
+};
+
+export type GetBootIdResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type GetBootIdResponse = GetBootIdResponses[keyof GetBootIdResponses];
 
 export type GetResultsData = {
     body?: never;

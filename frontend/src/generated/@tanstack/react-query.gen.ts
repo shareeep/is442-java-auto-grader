@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { analyzeSetup, execute, generate, generateQuestion, getAiSettings, getCsv, getLogs, getPdf, getPlagiarismReport, getQuestions, getResults, getStudentCode, getTemplateSource, getTester, listRuns, type Options, preparsePdf, recommend, refine, runGrading, save, saveSetup, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponse, ExecuteData, ExecuteResponse, GenerateData, GenerateQuestionData, GenerateQuestionResponse, GenerateResponse, GetAiSettingsData, GetAiSettingsResponse, GetCsvData, GetCsvResponse, GetLogsData, GetLogsResponse, GetPdfData, GetPdfResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetQuestionsData, GetQuestionsResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTemplateSourceData, GetTemplateSourceResponse, GetTesterData, GetTesterResponse, ListRunsData, ListRunsResponse, PreparsePdfData, PreparsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, RunGradingData, RunGradingResponse, SaveData, SaveResponse2, SaveSetupData, SaveSetupResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
+import { analyzeSetup, execute, generate, generateQuestion, getAiSettings, getBootId, getCsv, getLogs, getPdf, getPlagiarismReport, getQuestions, getResults, getStudentCode, getTemplateSource, getTester, listRuns, type Options, preparsePdf, recommend, refine, runGrading, save, saveSetup, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponse, ExecuteData, ExecuteResponse, GenerateData, GenerateQuestionData, GenerateQuestionResponse, GenerateResponse, GetAiSettingsData, GetAiSettingsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetLogsData, GetLogsResponse, GetPdfData, GetPdfResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetQuestionsData, GetQuestionsResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTemplateSourceData, GetTemplateSourceResponse, GetTesterData, GetTesterResponse, ListRunsData, ListRunsResponse, PreparsePdfData, PreparsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, RunGradingData, RunGradingResponse, SaveData, SaveResponse2, SaveSetupData, SaveSetupResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
 
 export const runGradingMutation = (options?: Partial<Options<RunGradingData>>): UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> => {
     const mutationOptions: UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> = {
@@ -234,6 +234,21 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
     }
     return [params];
 };
+
+export const getBootIdQueryKey = (options?: Options<GetBootIdData>) => createQueryKey('getBootId', options);
+
+export const getBootIdOptions = (options?: Options<GetBootIdData>) => queryOptions<GetBootIdResponse, DefaultError, GetBootIdResponse, ReturnType<typeof getBootIdQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBootId({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBootIdQueryKey(options)
+});
 
 export const getResultsQueryKey = (options: Options<GetResultsData>) => createQueryKey('getResults', options);
 
