@@ -235,6 +235,7 @@ const RunResults: React.FC = () => {
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [studentCode, setStudentCode] = useState<Record<string, Record<string, string>>>({});
   const [loadingCode, setLoadingCode] = useState<Set<string>>(new Set());
+  const [studentSearch, setStudentSearch] = useState('');
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const [expandedScore, setExpandedScore] = useState<string | null>(null);
@@ -349,11 +350,20 @@ const RunResults: React.FC = () => {
 
         {/* ── Left: File Tree ── */}
         <div className="w-[220px] shrink-0 border-r border-white/[0.06] bg-[#161b22] flex flex-col overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/[0.06] shrink-0">
+          <div className="px-3 py-2 border-b border-white/[0.06] shrink-0 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#4d5566]">Files</span>
+            <input
+              type="search"
+              placeholder="Filter students..."
+              value={studentSearch}
+              onChange={e => setStudentSearch(e.target.value)}
+              className="w-full text-[11px] bg-[#0d1117] border border-white/[0.06] rounded px-2 py-1 text-[#8b949e] outline-none focus:border-white/20 placeholder:text-[#3d4451]"
+            />
           </div>
           <div className="flex-1 overflow-auto py-1.5 font-mono text-xs">
-            {students.map(s => {
+            {students.filter(s =>
+              (s.displayName || s.username).toLowerCase().includes(studentSearch.toLowerCase())
+            ).map(s => {
               const expanded = expandedStudents.has(s.username);
               const files = studentCode[s.username] ?? {};
               const isLoading = loadingCode.has(s.username);

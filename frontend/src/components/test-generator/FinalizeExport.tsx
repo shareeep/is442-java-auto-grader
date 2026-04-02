@@ -383,6 +383,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
                       {activeResult.compiledOk && (
                         <span className="text-[9px] px-2 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-mono">COMPILED</span>
                       )}
+                      <span className="text-[9px] px-2 py-0.5 bg-secondary text-muted-foreground rounded font-mono border border-border">READ-ONLY</span>
                     </div>
                   </div>
                   <div className="h-[360px] overflow-auto">

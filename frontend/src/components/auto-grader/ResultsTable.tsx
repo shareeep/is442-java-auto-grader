@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AlertTriangle, Activity, CheckCircle2, ChevronRight, Code, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import SubmissionDetails, { Submission } from './SubmissionDetails';
 
@@ -17,6 +17,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef(0);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -61,10 +63,18 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
     [data.submissions, sortField, sortDir]
   );
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" ref={containerRef}>
 
       {selectedSubmission ? (
-        <SubmissionDetails submission={selectedSubmission} onBack={() => setSelectedSubmission(null)} />
+        <SubmissionDetails
+          submission={selectedSubmission}
+          onBack={() => {
+            setSelectedSubmission(null);
+            requestAnimationFrame(() => {
+              containerRef.current?.closest('.overflow-auto')?.scrollTo({ top: savedScroll.current });
+            });
+          }}
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="grid grid-cols-12 px-5 py-3 border-b border-border bg-secondary/50">
@@ -92,7 +102,10 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
               return (
                 <div
                   key={i}
-                  onClick={() => setSelectedSubmission(s)}
+                  onClick={() => {
+                    savedScroll.current = containerRef.current?.closest('.overflow-auto')?.scrollTop ?? 0;
+                    setSelectedSubmission(s);
+                  }}
                   className="grid grid-cols-12 gap-4 px-5 py-3.5 border-b border-border/50 last:border-0 items-center transition-colors hover:bg-secondary/50 cursor-pointer"
                 >
                   <div className="col-span-1 font-mono text-xs text-muted-foreground">{i + 1}</div>

@@ -96,23 +96,26 @@ const Wizard: React.FC = () => {
           const isCompleted = currentStep > step.id;
 
           return (
-            <div key={step.id}>
-              <div className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 border ${
+            <button
+              key={step.id}
+              onClick={() => isCompleted && setStep(step.id)}
+              disabled={!isCompleted && !isActive}
+              className={`w-full text-left flex items-center gap-3 p-3 rounded-md transition-all duration-200 border ${
                 isActive
                   ? 'bg-primary/15 text-primary border-primary/30 glow-blue -translate-y-0.5'
                   : isCompleted
-                    ? 'bg-vsc-green/10 text-vsc-green border-vsc-green/20'
-                    : 'bg-card text-muted-foreground border-border'
-              }`}>
-                <div className={`p-1.5 rounded ${isActive ? 'bg-primary/20' : isCompleted ? 'bg-vsc-green/10' : 'bg-secondary'}`}>
-                  {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-[9px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
-                  <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
-                </div>
+                    ? 'bg-vsc-green/10 text-vsc-green border-vsc-green/20 hover:bg-vsc-green/20 cursor-pointer'
+                    : 'bg-card text-muted-foreground border-border cursor-default'
+              }`}
+            >
+              <div className={`p-1.5 rounded ${isActive ? 'bg-primary/20' : isCompleted ? 'bg-vsc-green/10' : 'bg-secondary'}`}>
+                {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
               </div>
-            </div>
+              <div className="hidden md:block">
+                <p className="text-[9px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
+                <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
+              </div>
+            </button>
           );
         })}
       </div>
