@@ -474,10 +474,8 @@ const RunResults: React.FC = () => {
                         ? <ChevronDown size={11} className="text-[#4d5566] shrink-0" />
                         : <ChevronRight size={11} className="text-[#4d5566] shrink-0" />}
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-[#c9d1d9] truncate">{s.displayName || s.username}</p>
-                        {s.displayName && s.displayName !== s.username && (
-                          <p className="text-[10px] text-[#4d5566] truncate font-mono">{s.username}</p>
-                        )}
+                        <p className="text-xs font-medium text-[#c9d1d9] truncate">{s.name || s.displayName || s.username}</p>
+                        <p className="text-[10px] text-[#4d5566] truncate font-mono">{s.username}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -496,9 +494,15 @@ const RunResults: React.FC = () => {
                     <div className="px-3 pb-3 space-y-1.5">
                       {s.results.map(r => {
                         const qPct = r.maxScore > 0 ? r.score / r.maxScore : 0;
+                        const qid = r.questionId.toLowerCase();
+                        const activeFilename = activeTabKey?.split('::')[1]?.split(/[\\/]/).pop()?.replace(/\.java$/i, '').toLowerCase() ?? '';
+                        const isActiveQ = expandedScore === s.username && activeFilename === qid;
                         return (
-                          <div key={r.questionId} className="flex items-center justify-between text-xs gap-2">
-                            <span className="font-mono text-[#4d5566] w-8 shrink-0">{r.questionId}</span>
+                          <div
+                            key={r.questionId}
+                            className={`flex items-center justify-between text-xs gap-2 rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isActiveQ ? 'bg-white/[0.07] border-l-2 border-[#e8e3d5]/60 pl-2' : ''}`}
+                          >
+                            <span className={`font-mono w-8 shrink-0 ${isActiveQ ? 'text-[#e8e3d5]' : 'text-[#4d5566]'}`}>{r.questionId}</span>
                             <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${qPct === 1 ? 'bg-vsc-green' : qPct > 0 ? 'bg-[#e8e3d5]' : 'bg-vsc-red/40'}`}
