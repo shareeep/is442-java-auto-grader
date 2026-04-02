@@ -121,37 +121,35 @@ public class ConfigInferenceService {
 		if (testerDir == null && templateDir != null && Files.exists(templateDir)) {
 			logger.info("[INFER] Step 2c — No tester dir: scanning template source files for question IDs");
 			try (Stream<Path> walk = Files.walk(templateDir)) {
-				walk.filter(p -> !Files.isDirectory(p))
-						.filter(p -> {
-							String name = p.getFileName().toString();
-							return name.contains(".") && !name.startsWith(".");
-						})
-						.forEach(p -> {
-							String filename = p.getFileName().toString();
-							int dotIdx = filename.lastIndexOf('.');
-							String nameWithoutExt = filename.substring(0, dotIdx);
-							// Only match names that look like a question ID: Q1, Q1a, Q2b, Q10a …
-							if (nameWithoutExt.matches("(?i)Q\\d+[a-z]?")) {
-								String normalizedId = "Q" + nameWithoutExt.substring(1);
-								boolean alreadyPresent = qMap.keySet().stream()
-										.anyMatch(k -> k.equalsIgnoreCase(normalizedId));
-								if (!alreadyPresent) {
-									InferredQuestionConfig qc = new InferredQuestionConfig();
-									qc.setQuestionId(normalizedId);
-									// Folder will be resolved in Step 2b below
-									qMap.put(normalizedId, qc);
-									logger.info("[INFER] Step 2c — Discovered question {} from file {}", normalizedId,
-											filename);
-								}
-							}
-						});
+				walk.filter(p -> !Files.isDirectory(p)).filter(p -> {
+					String name = p.getFileName().toString();
+					return name.contains(".") && !name.startsWith(".");
+				}).forEach(p -> {
+					String filename = p.getFileName().toString();
+					int dotIdx = filename.lastIndexOf('.');
+					String nameWithoutExt = filename.substring(0, dotIdx);
+					// Only match names that look like a question ID: Q1, Q1a, Q2b, Q10a …
+					if (nameWithoutExt.matches("(?i)Q\\d+[a-z]?")) {
+						String normalizedId = "Q" + nameWithoutExt.substring(1);
+						boolean alreadyPresent = qMap.keySet().stream().anyMatch(k -> k.equalsIgnoreCase(normalizedId));
+						if (!alreadyPresent) {
+							InferredQuestionConfig qc = new InferredQuestionConfig();
+							qc.setQuestionId(normalizedId);
+							// Folder will be resolved in Step 2b below
+							qMap.put(normalizedId, qc);
+							logger.info("[INFER] Step 2c — Discovered question {} from file {}", normalizedId,
+									filename);
+						}
+					}
+				});
 			} catch (IOException e) {
 				logger.warn("[INFER] Step 2c — Could not scan template source files: {}", e.getMessage());
 			}
 		}
 
 		// 2b. Smart folder assignment: for any entry still without a folder, infer
-		// from allFolders (runs after 2c so newly-discovered questions also get assigned)
+		// from allFolders (runs after 2c so newly-discovered questions also get
+		// assigned)
 		for (InferredQuestionConfig qc : qMap.values()) {
 			if (qc.getFolder() == null || qc.getFolder().isEmpty()) {
 				String qIdLower = qc.getQuestionId().toLowerCase();
@@ -175,8 +173,7 @@ public class ConfigInferenceService {
 					qc.setDependencyFolder(bestFolder.getFileName().toString());
 					List<String> deps = getDependencies(bestFolder);
 					qc.getDependencyFiles().addAll(deps);
-					logger.info("[INFER] Step 2b — Assigned folder '{}' for {}", qc.getFolder(),
-							qc.getQuestionId());
+					logger.info("[INFER] Step 2b — Assigned folder '{}' for {}", qc.getFolder(), qc.getQuestionId());
 				}
 			}
 		}
