@@ -136,37 +136,37 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   const [inferring, setInferring] = useState(false);
   const [inferError, setInferError] = useState<string | null>(null);
   const [noTesters, setNoTesters] = useState(false);
+  const [pdfDragging, setPdfDragging] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const allReady = !!examId && !!templateId && (!!testerId || noTesters) && !parsingPdf;
   const completedCount = [examId, templateId, testerId || noTesters].filter(Boolean).length;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setUploadError(null);
-      setUploading(true);
-      setParsingPdf(false);
-      try {
-        const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
-        setExamId(uploaded!['examId']);
-
-        setParsingPdf(true);
-        preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
-          if ((result as any).status === 'error') {
-            console.warn('PDF parsing failed, will retry on inference');
-          }
-          setParsingPdf(false);
-        }).catch(err => {
-          console.warn('Background PDF parse failed:', err);
-          setParsingPdf(false);
-        });
-      } catch (err: any) {
-        setUploadError(err.message);
-      } finally {
-        setUploading(false);
-      }
+  const handlePdfFile = async (selectedFile: File) => {
+    setFile(selectedFile);
+    setUploadError(null);
+    setUploading(true);
+    setParsingPdf(false);
+    try {
+      const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
+      setExamId(uploaded!['examId']);
+      setParsingPdf(true);
+      preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
+        if ((result as any).status === 'error') console.warn('PDF parsing failed, will retry on inference');
+        setParsingPdf(false);
+      }).catch(err => {
+        console.warn('Background PDF parse failed:', err);
+        setParsingPdf(false);
+      });
+    } catch (err: any) {
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
     }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) await handlePdfFile(e.target.files[0]);
   };
 
   const handleUploadTemplate = async (files: File[]) => {
@@ -212,8 +212,26 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-8 bg-secondary/50 hover:bg-secondary hover:border-primary/30 transition-colors cursor-pointer">
+            <div
+              onClick={() => !uploading && pdfInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); if (!uploading) setPdfDragging(true); }}
+              onDragEnter={e => { e.preventDefault(); if (!uploading) setPdfDragging(true); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPdfDragging(false); }}
+              onDrop={async e => {
+                e.preventDefault();
+                setPdfDragging(false);
+                if (uploading) return;
+                const dropped = e.dataTransfer.files[0];
+                if (dropped) await handlePdfFile(dropped);
+              }}
+              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 transition-colors cursor-pointer ${
+                pdfDragging
+                  ? 'border-primary bg-primary/10 scale-[1.01]'
+                  : 'border-border bg-secondary/50 hover:bg-secondary hover:border-primary/30'
+              }`}
+            >
               <input
+                ref={pdfInputRef}
                 type="file"
                 className="hidden"
                 onChange={handleFileChange}
@@ -224,14 +242,18 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
                   ? <Loader2 className="text-primary animate-spin" size={28} />
                   : examId
                     ? <CheckCircle2 className="text-vsc-green" size={28} />
-                    : <FileUp className="text-muted-foreground" size={28} />
+                    : <FileUp className={pdfDragging ? 'text-primary' : 'text-muted-foreground'} size={28} />
                 }
               </div>
               <p className="font-outfit font-bold text-foreground text-center">
-                {uploading ? 'Uploading...' : file ? file.name : examId ? 'PDF uploaded' : 'Click or drag PDF to upload'}
+                {pdfDragging ? 'Drop PDF here'
+                  : uploading ? 'Uploading...'
+                  : file ? file.name
+                  : examId ? 'PDF uploaded'
+                  : 'Click or drag PDF to upload'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Maximum size 10MB</p>
-            </label>
+            </div>
 
             {uploadError && (
               <div className="flex items-center gap-3 p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in">
