@@ -279,6 +279,14 @@ const RunResults: React.FC = () => {
 
   const activeTab = openTabs.find(t => t.key === activeTabKey) ?? null;
 
+  // Auto-expand the matching student in the Scores panel when the active file tab changes
+  useEffect(() => {
+    if (activeTabKey) {
+      const username = activeTabKey.split('::')[0];
+      setExpandedScore(username);
+    }
+  }, [activeTabKey]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
