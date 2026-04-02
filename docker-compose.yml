@@ -12,6 +12,7 @@ services:
     environment:
       - DOCLING_SERVE_URL=http://docling:5001
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TZ=Asia/Singapore
     env_file:
       - .env
     depends_on:

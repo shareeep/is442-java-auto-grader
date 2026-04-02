@@ -28,6 +28,7 @@ import com.is442.autograder.model.StudentSubmission;
 import com.is442.autograder.reporting.CSVExporter;
 import com.is442.autograder.reporting.ConsoleLogCapture;
 import com.is442.autograder.reporting.ConsoleReporter;
+import com.is442.autograder.reporting.DetailedCsvExporter;
 import com.is442.autograder.reporting.PdfReportGenerator;
 import com.is442.autograder.reporting.QuestionLogWriter;
 import com.is442.autograder.reporting.ScoresheetEnricher;
@@ -50,6 +51,7 @@ public class GradingPipeline {
 	private final StructureNormalizer structureNormalizer;
 	private final SubmissionValidator submissionValidator;
 	private final CSVExporter csvExporter;
+	private final DetailedCsvExporter detailedCsvExporter;
 	private final ConsoleReporter consoleReporter;
 	private final ScoresheetEnricher scoresheetEnricher;
 	private List<QuestionConfig> inferredQuestionConfigs;
@@ -61,6 +63,7 @@ public class GradingPipeline {
 		this.structureNormalizer = new StructureNormalizer(identityResolver);
 		this.submissionValidator = new SubmissionValidator(identityResolver);
 		this.csvExporter = new CSVExporter();
+		this.detailedCsvExporter = new DetailedCsvExporter();
 		this.consoleReporter = new ConsoleReporter();
 		this.scoresheetEnricher = new ScoresheetEnricher();
 	}
@@ -214,6 +217,13 @@ public class GradingPipeline {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
 				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
+			}
+
+			// 6.5. Always export detailed CSV
+			if (!consoleReporter.isStopRequested()) {
+				Path detailedCsv = runOutputDir.resolve("detailed-report.csv");
+				detailedCsvExporter.exportDetailed(detailedCsv, submissions, questionConfigs);
+				System.out.println("Detailed report exported to: " + detailedCsv);
 			}
 
 			System.out.println("Full logs exported to: " + runOutputDir.resolve("logs"));
