@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
 import { uploadTemplate } from '@/api/uploadTemplate';
 import { analyzeSetup, preparsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
@@ -16,9 +17,11 @@ interface FolderUploadCardProps {
   hint: string;
   uploadId: string | null;
   onUpload: (files: File[]) => Promise<void>;
+  footer?: React.ReactNode;
+  disabled?: boolean;
 }
 
-const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, uploadId, onUpload }) => {
+const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, uploadId, onUpload, footer, disabled }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileCount, setFileCount] = useState(0);
   const [folderName, setFolderName] = useState('');
@@ -56,13 +59,15 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
       </CardHeader>
       <CardContent className="space-y-3">
         <div
-          onClick={() => !uploading && inputRef.current?.click()}
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all duration-200 group ${
-            uploadId
-              ? 'border-vsc-green/40 bg-vsc-green/5 hover:border-vsc-green/60'
-              : uploading
-                ? 'border-primary/40 bg-primary/5'
-                : 'border-border bg-secondary/50 hover:border-primary/30 hover:bg-secondary'
+          onClick={() => !uploading && !disabled && inputRef.current?.click()}
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-200 group ${
+            disabled
+              ? 'border-border bg-secondary/30 opacity-40 cursor-not-allowed'
+              : uploadId
+                ? 'border-vsc-green/40 bg-vsc-green/5 hover:border-vsc-green/60 cursor-pointer'
+                : uploading
+                  ? 'border-primary/40 bg-primary/5 cursor-pointer'
+                  : 'border-border bg-secondary/50 hover:border-primary/30 hover:bg-secondary cursor-pointer'
           }`}
         >
           <input
@@ -109,6 +114,7 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
         )}
 
         <p className="text-[10px] text-muted-foreground">{hint}</p>
+        {footer}
       </CardContent>
     </Card>
   );
@@ -129,9 +135,10 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   const [parsingPdf, setParsingPdf] = useState(false);
   const [inferring, setInferring] = useState(false);
   const [inferError, setInferError] = useState<string | null>(null);
+  const [noTesters, setNoTesters] = useState(false);
 
-  const allReady = !!examId && !!templateId && !!testerId && !parsingPdf;
-  const completedCount = [examId, templateId, testerId].filter(Boolean).length;
+  const allReady = !!examId && !!templateId && (!!testerId || noTesters) && !parsingPdf;
+  const completedCount = [examId, templateId, testerId || noTesters].filter(Boolean).length;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -257,10 +264,24 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
             onUpload={handleUploadTemplate}
           />
           <FolderUploadCard
+            key={noTesters ? 'testers-disabled' : 'testers-enabled'}
             title="Testers Directory"
             hint="Select the folder containing existing Tester.java files (e.g. Tester-Files with Q1Tester.java, etc.)."
             uploadId={testerId}
             onUpload={handleUploadTesters}
+            disabled={noTesters}
+            footer={
+              <label className="flex items-center gap-2 cursor-pointer pt-1">
+                <Checkbox
+                  checked={noTesters}
+                  onCheckedChange={(v) => {
+                    setNoTesters(!!v);
+                    if (v) setTesterId(undefined);
+                  }}
+                />
+                <span className="text-xs text-muted-foreground select-none">No existing testers — generate from scratch</span>
+              </label>
+            }
           />
         </div>
       </div>

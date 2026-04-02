@@ -8,6 +8,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Properties;
 
@@ -17,9 +19,8 @@ import java.util.Properties;
  */
 public class TesterFileWriter {
 	private static final String JAVA_SUFFIX = ".java";
-	private static final String BACKUP_SUFFIX = ".java.bak";
-	private static final String GENERATED_SUFFIX = "_generated";
 	private static final String TESTER_SUFFIX = "Tester";
+	private static final String ARCHIVE_TIMESTAMP_FORMAT = "yyyyMMdd_HHmmss";
 	private static final String WEIGHT_PLACEHOLDER_PATTERN = "WEIGHT_\\d+";
 	private static final String DEFAULT_WEIGHT = "1.0";
 	private static final String GRADER_METHOD_MARKER = "    public static void grade() {\n";
@@ -44,26 +45,31 @@ public class TesterFileWriter {
 	public Path write(String testerClassName, String originalCode, String generatedCode, List<GeneratedTestCase> cases,
 			Path originalTesterDir, Path outputDir) throws IOException {
 
-		Files.createDirectories(outputDir);
-
-		// Back up original if it exists
-		if (originalTesterDir != null) {
-			Path originalFile = originalTesterDir.resolve(testerClassName + JAVA_SUFFIX);
-			if (Files.exists(originalFile)) {
-				Files.copy(originalFile, originalFile.resolveSibling(testerClassName + BACKUP_SUFFIX),
-						StandardCopyOption.REPLACE_EXISTING);
-			}
-		}
-
-		String generatedClassName = testerClassName + GENERATED_SUFFIX;
 		String parentClass = testerClassName.replace(TESTER_SUFFIX, "");
 
 		// Substitute WEIGHT_N placeholders with actual weights
 		String codeWithWeights = substituteWeights(generatedCode, cases);
 
-		String fileContent = buildFileContent(generatedClassName, parentClass, originalCode, codeWithWeights);
+		String fileContent = buildFileContent(testerClassName, parentClass, originalCode, codeWithWeights);
 
-		Path outputFile = outputDir.resolve(generatedClassName + JAVA_SUFFIX);
+		// Path 1: tester dir exists — archive original, overwrite in place
+		// Path 2: no tester dir — write to outputDir
+		final Path outputFile;
+		if (originalTesterDir != null) {
+			Path orig = originalTesterDir.resolve(testerClassName + JAVA_SUFFIX);
+			if (Files.exists(orig)) {
+				String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern(ARCHIVE_TIMESTAMP_FORMAT));
+				Path archiveDir = originalTesterDir.resolve("archive").resolve(timestamp);
+				Files.createDirectories(archiveDir);
+				Files.copy(orig, archiveDir.resolve(testerClassName + JAVA_SUFFIX),
+						StandardCopyOption.REPLACE_EXISTING);
+			}
+			outputFile = originalTesterDir.resolve(testerClassName + JAVA_SUFFIX);
+		} else {
+			Files.createDirectories(outputDir);
+			outputFile = outputDir.resolve(testerClassName + JAVA_SUFFIX);
+		}
+
 		Files.writeString(outputFile, fileContent);
 		return outputFile;
 	}
@@ -124,12 +130,28 @@ public class TesterFileWriter {
 			} else {
 				// Non-void path — compare result using LLM-provided assertion
 				String expected = tc.expected() != null ? tc.expected().replace("\"", "'") : "";
+				String assertion = tc.assertion();
+				// Safety: if assertion references 'expected' but setup doesn't declare it,
+				// rewrite assertion to use result.toString().equals("<expected>") as fallback
+				boolean setupDeclaresExpected = tc.setup() != null && tc.setup().contains("expected");
+				if (assertion.contains("expected") && !setupDeclaresExpected) {
+					String rawExpected = tc.expected() != null ? tc.expected() : "";
+					if (assertion.contains("expected ==")) {
+						// Primitive comparison: expected == result → result == <value>
+						assertion = "result == " + rawExpected;
+					} else if (assertion.contains("expected.equals(result.toString())")) {
+						assertion = "result.toString().equals(\"" + rawExpected.replace("\"", "\\\"") + "\")";
+					} else {
+						// Generic: expected.equals(result) → result.equals(<value>)
+						assertion = "result.equals(" + rawExpected + ")";
+					}
+				}
 				sb.append("            try {\n");
 				appendSetup(sb, tc.setup());
 				sb.append("                var result = ").append(tc.methodCall()).append(";\n");
 				sb.append("                System.out.println(\"  Expected: ").append(expected).append("\");\n");
 				sb.append("                System.out.println(\"  Actual:   \" + result);\n");
-				sb.append("                if (").append(tc.assertion()).append(") {\n");
+				sb.append("                if (").append(assertion).append(") {\n");
 				sb.append("                    System.out.println(\"  => Passed\");\n");
 				sb.append("                    score += ").append(tc.weight()).append(";\n");
 				sb.append("                } else {\n");
@@ -148,6 +170,12 @@ public class TesterFileWriter {
 
 	private void appendSetup(StringBuilder sb, String setup) {
 		if (setup != null && !setup.isBlank()) {
+			// Safety: skip if setup is English prose rather than Java code
+			// (heuristic: no semicolons and > 60 chars means it's likely a description)
+			if (!setup.contains(";") && setup.length() > 60) {
+				sb.append("                // (setup omitted — non-Java content)\n");
+				return;
+			}
 			for (String line : setup.split(";")) {
 				String trimmed = line.trim();
 				if (!trimmed.isBlank()) {
@@ -205,12 +233,12 @@ public class TesterFileWriter {
 		return result;
 	}
 
-	private String buildFileContent(String generatedClassName, String parentClass, String originalCode,
+	private String buildFileContent(String testerClassName, String parentClass, String originalCode,
 			String generatedCode) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("// Auto-generated by IS442 AutoGrader — review before use\n");
 		sb.append("import java.util.*;\n\n");
-		sb.append("public class ").append(generatedClassName).append(" extends ").append(parentClass).append(" {\n\n");
+		sb.append("public class ").append(testerClassName).append(" extends ").append(parentClass).append(" {\n\n");
 		sb.append("    private static double score = 0;\n");
 		sb.append("    private static String qn = \"").append(parentClass).append("\";\n\n");
 		sb.append("    public static void main(String[] args) {\n");

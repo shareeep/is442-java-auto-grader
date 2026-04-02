@@ -1,0 +1,21 @@
+# Ensure gradlew always uses LF line endings (required for Linux Docker builds)
+gradlew text eol=lf
+
+# General: text files use LF, binaries untouched
+* text=auto
+*.java text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+
+# Binaries
+*.jar binary
+*.class binary
+*.png binary
+*.pdf binary
