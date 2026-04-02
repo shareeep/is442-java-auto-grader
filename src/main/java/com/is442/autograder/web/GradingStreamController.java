@@ -124,7 +124,8 @@ public class GradingStreamController {
 							}
 						});
 
-				// RunResults page can load them automatically because they are written by GradingPipeline
+				// RunResults page can load them automatically because they are written by
+				// GradingPipeline
 				String runId = null;
 				if (Files.isDirectory(outputDir)) {
 					try (Stream<Path> ls = Files.list(outputDir)) {
@@ -158,8 +159,6 @@ public class GradingStreamController {
 
 		return emitter;
 	}
-
-
 
 	private Map<String, Object> buildStudentPayload(StudentSubmission sub) {
 		Map<String, Object> data = new LinkedHashMap<>();
