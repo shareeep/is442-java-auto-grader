@@ -1,17 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Sparkles, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2, X, Plus, RotateCcw, Loader2 } from 'lucide-react';
 import { recommend, execute } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '@/components/ui/toast';
 
 interface GenerationHubProps {
   onNext: () => void;
   onBack: () => void;
+}
+
+const GEN_MESSAGES = [
+  'cooking...',
+  'tomfoolering...',
+  'thinking really hard...',
+  'consulting the oracle...',
+  'writing Java at 3am...',
+  'vibing with the AI...',
+];
+
+function useAnimatedText(active: boolean, msgs: string[], ms = 2000) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (!active) { setIdx(0); return; }
+    const t = setInterval(() => setIdx((i) => (i + 1) % msgs.length), ms);
+    return () => clearInterval(t);
+  }, [active, msgs, ms]);
+  return msgs[idx];
+}
+
+function CustomSuggestionInput({ qid }: { qid: string }) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const addCustomSuggestion = useWizardStore((s) => s.addCustomSuggestion);
+
+  const handleAdd = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    addCustomSuggestion(qid, trimmed);
+    setValue('');
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+        placeholder="Add custom test instruction..."
+        className="h-7 text-xs font-mono bg-card border-border"
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 px-2 text-xs shrink-0"
+        onClick={handleAdd}
+        disabled={!value.trim()}
+      >
+        <Plus size={12} />
+      </Button>
+    </div>
+  );
 }
 
 const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
@@ -21,13 +78,33 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
   const inferredConfig = useWizardStore((s) => s.inferredConfig);
   const selectedQs = useWizardStore((s) => s.selectedQs);
   const recommendations = useWizardStore((s) => s.recommendations);
+  const customSuggestions = useWizardStore((s) => s.customSuggestions);
   const results = useWizardStore((s) => s.results);
   const setSelectedQs = useWizardStore((s) => s.setSelectedQs);
   const setRecommendation = useWizardStore((s) => s.setRecommendation);
+  const deleteRecommendedConcept = useWizardStore((s) => s.deleteRecommendedConcept);
+  const deleteCustomSuggestion = useWizardStore((s) => s.deleteCustomSuggestion);
   const setResult = useWizardStore((s) => s.setResult);
+  const resetQuestion = useWizardStore((s) => s.resetQuestion);
   const reset = useWizardStore((s) => s.reset);
 
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<Record<string, boolean>>({});
+  const [loadingRec, setLoadingRec] = useState<Record<string, boolean>>({});
+
+  // When no tester dir: show all non-parent questions (maxScore = 0 since no testers to count from)
+  // When tester dir provided: only show questions with maxScore > 0 (matched testers)
+  const allQuestions = (inferredConfig?.questions || []).filter((q: any) =>
+    !q.implicitParent && (testerId ? q.maxScore > 0 : true)
+  );
+
+  // Initialize all questions as selected on first load
+  useEffect(() => {
+    if (allQuestions.length > 0 && selectedQs.length === 0) {
+      setSelectedQs(allQuestions.map((q: any) => q.questionId));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inferredConfig]);
 
   const handleStaleSession = (err: any) => {
     if (err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')) {
@@ -38,46 +115,81 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     return false;
   };
 
-  const [generating, setGenerating] = useState<Record<string, boolean>>({});
-  const [loadingRec, setLoadingRec] = useState<string | null>(null);
-
   const toggleQ = (qid: string) => {
     setSelectedQs(
-      selectedQs.includes(qid) ? selectedQs.filter(q => q !== qid) : [...selectedQs, qid]
+      selectedQs.includes(qid) ? selectedQs.filter((q) => q !== qid) : [...selectedQs, qid]
+    );
+  };
+
+  const toggleAll = () => {
+    setSelectedQs(
+      selectedQs.length === allQuestions.length ? [] : allQuestions.map((q: any) => q.questionId)
     );
   };
 
   const getRecommendation = async (qid: string) => {
-    setLoadingRec(qid);
+    setLoadingRec((prev) => ({ ...prev, [qid]: true }));
     try {
       const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
       setRecommendation(qid, rec);
     } catch (err) {
-      if (!handleStaleSession(err)) console.error(err);
+      if (!handleStaleSession(err)) {
+        toast({ title: `Recommendation failed for ${qid}`, description: 'The AI could not analyse this question. Please try again.', variant: 'destructive' });
+      }
     } finally {
-      setLoadingRec(null);
+      setLoadingRec((prev) => { const next = { ...prev }; delete next[qid]; return next; });
     }
   };
 
   const executeGen = async (qid: string) => {
-    setGenerating(prev => ({ ...prev, [qid]: true }));
+    setGenerating((prev) => ({ ...prev, [qid]: true }));
     const question = inferredConfig?.questions?.find((q: any) => q.questionId === qid);
     const rec = recommendations[qid];
+    const customs = customSuggestions[qid] ?? [];
+    const conceptsToCover = rec?.conceptsToCover ?? [];
+    // numCases = one per concept/instruction (min 3, max 5)
+    const totalSuggestions = conceptsToCover.length + customs.length;
+    const numCases = Math.min(5, totalSuggestions > 0 ? totalSuggestions : Math.max(3, rec?.recommendedCount || 3));
 
     try {
       const { data: result } = await execute({
-        body: { examId: examId!, testerId: testerId ?? undefined, templateId: templateId ?? undefined, numCases: rec?.recommendedCount || 3, question: question! },
+        body: {
+          examId: examId!,
+          testerId: testerId ?? undefined,
+          templateId: templateId ?? undefined,
+          numCases,
+          question: question!,
+          conceptsToCover,
+          customSuggestions: customs,
+        },
         throwOnError: true,
       });
       setResult(qid, result);
     } catch (err) {
-      if (!handleStaleSession(err)) console.error(err);
+      if (!handleStaleSession(err)) {
+        toast({ title: `Generation failed for ${qid}`, description: 'The AI returned an invalid response. Click Generate to try again.', variant: 'destructive' });
+      }
     } finally {
-      setGenerating(prev => ({ ...prev, [qid]: false }));
+      setGenerating((prev) => ({ ...prev, [qid]: false }));
     }
   };
 
-  const allQuestions = (inferredConfig?.questions || []).filter((q: any) => q.maxScore > 0);
+  const handleFinalize = () => {
+    if (selectedQs.length === 0) {
+      toast({ title: 'No questions selected', description: 'Select at least one question to finalize.', variant: 'destructive' });
+      return;
+    }
+    const ungenerated = selectedQs.filter((qid) => !results[qid]);
+    if (ungenerated.length > 0) {
+      toast({
+        title: 'Generation incomplete',
+        description: `${ungenerated.join(', ')} ${ungenerated.length === 1 ? 'has' : 'have'} not been generated yet.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    onNext();
+  };
 
   if (sessionError) {
     return (
@@ -98,11 +210,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
           <Button variant="outline" onClick={onBack} className="rounded-md">
             <ChevronLeft size={16} className="mr-1" /> Review
           </Button>
-          <Button
-            onClick={onNext}
-            className="rounded-md px-6 glow-blue"
-            disabled={Object.keys(results).length === 0}
-          >
+          <Button onClick={handleFinalize} className="rounded-md px-6 glow-blue">
             Finalize <ChevronRight size={16} className="ml-1" />
           </Button>
         </div>
@@ -113,7 +221,17 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
         <div className="lg:col-span-1 space-y-3">
           <Card className="border-border bg-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Question Selection</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Question Selection</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAll}
+                  className="text-[10px] font-mono h-6 px-2 text-muted-foreground hover:text-foreground"
+                >
+                  {selectedQs.length === allQuestions.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
               <CardDescription className="text-xs">Select questions to generate</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -145,7 +263,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
               <h3 className="font-bold font-mono text-xs">AI Recommended</h3>
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Click "Get Recommendations" on any question to have the AI suggest key testing concepts.
+              Click "Recommend" to have the AI suggest all testing concepts. Delete any you don't need, add custom instructions, then Generate.
             </p>
           </div>
         </div>
@@ -161,109 +279,240 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
               <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">Select a question from the sidebar to begin.</p>
             </div>
           ) : (
-            selectedQs.map(qid => {
+            selectedQs.map((qid) => {
               const rec = recommendations[qid];
+              const customs = customSuggestions[qid] ?? [];
               const isGenerating = generating[qid];
               const result = results[qid];
+              const isRecLoading = !!loadingRec[qid];
 
               return (
-                <Card key={qid} className="border-border bg-card overflow-hidden animate-in zoom-in-95 duration-300">
-                  <CardHeader className="bg-secondary/50 border-b border-border py-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-primary text-primary-foreground rounded flex items-center justify-center font-mono font-bold text-sm">
-                          {qid}
-                        </div>
-                        <CardTitle className="text-sm">Structured Generation</CardTitle>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-primary font-mono text-xs gap-1.5 hover:bg-primary/10"
-                          onClick={() => getRecommendation(qid)}
-                          disabled={loadingRec === qid || isGenerating}
-                        >
-                          <BrainCircuit size={14} /> {loadingRec === qid ? 'Analyzing...' : 'Recommend'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-8 px-3 rounded gap-1.5 glow-blue text-xs"
-                          onClick={() => executeGen(qid)}
-                          disabled={isGenerating}
-                        >
-                          {isGenerating ? 'Generating...' : <><Play size={12} fill="currentColor" /> Generate</>}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    {rec && (
-                      <div className="mb-4 p-3 bg-accent/5 rounded-md border border-accent/10 animate-in slide-in-from-top-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[9px] uppercase font-mono text-accent tracking-wider">AI Suggestions</p>
-                          <span className="text-[9px] bg-accent/10 px-2 py-0.5 rounded font-mono text-accent">{rec.recommendedCount} cases</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {rec.conceptsToCover.map((c: string, idx: number) => (
-                            <span key={idx} className="text-[10px] px-2 py-0.5 bg-card rounded border border-accent/10 text-muted-foreground font-mono flex items-center gap-1">
-                              <span className="w-1 h-1 bg-accent rounded-full" /> {c}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {isGenerating && (
-                      <div className="space-y-3 py-3 animate-pulse">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-primary font-mono">Processing{rec ? ' (using AI recommendations)' : '...'}</span>
-                          <span className="text-muted-foreground font-mono">Generating...</span>
-                        </div>
-                        <Progress value={undefined} className="h-1.5" />
-                      </div>
-                    )}
-
-                    {result && (
-                      <div className="space-y-3 animate-in fade-in duration-500">
-                        <div className="flex items-center justify-between p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
-                          <div className="flex items-center gap-2 text-xs font-mono font-bold">
-                            <CheckCircle2 size={14} /> Gen-Ready ({result.cases.length} cases)
-                          </div>
-                          <div className="flex items-center gap-3 text-[9px] font-mono">
-                            <span>Strict Schema: ON</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {result.cases.slice(0, 3).map((tc: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-3 p-2.5 bg-secondary rounded-md text-xs border border-border">
-                              <div className="w-5 h-5 bg-card rounded flex items-center justify-center font-mono font-bold text-[9px] border border-border">{idx + 1}</div>
-                              <p className="flex-1 text-muted-foreground">{tc.description}</p>
-                              <span className="font-mono text-[8px] text-muted-foreground uppercase">W:{tc.weight || 1}</span>
-                            </div>
-                          ))}
-                          {result.cases.length > 3 && (
-                            <p className="text-[10px] text-center text-muted-foreground font-mono">+{result.cases.length - 3} more</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {!rec && !isGenerating && !result && (
-                      <div className="flex flex-col items-center justify-center py-8 opacity-30">
-                        <Code size={28} />
-                        <p className="text-xs mt-2 font-mono">Ready</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <QuestionCard
+                  key={qid}
+                  qid={qid}
+                  rec={rec}
+                  customs={customs}
+                  isGenerating={isGenerating}
+                  isRecLoading={isRecLoading}
+                  result={result}
+                  onRecommend={() => getRecommendation(qid)}
+                  onGenerate={() => executeGen(qid)}
+                  onDeleteConcept={(idx) => deleteRecommendedConcept(qid, idx)}
+                  onDeleteCustom={(idx) => deleteCustomSuggestion(qid, idx)}
+                  onReset={() => {
+                    resetQuestion(qid);
+                    setGenerating((prev) => { const next = { ...prev }; delete next[qid]; return next; });
+                    setLoadingRec((prev) => { const next = { ...prev }; delete next[qid]; return next; });
+                  }}
+                />
               );
             })
           )}
         </div>
       </div>
     </div>
+  );
+};
+
+interface QuestionCardProps {
+  qid: string;
+  rec: any;
+  customs: string[];
+  isGenerating: boolean;
+  isRecLoading: boolean;
+  result: any;
+  onRecommend: () => void;
+  onGenerate: () => void;
+  onDeleteConcept: (idx: number) => void;
+  onDeleteCustom: (idx: number) => void;
+  onReset: () => void;
+}
+
+const QuestionCard: React.FC<QuestionCardProps> = ({
+  qid, rec, customs, isGenerating, isRecLoading, result,
+  onRecommend, onGenerate, onDeleteConcept, onDeleteCustom, onReset,
+}) => {
+  const genText = useAnimatedText(isGenerating, GEN_MESSAGES);
+
+  return (
+    <Card className="border-border bg-card overflow-hidden animate-in zoom-in-95 duration-300">
+      <CardHeader className="bg-secondary/50 border-b border-border py-3 px-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-primary text-primary-foreground rounded flex items-center justify-center font-mono font-bold text-sm">
+              {qid}
+            </div>
+            <CardTitle className="text-sm">Structured Generation</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Reset — only enabled when there's something to reset */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-1.5 text-muted-foreground hover:text-destructive"
+              onClick={onReset}
+              title="Reset this question"
+              disabled={isGenerating || isRecLoading || (!rec && customs.length === 0 && !result)}
+            >
+              <RotateCcw size={12} />
+            </Button>
+
+            {/* Recommend — hidden once generated, locked once recommended */}
+            {!result && (
+              rec ? (
+                <span className="text-[10px] font-mono text-accent flex items-center gap-1 px-2">
+                  <BrainCircuit size={12} /> Recommended
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary font-mono text-xs gap-1.5 hover:bg-primary/10"
+                  onClick={onRecommend}
+                  disabled={isRecLoading || isGenerating}
+                >
+                  {isRecLoading
+                    ? <><Loader2 size={12} className="animate-spin" /> Recommending...</>
+                    : <><BrainCircuit size={14} /> Recommend</>
+                  }
+                </Button>
+              )
+            )}
+
+            {/* Generate — muted/locked after first use */}
+            {result ? (
+              <Button
+                size="sm"
+                className="h-8 px-3 rounded gap-1.5 text-xs bg-vsc-green/10 text-vsc-green border border-vsc-green/20 cursor-default"
+                disabled
+              >
+                <CheckCircle2 size={12} /> Generated
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="h-8 px-3 rounded gap-1.5 glow-blue text-xs"
+                onClick={onGenerate}
+                disabled={isGenerating || isRecLoading}
+              >
+                <Play size={12} fill="currentColor" /> Generate
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 space-y-3">
+        {/* AI suggestions + custom suggestions */}
+        {rec ? (
+          <div className="p-3 bg-accent/5 rounded-md border border-accent/10 animate-in slide-in-from-top-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[9px] uppercase font-mono text-accent tracking-wider">AI Suggestions</p>
+              <span className="text-[9px] bg-accent/10 px-2 py-0.5 rounded font-mono text-accent">
+                {(rec.conceptsToCover?.length ?? 0) + customs.length} concepts
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {rec.conceptsToCover.map((c: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="text-[10px] px-2 py-0.5 bg-card rounded border border-accent/10 text-muted-foreground font-mono flex items-center gap-1 group"
+                >
+                  <span className="w-1 h-1 bg-accent rounded-full shrink-0" />
+                  {c}
+                  <button
+                    onClick={() => onDeleteConcept(idx)}
+                    className="ml-0.5 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+              {customs.map((c, idx) => (
+                <span
+                  key={`custom-${idx}`}
+                  className="text-[10px] px-2 py-0.5 bg-primary/5 rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
+                >
+                  <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                  Custom #{idx + 1} — {c}
+                  <button
+                    onClick={() => onDeleteCustom(idx)}
+                    className="ml-0.5 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <CustomSuggestionInput qid={qid} />
+          </div>
+        ) : (
+          <div className="p-3 bg-secondary/50 rounded-md border border-border">
+            <p className="text-[9px] uppercase font-mono text-muted-foreground tracking-wider mb-1.5">Custom Instructions</p>
+            {customs.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {customs.map((c, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[10px] px-2 py-0.5 bg-card rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
+                  >
+                    <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                    Custom #{idx + 1} — {c}
+                    <button
+                      onClick={() => onDeleteCustom(idx)}
+                      className="ml-0.5 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                    >
+                      <X size={9} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <CustomSuggestionInput qid={qid} />
+          </div>
+        )}
+
+        {/* Loading progress */}
+        {isGenerating && (
+          <div className="space-y-3 py-2 animate-pulse">
+            <div className="flex justify-between text-xs">
+              <span className="text-primary font-mono">{genText}</span>
+            </div>
+            <Progress value={undefined} className="h-1.5" />
+          </div>
+        )}
+
+        {/* Result preview */}
+        {result && (
+          <div className="space-y-3 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold">
+                <CheckCircle2 size={14} /> Gen-Ready ({result.cases.length} cases)
+              </div>
+              <div className="text-[9px] font-mono">Strict Schema: ON</div>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {result.cases.slice(0, 3).map((tc: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-3 p-2.5 bg-secondary rounded-md text-xs border border-border">
+                  <div className="w-5 h-5 bg-card rounded flex items-center justify-center font-mono font-bold text-[9px] border border-border">{idx + 1}</div>
+                  <p className="flex-1 text-muted-foreground">{tc.description}</p>
+                </div>
+              ))}
+              {result.cases.length > 3 && (
+                <p className="text-[10px] text-center text-muted-foreground font-mono">+{result.cases.length - 3} more</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!rec && !isGenerating && !result && customs.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-6 opacity-30">
+            <Code size={28} />
+            <p className="text-xs mt-2 font-mono">Ready</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

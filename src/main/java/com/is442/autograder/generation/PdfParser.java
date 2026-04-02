@@ -34,9 +34,6 @@ public class PdfParser {
 	private static final String DYNAMIC_FILENAME_PREFIX = "exam_";
 	private static final String PDF_EXTENSION = ".pdf";
 	private static final DateTimeFormatter DYNAMIC_FILENAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-	private static final Pattern SECTION_PATTERN_TEMPLATE = Pattern
-			.compile("(?i)(##\\s*Question\\s*%s)(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.DOTALL);
-
 	private final DoclingServeApi api;
 	private final String doclingServeUrl;
 
@@ -86,14 +83,34 @@ public class PdfParser {
 	 * Extract question section from already-parsed markdown (avoids re-parsing).
 	 */
 	public String extractQuestionSectionFromMarkdown(String fullMarkdown, String questionId) {
-		String normalizedId = questionId.replace("Q", "").replaceAll("[a-z]$", "");
-		Pattern p = Pattern.compile(String.format(SECTION_PATTERN_TEMPLATE.pattern(), normalizedId), Pattern.DOTALL);
-		Matcher m = p.matcher(fullMarkdown);
+		// Strip Q prefix: Q2a → 2a, Q10b → 10b
+		String fullId = questionId.replace("Q", "");
+		// Parent-only id: 2a → 2, 10b → 10
+		String parentId = fullId.replaceAll("[a-z]$", "");
+		boolean hasSub = !fullId.equals(parentId);
 
-		if (m.find()) {
-			String section = m.group(1) + m.group(2).trim();
-			logger.debug("[PDF] Extracted section  questionId={} chars={}", questionId, section.length());
+		// 1. Try exact match first (e.g. ## Question 2a — with word boundary to avoid 2a matching 2ab)
+		Pattern exactPattern = Pattern.compile(
+				String.format("(?i)(##\\s*Question\\s*%s)\\b(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.quote(fullId)),
+				Pattern.DOTALL);
+		Matcher exactMatcher = exactPattern.matcher(fullMarkdown);
+		if (exactMatcher.find()) {
+			String section = exactMatcher.group(1) + exactMatcher.group(2).trim();
+			logger.debug("[PDF] Extracted exact section  questionId={} chars={}", questionId, section.length());
 			return section;
+		}
+
+		// 2. Fall back to parent section (e.g. ## Question 2) only if this is a sub-question
+		if (hasSub) {
+			Pattern parentPattern = Pattern.compile(
+					String.format("(?i)(##\\s*Question\\s*%s)\\b(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.quote(parentId)),
+					Pattern.DOTALL);
+			Matcher parentMatcher = parentPattern.matcher(fullMarkdown);
+			if (parentMatcher.find()) {
+				String section = parentMatcher.group(1) + parentMatcher.group(2).trim();
+				logger.debug("[PDF] Extracted parent section for {}  chars={}", questionId, section.length());
+				return section;
+			}
 		}
 
 		logger.warn("[PDF] Section header not found for {}  falling back to full markdown ({} chars)", questionId,

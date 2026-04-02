@@ -6,7 +6,7 @@ WORKDIR /app
 COPY gradlew gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
-RUN chmod +x gradlew
+RUN sed -i 's/\r//' gradlew && chmod +x gradlew
 # Pre-download dependencies
 RUN ./gradlew dependencies --no-daemon || true
 

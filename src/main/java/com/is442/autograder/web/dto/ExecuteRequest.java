@@ -2,6 +2,8 @@ package com.is442.autograder.web.dto;
 
 import com.is442.autograder.model.InferredQuestionConfig;
 
+import java.util.List;
+
 public class ExecuteRequest {
 
 	private String examId;
@@ -9,6 +11,8 @@ public class ExecuteRequest {
 	private String templateId;
 	private int numCases;
 	private InferredQuestionConfig question;
+	private List<String> conceptsToCover;
+	private List<String> customSuggestions;
 
 	public String getExamId() {
 		return examId;
@@ -43,5 +47,19 @@ public class ExecuteRequest {
 	}
 	public void setQuestion(InferredQuestionConfig question) {
 		this.question = question;
+	}
+
+	public List<String> getConceptsToCover() {
+		return conceptsToCover;
+	}
+	public void setConceptsToCover(List<String> conceptsToCover) {
+		this.conceptsToCover = conceptsToCover;
+	}
+
+	public List<String> getCustomSuggestions() {
+		return customSuggestions;
+	}
+	public void setCustomSuggestions(List<String> customSuggestions) {
+		this.customSuggestions = customSuggestions;
 	}
 }
