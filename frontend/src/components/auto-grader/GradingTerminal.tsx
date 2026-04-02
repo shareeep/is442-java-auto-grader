@@ -177,7 +177,11 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
       <div className="flex items-center justify-between px-4 py-3 bg-vsc-panel">
         <div className="flex items-center gap-3">
           <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-400" />
+            <div
+              onClick={!done && onCancel ? handleCancel : onClose}
+              className="w-3 h-3 rounded-full bg-red-400 cursor-pointer hover:bg-red-300 transition-colors"
+              title={!done && onCancel ? 'Cancel grading' : 'Close terminal'}
+            />
             <div className="w-3 h-3 rounded-full bg-yellow-400" />
             <div className="w-3 h-3 rounded-full bg-green-400" />
           </div>
