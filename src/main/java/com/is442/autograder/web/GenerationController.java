@@ -232,7 +232,9 @@ public class GenerationController {
 		}
 
 		List<String> conceptsToCover = request.getConceptsToCover() != null ? request.getConceptsToCover() : List.of();
-		List<String> customSuggestions = request.getCustomSuggestions() != null ? request.getCustomSuggestions() : List.of();
+		List<String> customSuggestions = request.getCustomSuggestions() != null
+				? request.getCustomSuggestions()
+				: List.of();
 
 		try {
 			GenerationResult result = generationService.generateForInferredQuestion(iqc, examContext, existingTester,

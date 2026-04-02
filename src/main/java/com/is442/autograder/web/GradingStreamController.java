@@ -59,8 +59,14 @@ public class GradingStreamController {
 		String sessionId = UUID.randomUUID().toString();
 		ACTIVE_SESSIONS.put(sessionId, emitter);
 
-		emitter.onCompletion(() -> { ACTIVE_SESSIONS.remove(sessionId); ACTIVE_PIPELINES.remove(sessionId); });
-		emitter.onTimeout(() -> { ACTIVE_SESSIONS.remove(sessionId); ACTIVE_PIPELINES.remove(sessionId); });
+		emitter.onCompletion(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
+		emitter.onTimeout(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
 
 		// Save uploaded files to temp dirs
 		Path submissionsDir = Files.createTempDirectory("autograder-stream-submissions-");
@@ -174,7 +180,8 @@ public class GradingStreamController {
 		SseEmitter emitter = ACTIVE_SESSIONS.get(sessionId);
 		if (emitter != null) {
 			try {
-				emitter.send(SseEmitter.event().name("status").data(Map.of("phase", "cancelled", "message", "Grading cancelled.")));
+				emitter.send(SseEmitter.event().name("status")
+						.data(Map.of("phase", "cancelled", "message", "Grading cancelled.")));
 			} catch (IOException e) {
 				logger.warn("Could not send cancel event for session {}", sessionId);
 			}

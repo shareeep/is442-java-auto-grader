@@ -62,7 +62,8 @@ public class TestGenerationService {
 	 * @return generation result containing code and compile status
 	 */
 	public GenerationResult generateForQuestion(QuestionConfig question, String examContext, Path existingTesterFile,
-			int numCases, Path templateDir, List<String> conceptsToCover, List<String> customSuggestions) throws IOException, InterruptedException {
+			int numCases, Path templateDir, List<String> conceptsToCover, List<String> customSuggestions)
+			throws IOException, InterruptedException {
 
 		logger.info("[GEN] Starting generation  questionId={} numCases={}", question.getQuestionId(), numCases);
 
@@ -77,7 +78,8 @@ public class TestGenerationService {
 		}
 
 		// 3. Build user prompt and call LLM
-		String prompt = buildGeneratePrompt(question, examContext, existingCode, numCases, additionalContext, conceptsToCover, customSuggestions);
+		String prompt = buildGeneratePrompt(question, examContext, existingCode, numCases, additionalContext,
+				conceptsToCover, customSuggestions);
 		logger.info("[GEN] Calling AI  questionId={}", question.getQuestionId());
 
 		String rawJson;
@@ -109,13 +111,15 @@ public class TestGenerationService {
 	 * analyze-setup flow). Converts to QuestionConfig and delegates.
 	 */
 	public GenerationResult generateForInferredQuestion(InferredQuestionConfig iqc, String examContext,
-			Path existingTesterFile, int numCases, Path templateDir, List<String> conceptsToCover, List<String> customSuggestions) throws IOException, InterruptedException {
+			Path existingTesterFile, int numCases, Path templateDir, List<String> conceptsToCover,
+			List<String> customSuggestions) throws IOException, InterruptedException {
 		QuestionConfig qc = new QuestionConfig(iqc.getQuestionId(),
 				iqc.getFolder() != null ? iqc.getFolder() : iqc.getQuestionId(),
 				iqc.getTester() != null ? iqc.getTester() : iqc.getQuestionId() + "Tester", iqc.getMaxScore(),
 				iqc.getDependencyFolder(),
 				iqc.getDependencyFiles() != null ? iqc.getDependencyFiles() : Collections.emptyList());
-		return generateForQuestion(qc, examContext, existingTesterFile, numCases, templateDir, conceptsToCover, customSuggestions);
+		return generateForQuestion(qc, examContext, existingTesterFile, numCases, templateDir, conceptsToCover,
+				customSuggestions);
 	}
 
 	/**
@@ -172,8 +176,10 @@ public class TestGenerationService {
 		}
 
 		sb.append("Generate exactly ").append(numCases).append(" test cases.\n");
-		sb.append("IMPORTANT: Every 'description' must be a specific meaningful name — never 'Generated Test Case N' or any numbered placeholder.\n");
-		sb.append("REMINDER: 'setup' must be VALID JAVA CODE ONLY (no English prose). 'assertion' must be self-contained using only the variable 'result' — do NOT reference a variable named 'expected' (it does not exist).\n");
+		sb.append(
+				"IMPORTANT: Every 'description' must be a specific meaningful name — never 'Generated Test Case N' or any numbered placeholder.\n");
+		sb.append(
+				"REMINDER: 'setup' must be VALID JAVA CODE ONLY (no English prose). 'assertion' must be self-contained using only the variable 'result' — do NOT reference a variable named 'expected' (it does not exist).\n");
 		sb.append("Return ONLY a valid JSON array with ").append(numCases).append(" elements.");
 		return sb.toString();
 	}
@@ -241,8 +247,11 @@ public class TestGenerationService {
 			});
 			List<String> concepts = m.get("conceptsToCover") instanceof List<?> l ? (List<String>) l : List.of();
 			concepts = concepts.size() > 5 ? concepts.subList(0, 5) : concepts;
-			int count = !concepts.isEmpty() ? concepts.size()
-					: m.get("recommendedCount") instanceof Number n ? Math.min(5, n.intValue()) : DEFAULT_RECOMMENDED_COUNT;
+			int count = !concepts.isEmpty()
+					? concepts.size()
+					: m.get("recommendedCount") instanceof Number n
+							? Math.min(5, n.intValue())
+							: DEFAULT_RECOMMENDED_COUNT;
 			List<String> existingConcepts = m.get("existingConcepts") instanceof List<?> l
 					? (List<String>) l
 					: List.of();

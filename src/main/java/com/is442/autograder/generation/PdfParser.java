@@ -89,7 +89,8 @@ public class PdfParser {
 		String parentId = fullId.replaceAll("[a-z]$", "");
 		boolean hasSub = !fullId.equals(parentId);
 
-		// 1. Try exact match first (e.g. ## Question 2a — with word boundary to avoid 2a matching 2ab)
+		// 1. Try exact match first (e.g. ## Question 2a — with word boundary to avoid
+		// 2a matching 2ab)
 		Pattern exactPattern = Pattern.compile(
 				String.format("(?i)(##\\s*Question\\s*%s)\\b(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.quote(fullId)),
 				Pattern.DOTALL);
@@ -100,10 +101,11 @@ public class PdfParser {
 			return section;
 		}
 
-		// 2. Fall back to parent section (e.g. ## Question 2) only if this is a sub-question
+		// 2. Fall back to parent section (e.g. ## Question 2) only if this is a
+		// sub-question
 		if (hasSub) {
-			Pattern parentPattern = Pattern.compile(
-					String.format("(?i)(##\\s*Question\\s*%s)\\b(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.quote(parentId)),
+			Pattern parentPattern = Pattern.compile(String
+					.format("(?i)(##\\s*Question\\s*%s)\\b(.*?)(?=\\n##\\s*Question|\\Z)", Pattern.quote(parentId)),
 					Pattern.DOTALL);
 			Matcher parentMatcher = parentPattern.matcher(fullMarkdown);
 			if (parentMatcher.find()) {
