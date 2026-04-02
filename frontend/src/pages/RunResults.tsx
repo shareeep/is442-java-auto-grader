@@ -1,17 +1,36 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, Download, Eye, ChevronRight, ChevronDown,
+  ArrowLeft, Download, Eye, ChevronRight, ChevronDown, ChevronUp,
   FileCode2, Loader2, AlertCircle, User, CheckCircle2,
-  TriangleAlert, X, File as FileIcon, Plus, MessageSquare,
+  TriangleAlert, X, File as FileIcon, Plus, MessageSquare, Clock,
 } from 'lucide-react';
 import { getStudentCode } from '../generated/sdk.gen';
 import { getResultsOptions } from '../generated/@tanstack/react-query.gen';
 import { formatRunTimestamp } from '../lib/utils';
 
-interface QResult { questionId: string; score: number; maxScore: number; }
-interface Anomaly { severity: string; description: string; }
+interface QResult {
+  questionId: string;
+  score: number;
+  maxScore: number;
+  compiled: boolean;
+  executed: boolean;
+  output: string;
+  errorMessage: string;
+}
+
+interface CompileError { line: number; message: string; }
+
+function parseCompileErrors(errorMessage: string): CompileError[] {
+  const errors: CompileError[] = [];
+  for (const line of (errorMessage ?? '').split('\n')) {
+    const m = line.match(/^[^:]+\.java:(\d+):\s*(?:error|warning):\s*(.+)/);
+    if (m) errors.push({ line: parseInt(m[1], 10), message: m[2].trim() });
+  }
+  return errors;
+}
+interface Anomaly { severity: string; description: string; questionId?: string; }
 interface Student {
   username: string; name: string; displayName: string;
   totalScore: number; maxPossibleScore: number;
@@ -25,9 +44,10 @@ interface CodeViewerProps {
   code: string;
   comments: Record<number, LineComment[]>;
   onCommentsChange: (updater: (prev: Record<number, LineComment[]>) => Record<number, LineComment[]>) => void;
+  compileErrors?: CompileError[];
 }
 
-const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChange }) => {
+const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChange, compileErrors = [] }) => {
   const [htmlLines, setHtmlLines] = useState<string[]>([]);
   const [addingComment, setAddingComment] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
@@ -115,23 +135,31 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChang
           const lineComments = comments[ln] ?? [];
           const isAdding = addingComment === ln;
           const isHov = hovered === ln;
+          const errorForLine = compileErrors.find(e => e.line === ln);
+          const isErrorLine = !!errorForLine;
           return (
             <div key={i}>
               <div
-                className={`flex items-stretch group ${isHov || isAdding ? 'bg-white/[0.03]' : ''}`}
+                className={`flex items-stretch group ${
+                  isErrorLine ? 'bg-vsc-red/[0.06]' : isHov || isAdding ? 'bg-white/[0.03]' : ''
+                }`}
                 onMouseEnter={() => setHovered(ln)}
                 onMouseLeave={() => setHovered(null)}
               >
                 {/* Gutter */}
-                <div className="w-14 shrink-0 flex items-center justify-end gap-1.5 pr-3 select-none">
-                  <button
-                    onClick={() => { setAddingComment(ln); setDraft(''); }}
-                    className={`transition-all ${isHov || isAdding ? 'opacity-100' : 'opacity-0'} text-[#e8e3d5] hover:scale-110`}
-                    title="Add comment"
-                  >
-                    <Plus size={10} />
-                  </button>
-                  <span className="text-[#3d4451] text-right text-[12px] font-mono leading-6 min-w-[2ch]">{ln}</span>
+                <div className={`w-14 shrink-0 flex items-center justify-end gap-1.5 pr-3 select-none ${isErrorLine ? 'border-l-2 border-vsc-red' : ''}`}>
+                  {isErrorLine ? (
+                    <AlertCircle size={10} className="text-vsc-red shrink-0" />
+                  ) : (
+                    <button
+                      onClick={() => { setAddingComment(ln); setDraft(''); }}
+                      className={`transition-all ${isHov || isAdding ? 'opacity-100' : 'opacity-0'} text-[#e8e3d5] hover:scale-110`}
+                      title="Add comment"
+                    >
+                      <Plus size={10} />
+                    </button>
+                  )}
+                  <span className={`text-right text-[12px] font-mono leading-6 min-w-[2ch] ${isErrorLine ? 'text-vsc-red/60' : 'text-[#3d4451]'}`}>{ln}</span>
                 </div>
                 {/* Line content */}
                 <div
@@ -147,6 +175,13 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChang
                   </div>
                 )}
               </div>
+
+              {/* Compile error inline annotation */}
+              {isErrorLine && errorForLine && (
+                <div className="ml-14 mr-4 my-1 rounded border border-vsc-red/30 bg-vsc-red/10 px-3 py-1.5 text-[11px] font-mono text-vsc-red leading-relaxed">
+                  <span className="opacity-60">error: </span>{errorForLine.message}
+                </div>
+              )}
 
               {/* Existing comments */}
               {lineComments.map((c, ci) => (
@@ -221,6 +256,117 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChang
   );
 };
 
+// ── Test output panel (bottom of center pane) ─────────────────────────────
+interface TestOutputPanelProps { qResult: QResult; }
+
+const TestOutputPanel: React.FC<TestOutputPanelProps> = ({ qResult }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(200);
+  const isDragging = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = dragStartY.current - e.clientY;
+      setPanelHeight(Math.max(80, Math.min(600, dragStartHeight.current + delta)));
+    };
+    const onUp = () => { isDragging.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  // compiled/executed are undefined on runs made before this feature was added — hide panel entirely
+  if (qResult.compiled === undefined) return null;
+
+  const rawContent = qResult.compiled === false ? qResult.errorMessage : qResult.output;
+  const canExpand = !!rawContent?.trim();
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = panelHeight;
+    e.preventDefault();
+    if (!expanded && canExpand) setExpanded(true);
+  };
+
+  const passedCount = (qResult.output ?? '').split('\n').filter(l => l.trim() === 'Passed').length;
+  const totalTests = Math.round(qResult.maxScore);
+  const earnedScore = Math.round(qResult.score);
+
+  let statusColor: string;
+  let statusText: string;
+  let StatusIcon: React.ElementType;
+
+  if (qResult.compiled === false) {
+    statusColor = 'text-vsc-red';
+    statusText = 'Compilation failed — no tests run';
+    StatusIcon = AlertCircle;
+  } else if (qResult.executed === false) {
+    statusColor = 'text-vsc-orange';
+    statusText = `Execution timed out${earnedScore > 0 ? ` · partial score ${earnedScore}/${totalTests}` : ''}`;
+    StatusIcon = Clock;
+  } else if (qResult.errorMessage?.trim()) {
+    statusColor = 'text-vsc-red';
+    const passed = passedCount > 0 ? passedCount : earnedScore;
+    statusText = `Runtime error · ${passed}/${totalTests} test${totalTests !== 1 ? 's' : ''} passed`;
+    StatusIcon = TriangleAlert;
+  } else if (earnedScore === totalTests && totalTests > 0) {
+    statusColor = 'text-vsc-green';
+    statusText = `All ${totalTests} test${totalTests !== 1 ? 's' : ''} passed`;
+    StatusIcon = CheckCircle2;
+  } else {
+    const passed = passedCount > 0 ? passedCount : earnedScore;
+    statusColor = 'text-vsc-yellow';
+    statusText = `${passed}/${totalTests} test${totalTests !== 1 ? 's' : ''} passed`;
+    StatusIcon = TriangleAlert;
+  }
+
+  return (
+    <div className="shrink-0 bg-[#161b22] flex flex-col">
+      {/* Drag handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="h-[5px] cursor-ns-resize group flex items-center justify-center border-t border-white/[0.06] hover:border-white/20 transition-colors"
+      >
+        <div className="w-8 h-[2px] rounded-full bg-white/[0.12] group-hover:bg-white/30 transition-colors" />
+      </div>
+      {/* Header */}
+      <button
+        className="w-full flex items-center gap-2 px-4 py-2 text-xs hover:bg-white/[0.03] transition-colors disabled:cursor-default"
+        onClick={() => canExpand && setExpanded(v => !v)}
+        disabled={!canExpand}
+      >
+        <span className={`flex items-center gap-1.5 font-medium ${statusColor}`}>
+          <StatusIcon size={11} />
+          {statusText}
+        </span>
+        {canExpand && (
+          <span className="ml-auto text-[#4d5566]">
+            {expanded ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+          </span>
+        )}
+      </button>
+      {/* Content */}
+      {expanded && canExpand && (
+        <div
+          className="overflow-auto border-t border-white/[0.06]"
+          style={{ height: panelHeight }}
+        >
+          <pre className="px-4 py-3 text-[11px] font-mono text-[#8b949e] whitespace-pre-wrap leading-relaxed">
+            {rawContent?.trim()}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Main page ──────────────────────────────────────────────────────────────
 const RunResults: React.FC = () => {
   const { runId } = useParams<{ runId: string }>();
@@ -279,6 +425,16 @@ const RunResults: React.FC = () => {
   };
 
   const activeTab = openTabs.find(t => t.key === activeTabKey) ?? null;
+
+  // Find the QResult that corresponds to the currently active tab (for annotations + test output panel)
+  const activeQResult = useMemo(() => {
+    if (!activeTabKey) return null;
+    const [username, filepath] = activeTabKey.split('::');
+    const student = students.find(s => s.username === username);
+    if (!student) return null;
+    const filename = filepath.split(/[\\/]/).pop()?.replace(/\.java$/i, '').toLowerCase() ?? '';
+    return student.results.find(r => r.questionId.toLowerCase() === filename) ?? null;
+  }, [activeTabKey, students]);
 
   // Auto-expand the matching student in the Scores panel when the active file tab changes
   useEffect(() => {
@@ -442,16 +598,24 @@ const RunResults: React.FC = () => {
 
           {/* Code viewer or empty state */}
           {activeTab ? (
-            <CodeViewer
-              code={activeTab.content}
-              comments={allComments[activeTab.key] ?? {}}
-              onCommentsChange={updater =>
-                setAllComments(prev => ({
-                  ...prev,
-                  [activeTab.key]: updater(prev[activeTab.key] ?? {}),
-                }))
-              }
-            />
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+              <CodeViewer
+                code={activeTab.content}
+                comments={allComments[activeTab.key] ?? {}}
+                onCommentsChange={updater =>
+                  setAllComments(prev => ({
+                    ...prev,
+                    [activeTab.key]: updater(prev[activeTab.key] ?? {}),
+                  }))
+                }
+                compileErrors={
+                  activeQResult?.compiled === false
+                    ? parseCompileErrors(activeQResult.errorMessage)
+                    : []
+                }
+              />
+              {activeQResult && <TestOutputPanel qResult={activeQResult} />}
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center bg-[#0d1117]">
               <FileIcon size={32} className="text-[#3d4451]" />
@@ -500,47 +664,66 @@ const RunResults: React.FC = () => {
                     </div>
                   </button>
 
-                  {isOpen && (
-                    <div className="px-3 pb-3 space-y-1.5">
-                      {s.results.map(r => {
-                        const qPct = r.maxScore > 0 ? r.score / r.maxScore : 0;
-                        const qid = r.questionId.toLowerCase();
-                        const activeFilename = activeTabKey?.split('::')[1]?.split(/[\\/]/).pop()?.replace(/\.java$/i, '').toLowerCase() ?? '';
-                        const isActiveQ = expandedScore === s.username && activeFilename === qid;
-                        return (
-                          <div
-                            key={r.questionId}
-                            className={`flex items-center justify-between text-xs gap-2 rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isActiveQ ? 'bg-white/[0.07] border-l-2 border-[#e8e3d5]/60 pl-2' : ''}`}
-                          >
-                            <span className={`font-mono w-8 shrink-0 ${isActiveQ ? 'text-[#e8e3d5]' : 'text-[#4d5566]'}`}>{r.questionId}</span>
-                            <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${qPct === 1 ? 'bg-vsc-green' : qPct > 0 ? 'bg-[#e8e3d5]' : 'bg-vsc-red/40'}`}
-                                style={{ width: `${qPct * 100}%` }}
-                              />
-                            </div>
-                            <span className={`font-mono text-right w-10 shrink-0 ${qPct === 1 ? 'text-vsc-green' : qPct > 0 ? 'text-[#c9d1d9]' : 'text-vsc-red'}`}>
-                              {r.score}/{r.maxScore}
-                            </span>
+                  {isOpen && (() => {
+                    const generalAnomalies = s.anomalies.filter(a => !a.questionId);
+                    const anomalyByQ = s.anomalies.reduce<Record<string, Anomaly[]>>((acc, a) => {
+                      if (a.questionId) {
+                        (acc[a.questionId] ??= []).push(a);
+                      }
+                      return acc;
+                    }, {});
+                    const AnomalyRow = ({ a }: { a: Anomaly }) => (
+                      <div className="flex items-start gap-1.5 text-[10px]">
+                        {a.severity === 'ERROR'
+                          ? <AlertCircle size={10} className="text-vsc-red shrink-0 mt-0.5" />
+                          : a.severity === 'WARNING'
+                            ? <TriangleAlert size={10} className="text-vsc-yellow shrink-0 mt-0.5" />
+                            : <CheckCircle2 size={10} className="text-[#4d5566] shrink-0 mt-0.5" />}
+                        <span className="text-[#8b949e] leading-tight">{a.description}</span>
+                      </div>
+                    );
+                    return (
+                      <div className="px-3 pb-3 space-y-1.5">
+                        {/* General (non-question) anomalies at top */}
+                        {generalAnomalies.length > 0 && (
+                          <div className="space-y-1 pb-1.5 mb-0.5 border-b border-white/[0.06]">
+                            {generalAnomalies.map((a, i) => <AnomalyRow key={i} a={a} />)}
                           </div>
-                        );
-                      })}
-                      {s.anomalies.length > 0 && (
-                        <div className="mt-2 space-y-1 pt-2 border-t border-white/[0.06]">
-                          {s.anomalies.map((a, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[10px]">
-                              {a.severity === 'ERROR'
-                                ? <AlertCircle size={10} className="text-vsc-red shrink-0 mt-0.5" />
-                                : a.severity === 'WARNING'
-                                  ? <TriangleAlert size={10} className="text-vsc-yellow shrink-0 mt-0.5" />
-                                  : <CheckCircle2 size={10} className="text-[#4d5566] shrink-0 mt-0.5" />}
-                              <span className="text-[#8b949e] leading-tight">{a.description}</span>
+                        )}
+                        {/* Question rows with their own anomalies underneath */}
+                        {s.results.map(r => {
+                          const qPct = r.maxScore > 0 ? r.score / r.maxScore : 0;
+                          const qid = r.questionId.toLowerCase();
+                          const activeFilename = activeTabKey?.split('::')[1]?.split(/[\\/]/).pop()?.replace(/\.java$/i, '').toLowerCase() ?? '';
+                          const isActiveQ = expandedScore === s.username && activeFilename === qid;
+                          const qAnomalies = anomalyByQ[r.questionId] ?? [];
+                          return (
+                            <div key={r.questionId}>
+                              <div
+                                className={`flex items-center justify-between text-xs gap-2 rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isActiveQ ? 'bg-white/[0.07] border-l-2 border-[#e8e3d5]/60 pl-2' : ''}`}
+                              >
+                                <span className={`font-mono w-8 shrink-0 ${isActiveQ ? 'text-[#e8e3d5]' : 'text-[#4d5566]'}`}>{r.questionId}</span>
+                                <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${qPct === 1 ? 'bg-vsc-green' : qPct > 0 ? 'bg-[#e8e3d5]' : 'bg-vsc-red/40'}`}
+                                    style={{ width: `${qPct * 100}%` }}
+                                  />
+                                </div>
+                                <span className={`font-mono text-right w-10 shrink-0 ${qPct === 1 ? 'text-vsc-green' : qPct > 0 ? 'text-[#c9d1d9]' : 'text-vsc-red'}`}>
+                                  {r.score}/{r.maxScore}
+                                </span>
+                              </div>
+                              {qAnomalies.length > 0 && (
+                                <div className="ml-2 mt-0.5 mb-1 space-y-0.5 pl-2 border-l border-white/[0.08]">
+                                  {qAnomalies.map((a, i) => <AnomalyRow key={i} a={a} />)}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
