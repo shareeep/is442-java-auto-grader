@@ -19,7 +19,7 @@ This synthesis consolidates content from the following docs (some now deleted):
 | `[old] ideas-for-swe-style-new-test-case-generation.md` | 3 approaches for test generation | Still exists (marked old) |
 | `TESTCASES.md` | 18 test submissions (6 original + 12 generated) | Still exists |
 | `README.md` (docs) | Docs index (2 lines) | Minimal |
-| `README.md` (root) | Project README | Partially stale (missing web UI, AI features) |
+| `README.md` (root) | Project README | Added missing web UI, AI features |
 
 ---
 

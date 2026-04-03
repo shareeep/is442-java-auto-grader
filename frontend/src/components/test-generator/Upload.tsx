@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
+import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload, ChevronRight } from 'lucide-react';
 import { uploadTemplate } from '@/api/uploadTemplate';
 import { analyzeSetup, preparsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
@@ -96,7 +95,7 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
                 : 'Click to select & upload folder'}
             </p>
             {uploadId && (
-              <p className="text-[10px] text-vsc-green mt-0.5">{fileCount > 0 ? `${fileCount} files uploaded ✓` : 'Uploaded ✓'}</p>
+              <p className="text-xs text-vsc-green mt-0.5">{fileCount > 0 ? `${fileCount} files uploaded ✓` : 'Uploaded ✓'}</p>
             )}
           </div>
           {!uploadId && !uploading && (
@@ -113,7 +112,7 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
         {footer}
       </CardContent>
     </Card>
@@ -129,44 +128,42 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   const setTesterId = useWizardStore((s) => s.setTesterId);
   const setInferredConfig = useWizardStore((s) => s.setInferredConfig);
 
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parsingPdf, setParsingPdf] = useState(false);
+  const [pdfDragging, setPdfDragging] = useState(false);
   const [inferring, setInferring] = useState(false);
   const [inferError, setInferError] = useState<string | null>(null);
-  const [noTesters, setNoTesters] = useState(false);
 
-  const allReady = !!examId && !!templateId && (!!testerId || noTesters) && !parsingPdf;
-  const completedCount = [examId, templateId, testerId || noTesters].filter(Boolean).length;
+  const allReady = !!examId && !!templateId && !parsingPdf;
+
+  const uploadPdfFile = async (selectedFile: File) => {
+    setFile(selectedFile);
+    setUploadError(null);
+    setUploading(true);
+    setParsingPdf(false);
+    try {
+      const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
+      setExamId(uploaded!['examId']);
+      setParsingPdf(true);
+      preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
+        if ((result as any).status === 'error') console.warn('PDF parsing failed, will retry on inference');
+        setParsingPdf(false);
+      }).catch(err => {
+        console.warn('Background PDF parse failed:', err);
+        setParsingPdf(false);
+      });
+    } catch (err: any) {
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setUploadError(null);
-      setUploading(true);
-      setParsingPdf(false);
-      try {
-        const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
-        setExamId(uploaded!['examId']);
-
-        setParsingPdf(true);
-        preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
-          if ((result as any).status === 'error') {
-            console.warn('PDF parsing failed, will retry on inference');
-          }
-          setParsingPdf(false);
-        }).catch(err => {
-          console.warn('Background PDF parse failed:', err);
-          setParsingPdf(false);
-        });
-      } catch (err: any) {
-        setUploadError(err.message);
-      } finally {
-        setUploading(false);
-      }
-    }
+    if (e.target.files && e.target.files[0]) await uploadPdfFile(e.target.files[0]);
   };
 
   const handleUploadTemplate = async (files: File[]) => {
@@ -198,7 +195,26 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   };
 
   return (
-    <div className="flex flex-col gap-4 pb-20">
+    <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-right-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Upload</h2>
+          <p className="text-muted-foreground text-sm">Upload your exam PDF, template folder, and optional testers.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleBeginInference}
+            disabled={!allReady || inferring}
+            className="rounded-md px-6 glow-blue"
+          >
+            {inferring
+              ? <><Loader2 size={14} className="animate-spin mr-1" /> Running Inference...</>
+              : <>Continue <ChevronRight size={16} className="ml-1" /></>
+            }
+          </Button>
+        </div>
+      </div>
+
       {/* Main upload row: PDF square + two dir cards stacked */}
       <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
         {/* PDF Upload — square card */}
@@ -212,8 +228,26 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-8 bg-secondary/50 hover:bg-secondary hover:border-primary/30 transition-colors cursor-pointer">
+            <div
+              onClick={() => !uploading && pdfInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); if (!uploading) setPdfDragging(true); }}
+              onDragEnter={e => { e.preventDefault(); if (!uploading) setPdfDragging(true); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPdfDragging(false); }}
+              onDrop={async e => {
+                e.preventDefault();
+                setPdfDragging(false);
+                if (uploading) return;
+                const dropped = e.dataTransfer.files[0];
+                if (dropped) await uploadPdfFile(dropped);
+              }}
+              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 transition-all duration-200 cursor-pointer ${
+                pdfDragging
+                  ? 'border-primary bg-primary/10 scale-[1.01]'
+                  : 'border-border bg-secondary/50 hover:bg-secondary hover:border-primary/30'
+              }`}
+            >
               <input
+                ref={pdfInputRef}
                 type="file"
                 className="hidden"
                 onChange={handleFileChange}
@@ -224,14 +258,14 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
                   ? <Loader2 className="text-primary animate-spin" size={28} />
                   : examId
                     ? <CheckCircle2 className="text-vsc-green" size={28} />
-                    : <FileUp className="text-muted-foreground" size={28} />
+                    : <FileUp className={pdfDragging ? 'text-primary' : 'text-muted-foreground'} size={28} />
                 }
               </div>
               <p className="font-outfit font-bold text-foreground text-center">
-                {uploading ? 'Uploading...' : file ? file.name : examId ? 'PDF uploaded' : 'Click or drag PDF to upload'}
+                {pdfDragging ? 'Drop PDF here' : uploading ? 'Uploading...' : file ? file.name : examId ? 'PDF uploaded' : 'Click or drag PDF to upload'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Maximum size 10MB</p>
-            </label>
+            </div>
 
             {uploadError && (
               <div className="flex items-center gap-3 p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/20 animate-in fade-in">
@@ -248,7 +282,7 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
               }`}>
                 {parsingPdf ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                 <p className="text-sm font-medium">
-                  {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded and ready for inference.'}
+                  {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded.'}
                 </p>
               </div>
             )}
@@ -258,30 +292,16 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
         {/* Two directory cards stacked */}
         <div className="flex flex-col gap-4">
           <FolderUploadCard
-            title="Template Directory"
-            hint="Select the folder containing student code templates (e.g. RenameToYourUsername with Q1, Q2 subfolders)."
+            title="Template Folder"
+            hint="Select the student code template folder (e.g. RenameToYourUsername)."
             uploadId={templateId}
             onUpload={handleUploadTemplate}
           />
           <FolderUploadCard
-            key={noTesters ? 'testers-disabled' : 'testers-enabled'}
             title="Testers Directory"
-            hint="Select the folder containing existing Tester.java files (e.g. Tester-Files with Q1Tester.java, etc.)."
+            hint="Optional — upload your existing Tester-Files folder. Leave empty to generate tests from scratch."
             uploadId={testerId}
             onUpload={handleUploadTesters}
-            disabled={noTesters}
-            footer={
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <Checkbox
-                  checked={noTesters}
-                  onCheckedChange={(v) => {
-                    setNoTesters(!!v);
-                    if (v) setTesterId(undefined);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground select-none">No existing testers — generate from scratch</span>
-              </label>
-            }
           />
         </div>
       </div>
@@ -293,24 +313,6 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
         </div>
       )}
 
-      <div className="flex justify-center">
-        <Button
-          size="lg"
-          onClick={handleBeginInference}
-          disabled={inferring || parsingPdf || !allReady}
-          className="min-w-[280px] h-12 rounded-md glow-blue"
-        >
-          {parsingPdf ? (
-            <>Analyzing PDF...</>
-          ) : inferring ? (
-            <><Loader2 size={16} className="animate-spin mr-2" />Inferring...</>
-          ) : allReady ? (
-            <>Begin Inference ({completedCount}/3 ready)</>
-          ) : (
-            <>Upload {3 - completedCount} more to continue</>
-          )}
-        </Button>
-      </div>
     </div>
   );
 };

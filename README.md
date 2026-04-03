@@ -1,6 +1,6 @@
 # IS442 Auto-Grading System
 
-Automated grading system for IS442 Java programming assignments. Extracts student submissions from ZIP files, compiles and runs tester files against student code, and generates grading reports — with an AI-powered test generation web UI.
+Automated grading system for IS442 Java programming assignments. Extracts student submissions from ZIP files, compiles and runs tester files against student code, and generates grading reports with an AI-powered test generation web UI.
 
 ## Modes
 
@@ -35,17 +35,55 @@ java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --cli
 4. Optionally add scoresheet CSV
 5. Choose output directory
 
-## Web UI
+## Web UI (React + Docker Compose)
 
-Requires Docker:
+Full-stack web application with AI-powered test generation, live grading terminal, and past runs viewer.
 
+### Setup
+
+**Environment:** Create `.env` file in project root:
+```
+OPENROUTER_API_KEY=contact us for access
+DOCLING_SERVE_URL=http://localhost:5001
+```
+
+**Launch:**
 ```bash
 docker compose up
 ```
 
-Starts: backend (8080) + frontend (5173) + Docling (5001).
+Starts three services:
+- **Frontend** (http://localhost) — React UI (Vite, Tailwind + shadcn/ui)
+- **Backend** (http://localhost:8080) — Spring Boot REST API
+- **Docling** (http://localhost:5001) — PDF parsing with OCR
 
-**Swagger UI** (API docs): [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+**API docs:** [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
+### Web UI Features
+
+#### 1. **Test Generator Wizard** (4-step flow)
+- **Step 1: Project Setup** — Upload exam PDF, template files, tester data files
+- **Step 2: Inference Review** — Auto-detects questions from PDF and file structure; review & edit
+- **Step 3: Generation Hub** — AI analyzes each question and generates test cases using LangChain4j
+- **Step 4: Finalize & Export** — Split-pane code viewer; optionally refine with AI feedback loop
+
+#### 2. **Auto-Grader Workspace**
+- Upload student submissions (ZIP files)
+- Auto-infer questions from testers
+- Execute grading with live progress terminal (SSE stream)
+- Generate PDF reports with charts and dual CSV outputs (LMS-compatible + detailed breakdown)
+
+#### 3. **Past Runs Viewer**
+- Browse all previous grading sessions
+- Inspect results per student and per question
+- Download reports (PDF, CSV) and generated test code
+
+#### 4. **Features**
+- **AI Test Generation** — Structured JSON output (no syntax errors), deterministic assembly, concept coverage analysis
+- **PDF Parsing with OCR** — Docling Serve extracts questions from scanned PDFs, diagrams, and images
+- **Config Auto-Inference** — Questions auto-detected from tester filenames, template folder structure, and PDF headings
+- **Live Grading Logs** — Real-time progress stream (SSE) with student count and status
+- **Code Review Interface** — Side-by-side syntax-highlighted comparison of template vs generated code
 
 ## Dev
 
@@ -56,17 +94,28 @@ Starts: backend (8080) + frontend (5173) + Docling (5001).
 
 ## Features
 
+**Core Grading:**
 - **ZIP extraction** — automatically unpacks and normalises student submissions
 - **Identity resolution** — resolves student names from Java headers, scoresheet, or username
 - **Compilation & execution** — compiles student code + tester files, runs with timeout protection
 - **Anomaly detection** — flags missing headers, unrenamed folders, compilation errors
 - **PDF report generation** — instructor reports with charts (JFreeChart + OpenPDF)
 - **Dual CSV output** — LMS-compatible graded scoresheet + detailed per-question breakdown
-- **AI test generation** — LangChain4j + Docling; structured JSON output, code refinement loop
-- **Config inference** — auto-detects question structure from tester files at runtime
-- **Web UI** — React + TypeScript + Vite; VS Code-themed 4-step wizard
-- **Live grading terminal** — SSE stream of grading progress
-- **Past runs viewer** — browse previous grading sessions
+- **Config inference** — auto-detects question structure from tester files and PDF headings
+
+**AI & Test Generation:**
+- **LangChain4j integration** — AI service with structured JSON output (no syntax errors)
+- **Docling PDF parsing** — OCR-capable extraction from scanned PDFs, diagrams, and images
+- **Concept-aware generation** — AI recommends test count and concepts to cover based on existing tests
+- **Deterministic assembly** — structured test cases assembled into valid Java code
+- **Code refinement loop** — iteratively improve generated tests via AI feedback
+
+**Web UI:**
+- **4-step wizard** — guided workflow for exam setup, question inference, test generation, and export
+- **Live grading terminal** — real-time SSE stream of compilation and execution progress
+- **Past runs viewer** — browse and inspect previous grading sessions
+- **Code review interface** — side-by-side syntax-highlighted code comparison
+- **Auto-inferred configuration** — questions detected automatically from files and PDF structure
 
 ## Project Structure
 
@@ -116,7 +165,8 @@ Output: `frontend/src/generated/` — types, SDK functions, `useQuery`/`useMutat
 
 | Document | Description |
 |----------|-------------|
-| [UPDATES.md](docs/UPDATES.md) | Modernization summary, phase status, file inventory, WIP tasks |
+| [UPDATES.md](docs/[new]%20UPDATES.md) | Modernization summary, phase status, file inventory, WIP tasks |
+| [ai-processing-flow.md](docs/[for-ref]%20ai-processing-flow.md) | AI generation architecture, flow, and configuration for reference |
 | [TESTCASES.md](docs/TESTCASES.md) | 18 test submissions and edge case coverage |
 | [design-overview.md](docs/[old]%20design-overview.md) | Original 5-layer architecture (historical) |
 
@@ -128,8 +178,13 @@ Output: `frontend/src/generated/` — types, SDK functions, `useQuery`/`useMutat
 - **Docling Serve** — PDF parsing with OCR
 - **SQLite** — session cache
 - **React 19 + TypeScript + Vite** — frontend
-- **TanStack Query** — server state caching (5min stale, 30min gc)
+- **TanStack Query v5** — server state caching (5min stale, 30min gc)
 - **HeyAPI (`@hey-api/openapi-ts`)** — auto-generate types + hooks from OpenAPI spec
 - **Tailwind CSS + shadcn/ui** — styling
 - **Spotless + Checkstyle** — code style
 - **Docker Compose** — 3-service deployment
+
+**Requirements:**
+- Docker & Docker Compose (for web UI)
+- OpenRouter API key (for AI test generation)
+- Docling Serve running on localhost:5001 (started by docker-compose)

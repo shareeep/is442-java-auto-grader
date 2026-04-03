@@ -1,6 +1,5 @@
 package com.is442.autograder.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is442.autograder.GradingPipeline;
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.generation.ConfigInferenceService;
@@ -20,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,8 +36,9 @@ public class GradingStreamController {
 	private final ExecutorService executor = Executors.newFixedThreadPool(4);
 	private final AppConfig appConfig;
 
-	// Stores emitters for active grading sessions
+	// Stores emitters and pipelines for active grading sessions
 	private static final Map<String, SseEmitter> ACTIVE_SESSIONS = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<String, com.is442.autograder.GradingPipeline> ACTIVE_PIPELINES = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public GradingStreamController(AppConfig appConfig) {
 		this.appConfig = appConfig;
@@ -58,8 +59,14 @@ public class GradingStreamController {
 		String sessionId = UUID.randomUUID().toString();
 		ACTIVE_SESSIONS.put(sessionId, emitter);
 
-		emitter.onCompletion(() -> ACTIVE_SESSIONS.remove(sessionId));
-		emitter.onTimeout(() -> ACTIVE_SESSIONS.remove(sessionId));
+		emitter.onCompletion(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
+		emitter.onTimeout(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
 
 		// Save uploaded files to temp dirs
 		Path submissionsDir = Files.createTempDirectory("autograder-stream-submissions-");
@@ -106,6 +113,7 @@ public class GradingStreamController {
 
 				GradingPipeline pipeline = new GradingPipeline(appConfig);
 				pipeline.setInferredQuestionConfigs(inferredConfigs);
+				ACTIVE_PIPELINES.put(sessionId, pipeline);
 
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "grading", "message", "Starting grading...")));
@@ -126,7 +134,8 @@ public class GradingStreamController {
 							}
 						});
 
-				// Persist results.json + student code so the RunResults page can load them
+				// RunResults page can load them automatically because they are written by
+				// GradingPipeline
 				String runId = null;
 				if (Files.isDirectory(outputDir)) {
 					try (Stream<Path> ls = Files.list(outputDir)) {
@@ -160,6 +169,26 @@ public class GradingStreamController {
 		});
 
 		return emitter;
+	}
+
+	@PostMapping("/stop/{sessionId}")
+	public org.springframework.http.ResponseEntity<?> stopGrading(@PathVariable String sessionId) {
+		GradingPipeline pipeline = ACTIVE_PIPELINES.get(sessionId);
+		if (pipeline == null) {
+			return org.springframework.http.ResponseEntity.notFound().build();
+		}
+		pipeline.cancel();
+		SseEmitter emitter = ACTIVE_SESSIONS.get(sessionId);
+		if (emitter != null) {
+			try {
+				emitter.send(SseEmitter.event().name("status")
+						.data(Map.of("phase", "cancelled", "message", "Grading cancelled.")));
+			} catch (IOException e) {
+				logger.warn("Could not send cancel event for session {}", sessionId);
+			}
+			emitter.complete();
+		}
+		return org.springframework.http.ResponseEntity.ok(Map.of("cancelled", true));
 	}
 
 	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
@@ -207,14 +236,27 @@ public class GradingStreamController {
 
 		List<Map<String, Object>> results = new ArrayList<>();
 		for (var res : sub.getResults()) {
-			results.add(
-					Map.of("questionId", res.getQuestionId(), "score", res.getScore(), "maxScore", res.getMaxScore()));
+			Map<String, Object> r = new LinkedHashMap<>();
+			r.put("questionId", res.getQuestionId());
+			r.put("score", res.getScore());
+			r.put("maxScore", res.getMaxScore());
+			r.put("compiled", res.isCompiled());
+			r.put("executed", res.isExecuted());
+			r.put("output", res.getOutput() != null ? res.getOutput() : "");
+			r.put("errorMessage", res.getErrorMessage() != null ? res.getErrorMessage() : "");
+			results.add(r);
 		}
 		data.put("results", results);
 
 		List<Map<String, Object>> anomalies = new ArrayList<>();
 		for (var ano : sub.getAnomalies()) {
-			anomalies.add(Map.of("severity", ano.getSeverity().name(), "description", ano.getDescription()));
+			Map<String, Object> anoMap = new LinkedHashMap<>();
+			anoMap.put("severity", ano.getSeverity().name());
+			anoMap.put("description", ano.getDescription());
+			if (ano.getQuestionId() != null) {
+				anoMap.put("questionId", ano.getQuestionId());
+			}
+			anomalies.add(anoMap);
 		}
 		data.put("anomalies", anomalies);
 

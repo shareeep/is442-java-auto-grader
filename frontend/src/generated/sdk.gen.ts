@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponses, ExecuteData, ExecuteResponses, GenerateData, GenerateQuestionData, GenerateQuestionResponses, GenerateResponses, GetAiSettingsData, GetAiSettingsResponses, GetCsvData, GetCsvResponses, GetLogsData, GetLogsResponses, GetPdfData, GetPdfResponses, GetQuestionsData, GetQuestionsResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTemplateSourceData, GetTemplateSourceResponses, GetTesterData, GetTesterResponses, ListRunsData, ListRunsResponses, PreparsePdfData, PreparsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, RunGradingData, RunGradingResponses, SaveData, SaveResponses, SaveSetupData, SaveSetupResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponses, ExecuteData, ExecuteResponses, GenerateData, GenerateQuestionData, GenerateQuestionResponses, GenerateResponses, GetAiSettingsData, GetAiSettingsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetLogsData, GetLogsResponses, GetPdfData, GetPdfResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetQuestionsData, GetQuestionsResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTemplateSourceData, GetTemplateSourceResponses, GetTesterData, GetTesterResponses, ListRunsData, ListRunsResponses, PreparsePdfData, PreparsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, RunGradingData, RunGradingResponses, SaveData, SaveResponses, SaveSetupData, SaveSetupResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -148,7 +148,11 @@ export const analyzeSetup = <ThrowOnError extends boolean = false>(options: Opti
     }
 });
 
+export const getBootId = <ThrowOnError extends boolean = false>(options?: Options<GetBootIdData, ThrowOnError>) => (options?.client ?? client).get<GetBootIdResponses, unknown, ThrowOnError>({ url: '/api/system/boot', ...options });
+
 export const getResults = <ThrowOnError extends boolean = false>(options: Options<GetResultsData, ThrowOnError>) => (options.client ?? client).get<GetResultsResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/results', ...options });
+
+export const getPlagiarismReport = <ThrowOnError extends boolean = false>(options: Options<GetPlagiarismReportData, ThrowOnError>) => (options.client ?? client).get<GetPlagiarismReportResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/plagiarism', ...options });
 
 export const getPdf = <ThrowOnError extends boolean = false>(options: Options<GetPdfData, ThrowOnError>) => (options.client ?? client).get<GetPdfResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/pdf', ...options });
 

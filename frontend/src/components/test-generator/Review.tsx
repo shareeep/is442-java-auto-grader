@@ -281,15 +281,15 @@ const InferenceReview: React.FC<InferenceReviewProps> = ({ onNext, onBack }) => 
     <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-outfit text-foreground">Configuration Review</h2>
-          <p className="text-muted-foreground text-sm">Review the inferred structure. Resolve any issues before proceeding.</p>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Review</h2>
+          <p className="text-muted-foreground text-sm">Review the inferred structure.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onBack} className="rounded-md">
             <ChevronLeft size={16} className="mr-1" /> Back
           </Button>
           <Button onClick={onNext} className="rounded-md px-6 glow-blue">
-            Confirm & Continue <ChevronRight size={16} className="ml-1" />
+            Continue <ChevronRight size={16} className="ml-1" />
           </Button>
         </div>
       </div>

@@ -282,7 +282,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-left-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-outfit text-foreground">Finalize & Export</h2>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Export</h2>
           <p className="text-muted-foreground text-sm">
             Review generated code, delete unwanted test cases, then export.
           </p>
@@ -293,13 +293,13 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
           </Button>
           <Button
             onClick={handleExport}
-            disabled={exporting || exportComplete || questionIds.length === 0}
+            disabled={exporting || questionIds.length === 0}
             className={`rounded-md px-6 ${exportComplete ? 'bg-vsc-green hover:bg-vsc-green/90' : 'glow-accent bg-accent hover:bg-accent/90'}`}
           >
             {exporting ? (
               <><Loader2 size={14} className="mr-1.5 animate-spin" /> Exporting...</>
             ) : exportComplete ? (
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Exported</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Re-export</span>
             ) : (
               <><Download size={16} className="mr-1.5" /> Export Project</>
             )}
@@ -383,6 +383,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
                       {activeResult.compiledOk && (
                         <span className="text-[9px] px-2 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-mono">COMPILED</span>
                       )}
+                      <span className="text-[9px] px-2 py-0.5 bg-secondary text-muted-foreground rounded font-mono border border-border">READ-ONLY</span>
                     </div>
                   </div>
                   <div className="h-[360px] overflow-auto">
