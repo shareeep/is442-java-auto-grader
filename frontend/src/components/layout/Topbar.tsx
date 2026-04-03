@@ -1,8 +1,19 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Beaker } from 'lucide-react';
 import React from 'react';
+import { useGraderStore } from '@/store/graderStore';
 
 const Topbar: React.FC = () => {
+  const phase = useGraderStore((s) => s.phase);
+  const resetGrader = useGraderStore((s) => s.reset);
+
+  const handleBrandClick = () => {
+    // Force return to the upload/home workspace from persisted results state.
+    if (phase === 'results') {
+      resetGrader();
+    }
+  };
+
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2 px-3 py-1.5 rounded-md font-sans text-sm font-medium transition-all duration-200 ${isActive
       ? 'bg-primary/15 text-primary ring-1 ring-primary/20'
@@ -12,12 +23,17 @@ const Topbar: React.FC = () => {
   return (
     <header className="h-11 shrink-0 flex items-center px-4 border-b border-border bg-card z-20 relative">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 mr-6 select-none">
+      <Link
+        to="/grader"
+        onClick={handleBrandClick}
+        className="flex items-center gap-2.5 mr-6 select-none rounded-md px-1 py-0.5 transition-colors hover:bg-secondary"
+        aria-label="Go to auto-grader home"
+      >
         <span className="text-sm font-bold text-foreground tracking-tight">IS442</span>
         <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground border border-border rounded px-1 py-0.5">
           Auto Grader
         </span>
-      </div>
+      </Link>
 
       {/* Nav links */}
       <nav className="flex items-center gap-1">
