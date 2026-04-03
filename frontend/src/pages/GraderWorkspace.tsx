@@ -32,60 +32,73 @@ interface UploadCardProps {
   accept?: string;
   name: string;
   count: number;
+  error?: string | null;
   onChange: (files: File[]) => void;
 }
 
 const UploadCard: React.FC<UploadCardProps> = ({
-  label, hint, icon, required, isDirectory, accept, name, count, onChange,
+  label, hint, icon, required, isDirectory, accept, name, count, error, onChange,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const dirProps = isDirectory ? { webkitdirectory: 'true', directory: 'true' } as any : {};
 
   return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      className={`group relative flex cursor-pointer flex-col items-start gap-3 rounded-xl border px-4 py-4 transition-all duration-200 sm:flex-row sm:items-center sm:gap-4 sm:px-5 ${
-        count > 0
-          ? 'border-primary/40 bg-primary/5 hover:border-primary/60'
-          : 'border-border bg-card hover:border-border/80 hover:bg-card/80'
-      }`}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        name={name}
-        multiple
-        accept={accept}
-        {...dirProps}
-        className="hidden"
-        onChange={e => onChange(Array.from(e.target.files || []))}
-      />
-      <div className={`shrink-0 transition-colors ${count > 0 ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">{label}</span>
-          {required && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-              Required
+    <div className="flex flex-col gap-1">
+      <div
+        onClick={() => inputRef.current?.click()}
+        className={`relative flex items-center gap-4 px-5 py-4 rounded-xl border cursor-pointer transition-all duration-200 group ${
+          error
+            ? 'border-destructive/40 bg-destructive/5'
+            : count > 0
+              ? 'border-vsc-green/40 bg-vsc-green/5 hover:border-vsc-green/60'
+              : 'border-border bg-card hover:border-border/80 hover:bg-card/80'
+        }`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          name={name}
+          multiple
+          accept={accept}
+          {...dirProps}
+          className="hidden"
+          onChange={e => onChange(Array.from(e.target.files || []))}
+        />
+        <div className={`shrink-0 transition-colors ${
+          error ? 'text-destructive' : count > 0 ? 'text-vsc-green' : 'text-muted-foreground group-hover:text-foreground'
+        }`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">{label}</span>
+            {required && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                Required
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+        </div>
+        <div className="shrink-0">
+          {count > 0 ? (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-vsc-green">
+              <CheckCircle2 size={14} />
+              {count} {isDirectory ? 'files' : 'file'}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+              Choose {isDirectory ? 'folder' : 'file'}
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
       </div>
-      <div className="shrink-0 sm:ml-auto">
-        {count > 0 ? (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-            <CheckCircle2 size={14} />
-            {count} {isDirectory ? 'files' : 'file'}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-            Choose {isDirectory ? 'folder' : 'file'}
-          </span>
-        )}
-      </div>
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-destructive/10 text-destructive rounded-lg border border-destructive/20 text-xs">
+          <AlertCircle size={13} className="shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -186,6 +199,9 @@ const GraderWorkspace: React.FC = () => {
   const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
   const [testerFiles, setTesterFiles] = useState<File[]>([]);
   const [scoresheetFiles, setScoresheetFiles] = useState<File[]>([]);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [testerError, setTesterError] = useState<string | null>(null);
+  const [scoresheetError, setScoresheetError] = useState<string | null>(null);
   const [streamFormData, setStreamFormData] = useState<FormData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(true);
@@ -239,9 +255,16 @@ const GraderWorkspace: React.FC = () => {
     setStreamFormData(null);
   };
 
+  const clearUploadErrors = () => {
+    setSubmissionError(null);
+    setTesterError(null);
+    setScoresheetError(null);
+  };
+
   const handleCancel = () => {
     graderReset();
     setError(null);
+    clearUploadErrors();
     setStreamFormData(null);
     setSubmissionFiles([]);
     setTesterFiles([]);
@@ -252,6 +275,7 @@ const GraderWorkspace: React.FC = () => {
   const handleReset = () => {
     graderReset();
     setError(null);
+    clearUploadErrors();
     setStreamFormData(null);
     setSubmissionFiles([]);
     setTesterFiles([]);
@@ -356,7 +380,18 @@ const GraderWorkspace: React.FC = () => {
                   icon={<FolderArchive size={20} />}
                   required isDirectory name="submissions"
                   count={submissionFiles.length}
-                  onChange={files => { setSubmissionFiles(files.filter(f => f.name.toLowerCase().endsWith('.zip'))); setError(null); }}
+                  error={submissionError}
+                  onChange={files => {
+                    const zips = files.filter(f => f.name.toLowerCase().endsWith('.zip'));
+                    if (files.length > 0 && zips.length === 0) {
+                      setSubmissionError('Wrong Folder Submitted — folder must contain ZIP files.');
+                      setSubmissionFiles([]);
+                    } else {
+                      setSubmissionError(null);
+                      setSubmissionFiles(zips);
+                    }
+                    setError(null);
+                  }}
                 />
                 <UploadCard
                   label="Test Cases (Testers)"
@@ -364,7 +399,18 @@ const GraderWorkspace: React.FC = () => {
                   icon={<FileCode2 size={20} />}
                   required isDirectory name="testers"
                   count={testerFiles.length}
-                  onChange={files => { setTesterFiles(files); setError(null); }}
+                  error={testerError}
+                  onChange={files => {
+                    const javas = files.filter(f => f.name.toLowerCase().endsWith('.java'));
+                    if (files.length > 0 && javas.length === 0) {
+                      setTesterError('Wrong Folder Submitted — expected the Tester-Files folder with .java test files.');
+                      setTesterFiles([]);
+                    } else {
+                      setTesterError(null);
+                      setTesterFiles(files);
+                    }
+                    setError(null);
+                  }}
                 />
               </div>
 
@@ -376,7 +422,18 @@ const GraderWorkspace: React.FC = () => {
                   icon={<FileSpreadsheet size={20} />}
                   accept=".csv" name="scoresheet"
                   count={scoresheetFiles.length}
-                  onChange={files => { setScoresheetFiles(files); setError(null); }}
+                  error={scoresheetError}
+                  onChange={files => {
+                    const csvs = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+                    if (files.length > 0 && csvs.length === 0) {
+                      setScoresheetError('Wrong File Submitted — expected a CSV file.');
+                      setScoresheetFiles([]);
+                    } else {
+                      setScoresheetError(null);
+                      setScoresheetFiles(csvs);
+                    }
+                    setError(null);
+                  }}
                 />
               </div>
 

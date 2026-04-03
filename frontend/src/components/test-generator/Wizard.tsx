@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, GraduationCap, LayoutPanelLeft, ListChecks, FileCheck, RotateCcw } from 'lucide-react';
 
-import ProjectSetup from './ProjectSetup';
-import InferenceReview from './InferenceReview';
-import GenerationHub from './GenerationHub';
-import FinalizeExport from './FinalizeExport';
+import ProjectSetup from './Upload';
+import InferenceReview from './Review';
+import GenerationHub from './Generate';
+import FinalizeExport from './Export';
 import { useWizardStore } from '../../store/wizardStore';
 
 const STEPS = [
-  { id: 1, title: 'Project Setup', icon: GraduationCap },
-  { id: 2, title: 'Inference & Review', icon: LayoutPanelLeft },
-  { id: 3, title: 'Generation Hub', icon: ListChecks },
-  { id: 4, title: 'Finalize & Export', icon: FileCheck },
+  { id: 1, title: 'Upload', icon: GraduationCap },
+  { id: 2, title: 'Review', icon: LayoutPanelLeft },
+  { id: 3, title: 'Generate', icon: ListChecks },
+  { id: 4, title: 'Export', icon: FileCheck },
 ];
 
 const Wizard: React.FC = () => {

@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Sparkles, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2, X, Plus, RotateCcw, Loader2 } from 'lucide-react';
+import { FastForward, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2, X, Plus, RotateCcw, Loader2 } from 'lucide-react';
 import { recommend, execute } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -91,6 +91,25 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [loadingRec, setLoadingRec] = useState<Record<string, boolean>>({});
+  const [genAllProgress, setGenAllProgress] = useState<{ total: number; done: number } | null>(null);
+  const [recProgress, setRecProgress] = useState<{ total: number; done: number } | null>(null);
+  const hasAutoRecommended = useRef(false);
+  const cancelledQids = useRef<Set<string>>(new Set());
+
+  // Auto-clear progress bars shortly after all done
+  useEffect(() => {
+    if (genAllProgress && genAllProgress.done === genAllProgress.total) {
+      const t = setTimeout(() => setGenAllProgress(null), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [genAllProgress]);
+
+  useEffect(() => {
+    if (recProgress && recProgress.done === recProgress.total) {
+      const t = setTimeout(() => setRecProgress(null), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [recProgress]);
 
   // When no tester dir: show all non-parent questions (maxScore = 0 since no testers to count from)
   // When tester dir provided: only show questions with maxScore > 0 (matched testers)
@@ -105,6 +124,21 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inferredConfig]);
+
+  // Auto-recommend for all selected questions when landing on this step
+  useEffect(() => {
+    if (hasAutoRecommended.current || selectedQs.length === 0) return;
+    hasAutoRecommended.current = true;
+    const toRecommend = selectedQs.filter((qid) => !recommendations[qid]);
+    if (toRecommend.length === 0) return;
+    setRecProgress({ total: toRecommend.length, done: 0 });
+    toRecommend.forEach((qid) =>
+      getRecommendation(qid, () =>
+        setRecProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : null))
+      )
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedQs]);
 
   const handleStaleSession = (err: any) => {
     if (err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')) {
@@ -127,7 +161,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     );
   };
 
-  const getRecommendation = async (qid: string) => {
+  const getRecommendation = async (qid: string, onDone?: () => void) => {
     setLoadingRec((prev) => ({ ...prev, [qid]: true }));
     try {
       const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
@@ -138,10 +172,11 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
       }
     } finally {
       setLoadingRec((prev) => { const next = { ...prev }; delete next[qid]; return next; });
+      onDone?.();
     }
   };
 
-  const executeGen = async (qid: string) => {
+  const executeGen = async (qid: string, onDone?: () => void) => {
     setGenerating((prev) => ({ ...prev, [qid]: true }));
     const question = inferredConfig?.questions?.find((q: any) => q.questionId === qid);
     const rec = recommendations[qid];
@@ -164,14 +199,42 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
         },
         throwOnError: true,
       });
-      setResult(qid, result);
+      if (!cancelledQids.current.has(qid)) {
+        setResult(qid, result);
+      }
     } catch (err) {
-      if (!handleStaleSession(err)) {
+      if (!cancelledQids.current.has(qid) && !handleStaleSession(err)) {
         toast({ title: `Generation failed for ${qid}`, description: 'The AI returned an invalid response. Click Generate to try again.', variant: 'destructive' });
       }
     } finally {
+      cancelledQids.current.delete(qid);
       setGenerating((prev) => ({ ...prev, [qid]: false }));
+      onDone?.();
     }
+  };
+
+  const isAnyGenerating = Object.values(generating).some(Boolean);
+  const isAnyRecLoading = Object.values(loadingRec).some(Boolean);
+  const ungeneratedSelected = selectedQs.filter((qid) => !results[qid]);
+
+  const generateAll = () => {
+    if (isAnyGenerating) {
+      // Cancel all in-progress generations
+      Object.entries(generating).forEach(([qid, active]) => {
+        if (active) cancelledQids.current.add(qid);
+      });
+      setGenerating({});
+      setGenAllProgress(null);
+      return;
+    }
+    const toGenerate = ungeneratedSelected;
+    if (toGenerate.length === 0) return;
+    setGenAllProgress({ total: toGenerate.length, done: 0 });
+    toGenerate.forEach((qid) =>
+      executeGen(qid, () =>
+        setGenAllProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : null))
+      )
+    );
   };
 
   const handleFinalize = () => {
@@ -203,18 +266,73 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     <div className="flex flex-col gap-6 pb-20 animate-in fade-in slide-in-from-right-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-outfit text-foreground">Generation Hub</h2>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Generate</h2>
           <p className="text-muted-foreground text-sm">Select questions and generate structured test cases.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onBack} className="rounded-md">
             <ChevronLeft size={16} className="mr-1" /> Review
           </Button>
-          <Button onClick={handleFinalize} className="rounded-md px-6 glow-blue">
-            Finalize <ChevronRight size={16} className="ml-1" />
+          <Button
+            variant="outline"
+            onClick={generateAll}
+            disabled={isAnyRecLoading || (!isAnyGenerating && ungeneratedSelected.length === 0)}
+            className={`rounded-md gap-1.5 ${isAnyGenerating ? 'border-destructive/40 text-destructive hover:bg-destructive/10' : ''}`}
+          >
+            {isAnyGenerating
+              ? <><X size={14} /> Cancel</>
+              : isAnyRecLoading
+                ? <><Loader2 size={14} className="animate-spin" /> Recommending...</>
+                : <><FastForward size={14} fill="currentColor" /> Generate All</>
+            }
+          </Button>
+          <Button
+            onClick={handleFinalize}
+            disabled={isAnyGenerating || ungeneratedSelected.length > 0 || selectedQs.length === 0}
+            className="rounded-md px-6 glow-blue"
+          >
+            Continue <ChevronRight size={16} className="ml-1" />
           </Button>
         </div>
       </div>
+
+      {recProgress && (
+        <div className="space-y-1.5 px-4 py-3 rounded-md border border-accent/20 bg-accent/5 animate-in fade-in">
+          <div className="flex justify-between items-center text-xs font-mono text-accent">
+            <span className="flex items-center gap-2">
+              {recProgress.done < recProgress.total
+                ? <Loader2 size={12} className="animate-spin" />
+                : <CheckCircle2 size={12} />
+              }
+              {recProgress.done < recProgress.total
+                ? `Fetching recommendations… ${recProgress.done} / ${recProgress.total} done`
+                : `All ${recProgress.total} recommendations ready — review before generating`
+              }
+            </span>
+            <span>{Math.round((recProgress.done / recProgress.total) * 100)}%</span>
+          </div>
+          <Progress value={(recProgress.done / recProgress.total) * 100} className="h-1.5" />
+        </div>
+      )}
+
+      {genAllProgress && (
+        <div className="space-y-1.5 px-4 py-3 rounded-md border border-primary/20 bg-primary/5 animate-in fade-in">
+          <div className="flex justify-between items-center text-xs font-mono text-primary">
+            <span className="flex items-center gap-2">
+              {genAllProgress.done < genAllProgress.total
+                ? <Loader2 size={12} className="animate-spin" />
+                : <CheckCircle2 size={12} />
+              }
+              {genAllProgress.done < genAllProgress.total
+                ? `Generating… ${genAllProgress.done} / ${genAllProgress.total} done`
+                : `All ${genAllProgress.total} generated`
+              }
+            </span>
+            <span>{Math.round((genAllProgress.done / genAllProgress.total) * 100)}%</span>
+          </div>
+          <Progress value={(genAllProgress.done / genAllProgress.total) * 100} className="h-1.5" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sidebar: Selection */}
@@ -259,7 +377,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
 
           <div className="p-4 bg-accent/5 rounded-md border border-accent/10">
             <div className="flex items-center gap-2 text-accent mb-2">
-              <Sparkles size={14} />
+              <BrainCircuit size={14} />
               <h3 className="font-bold font-mono text-xs">AI Recommended</h3>
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -342,7 +460,6 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             <div className="w-8 h-8 bg-primary text-primary-foreground rounded flex items-center justify-center font-mono font-bold text-sm">
               {qid}
             </div>
-            <CardTitle className="text-sm">Structured Generation</CardTitle>
           </div>
           <div className="flex items-center gap-2">
             {/* Reset — only enabled when there's something to reset */}
