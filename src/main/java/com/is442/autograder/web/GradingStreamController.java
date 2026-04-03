@@ -236,14 +236,27 @@ public class GradingStreamController {
 
 		List<Map<String, Object>> results = new ArrayList<>();
 		for (var res : sub.getResults()) {
-			results.add(
-					Map.of("questionId", res.getQuestionId(), "score", res.getScore(), "maxScore", res.getMaxScore()));
+			Map<String, Object> r = new LinkedHashMap<>();
+			r.put("questionId", res.getQuestionId());
+			r.put("score", res.getScore());
+			r.put("maxScore", res.getMaxScore());
+			r.put("compiled", res.isCompiled());
+			r.put("executed", res.isExecuted());
+			r.put("output", res.getOutput() != null ? res.getOutput() : "");
+			r.put("errorMessage", res.getErrorMessage() != null ? res.getErrorMessage() : "");
+			results.add(r);
 		}
 		data.put("results", results);
 
 		List<Map<String, Object>> anomalies = new ArrayList<>();
 		for (var ano : sub.getAnomalies()) {
-			anomalies.add(Map.of("severity", ano.getSeverity().name(), "description", ano.getDescription()));
+			Map<String, Object> anoMap = new LinkedHashMap<>();
+			anoMap.put("severity", ano.getSeverity().name());
+			anoMap.put("description", ano.getDescription());
+			if (ano.getQuestionId() != null) {
+				anoMap.put("questionId", ano.getQuestionId());
+			}
+			anomalies.add(anoMap);
 		}
 		data.put("anomalies", anomalies);
 

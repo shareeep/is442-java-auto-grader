@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { AlertTriangle, Activity, CheckCircle2, ChevronRight, Code, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Activity, CheckCircle2, ChevronRight, Code, ChevronsUpDown, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import SubmissionDetails, { Submission } from './SubmissionDetails';
 
 interface ResultsTableProps {
@@ -17,6 +17,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef(0);
 
@@ -47,20 +48,28 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
   }
 
   const submissions = useMemo(() =>
-    [...(data.submissions || [])].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'name') {
-        const na = a.name || a.username || a.displayName || '';
-        const nb = b.name || b.username || b.displayName || '';
-        cmp = na.localeCompare(nb);
-      } else {
-        const pa = a.maxPossibleScore > 0 ? a.totalScore / a.maxPossibleScore : 0;
-        const pb = b.maxPossibleScore > 0 ? b.totalScore / b.maxPossibleScore : 0;
-        cmp = pa - pb;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    }),
-    [data.submissions, sortField, sortDir]
+    [...(data.submissions || [])]
+      .filter(s => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (s.name || '').toLowerCase().includes(q)
+          || (s.username || '').toLowerCase().includes(q)
+          || (s.displayName || '').toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortField === 'name') {
+          const na = a.name || a.username || a.displayName || '';
+          const nb = b.name || b.username || b.displayName || '';
+          cmp = na.localeCompare(nb);
+        } else {
+          const pa = a.maxPossibleScore > 0 ? a.totalScore / a.maxPossibleScore : 0;
+          const pb = b.maxPossibleScore > 0 ? b.totalScore / b.maxPossibleScore : 0;
+          cmp = pa - pb;
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      }),
+    [data.submissions, sortField, sortDir, search]
   );
   return (
     <div className="flex flex-col gap-5" ref={containerRef}>
@@ -76,6 +85,19 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
           }}
         />
       ) : (
+        <>
+        {(data.submissions?.length ?? 0) > 10 && (
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              placeholder="Search students..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
+            />
+          </div>
+        )}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="grid grid-cols-12 px-5 py-3 border-b border-border bg-secondary/50">
             <div className="col-span-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">No.</div>
@@ -159,6 +181,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );
