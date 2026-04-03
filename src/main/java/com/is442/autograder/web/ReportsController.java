@@ -43,10 +43,8 @@ public class ReportsController {
 
 	private String buildPdfFilename(String id) {
 		try {
-			String sgtTime = LocalDateTime.parse(id, RUN_ID_FMT)
-					.atZone(ZoneOffset.UTC)
-					.withZoneSameInstant(ZoneId.of("Asia/Singapore"))
-					.format(PDF_NAME_FMT);
+			String sgtTime = LocalDateTime.parse(id, RUN_ID_FMT).atZone(ZoneOffset.UTC)
+					.withZoneSameInstant(ZoneId.of("Asia/Singapore")).format(PDF_NAME_FMT);
 			String name = appConfig.getAssessmentName().toLowerCase().replaceAll("\\s+", "-");
 			return name + "-results-" + sgtTime + ".pdf";
 		} catch (Exception e) {
@@ -73,7 +71,8 @@ public class ReportsController {
 						run.put("timestamp", id); // format: yyyyMMdd-HHmmss
 						boolean hasPdf = Files.exists(dir.resolve("instructor-report.pdf"));
 						run.put("hasPdf", hasPdf);
-						if (hasPdf) run.put("pdfFilename", buildPdfFilename(id));
+						if (hasPdf)
+							run.put("pdfFilename", buildPdfFilename(id));
 						run.put("hasCsv", Files.exists(dir.resolve("IS442-ScoreSheet-Graded.csv"))
 								|| Files.exists(dir.resolve("detailed-report.csv")));
 						run.put("hasPlagiarism", Files.exists(dir.resolve("plagiarism-report.jplag")));
