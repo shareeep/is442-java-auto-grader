@@ -129,7 +129,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
           const score = `${data.totalScore}/${data.maxPossibleScore}`;
           const anomalyCount = data.anomalies?.length || 0;
           let msg = `Graded ${data.displayName || data.username} — ${score}`;
-          if (anomalyCount > 0) msg += ` (${anomalyCount} anomalies)`;
+          if (anomalyCount > 0) msg += ` (${anomalyCount} ${anomalyCount === 1 ? 'issue' : 'issues'})`;
           addLog({ type: 'student', timestamp: now(), message: msg, data });
           break;
         }

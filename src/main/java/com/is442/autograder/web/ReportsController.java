@@ -10,11 +10,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.is442.autograder.config.AppConfig;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -27,6 +32,27 @@ public class ReportsController {
 
 	private static final Logger logger = LoggerFactory.getLogger(ReportsController.class);
 	private static final Path OUTPUT_DIR = Paths.get("output");
+	private static final DateTimeFormatter RUN_ID_FMT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+	private static final DateTimeFormatter PDF_NAME_FMT = DateTimeFormatter.ofPattern("dd-MM_HH-mm");
+
+	private final AppConfig appConfig;
+
+	public ReportsController(AppConfig appConfig) {
+		this.appConfig = appConfig;
+	}
+
+	private String buildPdfFilename(String id) {
+		try {
+			String sgtTime = LocalDateTime.parse(id, RUN_ID_FMT)
+					.atZone(ZoneOffset.UTC)
+					.withZoneSameInstant(ZoneId.of("Asia/Singapore"))
+					.format(PDF_NAME_FMT);
+			String name = appConfig.getAssessmentName().toLowerCase().replaceAll("\\s+", "-");
+			return name + "-results-" + sgtTime + ".pdf";
+		} catch (Exception e) {
+			return "grading-report-" + id + ".pdf";
+		}
+	}
 
 	private boolean isUnsafePathSegment(String segment) {
 		return segment.contains("..") || segment.contains("/") || segment.contains("\\");
@@ -45,7 +71,9 @@ public class ReportsController {
 						String id = dir.getFileName().toString();
 						run.put("id", id);
 						run.put("timestamp", id); // format: yyyyMMdd-HHmmss
-						run.put("hasPdf", Files.exists(dir.resolve("instructor-report.pdf")));
+						boolean hasPdf = Files.exists(dir.resolve("instructor-report.pdf"));
+						run.put("hasPdf", hasPdf);
+						if (hasPdf) run.put("pdfFilename", buildPdfFilename(id));
 						run.put("hasCsv", Files.exists(dir.resolve("IS442-ScoreSheet-Graded.csv"))
 								|| Files.exists(dir.resolve("detailed-report.csv")));
 						run.put("hasPlagiarism", Files.exists(dir.resolve("plagiarism-report.jplag")));
@@ -92,8 +120,14 @@ public class ReportsController {
 			return ResponseEntity.notFound().build();
 		}
 		Resource resource = new FileSystemResource(pdf);
+		String displayFilename = buildPdfFilename(id);
 		return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
-				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"instructor-report.pdf\"").body(resource);
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + displayFilename + "\"").body(resource);
+	}
+
+	@GetMapping("/{id}/pdf/{filename:.+}")
+	public ResponseEntity<Resource> getPdfWithName(@PathVariable String id, @PathVariable String filename) {
+		return getPdf(id);
 	}
 
 	@GetMapping("/{id}/csv")

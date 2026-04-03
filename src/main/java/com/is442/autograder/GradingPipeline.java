@@ -3,7 +3,8 @@ package com.is442.autograder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -264,7 +265,7 @@ public class GradingPipeline {
 		if (baseOutputDir == null) {
 			return null;
 		}
-		String runId = LocalDateTime.now().format(RUN_ID_FORMATTER);
+		String runId = Instant.now().atZone(ZoneOffset.UTC).format(RUN_ID_FORMATTER);
 		Path runDir = baseOutputDir.resolve(runId);
 		Files.createDirectories(runDir);
 		return runDir;

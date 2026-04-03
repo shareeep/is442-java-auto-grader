@@ -4,7 +4,8 @@ import java.awt.Color;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -138,7 +139,8 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 
 	private void writeReportHeader(Document doc, int submissionCount) throws IOException {
-		String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm"));
+		String timestamp = Instant.now().atZone(ZoneId.of("Asia/Singapore"))
+				.format(DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm"));
 
 		PdfPTable tbl = new PdfPTable(1);
 		tbl.setWidthPercentage(100);

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { getStudentCode } from '../generated/sdk.gen';
 import { getResultsOptions, listRunsOptions } from '../generated/@tanstack/react-query.gen';
-import { formatRunTimestamp } from '../lib/utils';
+import { formatRunTimestamp, pdfUrl } from '../lib/utils';
 
 interface QResult {
   questionId: string;
@@ -470,7 +470,7 @@ const RunResults: React.FC = () => {
   return (
     <div className="flex h-[calc(100dvh-57px)] min-h-[calc(100dvh-57px)] flex-col overflow-hidden bg-[#0d1117]">
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col gap-3 border-b border-white/[0.08] bg-[#161b22] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="shrink-0 flex flex-col gap-3 border-b border-white/[0.08] bg-[#161b22] px-4 py-3 sm:px-6 lg:px-8 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -490,7 +490,7 @@ const RunResults: React.FC = () => {
           {runId && (
             <>
               <button
-                onClick={() => window.open(`/api/reports/${runId}/pdf`, '_blank')}
+                onClick={() => window.open(pdfUrl(runId!, (runMeta as any)?.pdfFilename), '_blank')}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
               >
                 <Eye size={12} /> PDF Report
