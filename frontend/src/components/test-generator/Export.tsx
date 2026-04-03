@@ -282,7 +282,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-left-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-outfit text-foreground">Finalize & Export</h2>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Export</h2>
           <p className="text-muted-foreground text-sm">
             Review generated code, delete unwanted test cases, then export.
           </p>

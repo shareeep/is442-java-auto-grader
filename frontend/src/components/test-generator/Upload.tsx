@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
+import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload, ChevronRight } from 'lucide-react';
 import { uploadTemplate } from '@/api/uploadTemplate';
 import { analyzeSetup, preparsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
@@ -137,10 +136,8 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   const [pdfDragging, setPdfDragging] = useState(false);
   const [inferring, setInferring] = useState(false);
   const [inferError, setInferError] = useState<string | null>(null);
-  const [noTesters, setNoTesters] = useState(false);
 
-  const allReady = !!examId && !!templateId && (!!testerId || noTesters) && !parsingPdf;
-  const completedCount = [examId, templateId, testerId || noTesters].filter(Boolean).length;
+  const allReady = !!examId && !!templateId && !parsingPdf;
 
   const uploadPdfFile = async (selectedFile: File) => {
     setFile(selectedFile);
@@ -198,7 +195,26 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
   };
 
   return (
-    <div className="flex flex-col gap-4 pb-20">
+    <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-right-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold font-outfit text-foreground">Upload</h2>
+          <p className="text-muted-foreground text-sm">Upload your exam PDF, template folder, and optional testers.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleBeginInference}
+            disabled={!allReady || inferring}
+            className="rounded-md px-6 glow-blue"
+          >
+            {inferring
+              ? <><Loader2 size={14} className="animate-spin mr-1" /> Running Inference...</>
+              : <>Continue <ChevronRight size={16} className="ml-1" /></>
+            }
+          </Button>
+        </div>
+      </div>
+
       {/* Main upload row: PDF square + two dir cards stacked */}
       <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
         {/* PDF Upload — square card */}
@@ -266,7 +282,7 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
               }`}>
                 {parsingPdf ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                 <p className="text-sm font-medium">
-                  {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded and ready for inference.'}
+                  {parsingPdf ? 'Analyzing PDF...' : 'PDF uploaded.'}
                 </p>
               </div>
             )}
@@ -276,30 +292,16 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
         {/* Two directory cards stacked */}
         <div className="flex flex-col gap-4">
           <FolderUploadCard
-            title="Template Directory"
-            hint="Select the folder containing student code templates (e.g. RenameToYourUsername with Q1, Q2 subfolders)."
+            title="Template Folder"
+            hint="Select the student code template folder (e.g. RenameToYourUsername)."
             uploadId={templateId}
             onUpload={handleUploadTemplate}
           />
           <FolderUploadCard
-            key={noTesters ? 'testers-disabled' : 'testers-enabled'}
             title="Testers Directory"
-            hint="Select the folder containing existing Tester.java files (e.g. Tester-Files with Q1Tester.java, etc.)."
+            hint="Optional — upload your existing Tester-Files folder. Leave empty to generate tests from scratch."
             uploadId={testerId}
             onUpload={handleUploadTesters}
-            disabled={noTesters}
-            footer={
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <Checkbox
-                  checked={noTesters}
-                  onCheckedChange={(v) => {
-                    setNoTesters(!!v);
-                    if (v) setTesterId(undefined);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground select-none">No existing testers — generate from scratch</span>
-              </label>
-            }
           />
         </div>
       </div>
@@ -311,24 +313,6 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
         </div>
       )}
 
-      <div className="flex justify-center">
-        <Button
-          size="lg"
-          onClick={handleBeginInference}
-          disabled={inferring || parsingPdf || !allReady}
-          className="min-w-[280px] h-12 rounded-md glow-blue"
-        >
-          {parsingPdf ? (
-            <>Analyzing PDF...</>
-          ) : inferring ? (
-            <><Loader2 size={16} className="animate-spin mr-2" />Inferring...</>
-          ) : allReady ? (
-            <>Begin Inference ({completedCount}/3 ready)</>
-          ) : (
-            <>Upload {3 - completedCount} more to continue</>
-          )}
-        </Button>
-      </div>
     </div>
   );
 };
