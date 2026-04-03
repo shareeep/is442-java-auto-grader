@@ -41,7 +41,7 @@ public interface LangChainService {
 			- For exception tests: set expectsException=true, assertion=null
 			- For void methods: set assertion=null, expectsException=false
 			- Return ONLY a valid JSON array — no markdown, no explanation, no code fences""")
-	String generateTestCasesJson(@UserMessage String prompt);
+	String generateTestCasesJson(@UserMessage dev.langchain4j.data.message.UserMessage userMessage);
 
 	@SystemMessage("""
 			You are an expert Java test case analyst.
@@ -64,7 +64,7 @@ public interface LangChainService {
 			- Consider: normal paths, boundary conditions, exception paths, null inputs, large inputs, type-specific edge cases — but only include those that genuinely apply
 			- Set 'recommendedCount' equal to the number of items in 'conceptsToCover'
 			Return ONLY valid JSON, no markdown.""")
-	String recommendJson(@UserMessage String prompt);
+	String recommendJson(@UserMessage dev.langchain4j.data.message.UserMessage userMessage);
 
 	@SystemMessage("""
 			You are a Java test code refiner for an automated grading system.

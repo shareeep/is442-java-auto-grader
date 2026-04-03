@@ -59,6 +59,17 @@ configurations.checkstyle {
         if (details.requested.group == 'org.codehaus.plexus' && details.requested.name == 'plexus-utils') {
             details.useVersion '4.0.3'
         }
+        // CVE-2025-48924: commons-lang3 Uncontrolled Recursion (fixed in 3.18.0)
+        if (details.requested.group == 'org.apache.commons' && details.requested.name == 'commons-lang3') {
+            details.useVersion '3.20.0'
+        }
+        // GHSA-72hv-8253-57qq: jackson-core Async Parser DoS (fixed in 2.21.1)
+        // Only jackson-core needs the patch; jackson-databind and jackson-annotations
+        // must stay at Spring Boot's managed version to avoid class-not-found errors.
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+                details.requested.name == 'jackson-core') {
+            details.useVersion '2.21.1'
+        }
     }
 }
 
