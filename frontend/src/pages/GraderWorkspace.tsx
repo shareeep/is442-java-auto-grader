@@ -118,41 +118,41 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-foreground truncate">{formatRunTimestamp(run.timestamp)}</p>
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     {failed
-                      ? <><AlertCircle size={9} className="text-destructive" /> Incomplete</>
-                      : <><Users size={9} /> {run.studentCount} students</>
+                      ? <><AlertCircle size={11} className="text-destructive" /> Incomplete</>
+                      : <><Users size={11} /> {run.studentCount} students</>
                     }
                   </p>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  {run.hasPdf && <span className="text-[9px] px-1 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>}
-                  {run.hasCsv && <span className="text-[9px] px-1 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>}
+                  {run.hasPdf && <span className="text-[10px] px-1 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>}
+                  {run.hasCsv && <span className="text-[10px] px-1 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 {run.hasPdf && (
                   <button
                     onClick={() => window.open(`/api/reports/${run.id}/pdf`, '_blank')}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
                   >
-                    <Eye size={9} /> PDF
+                    <Eye size={11} /> PDF
                   </button>
                 )}
                 {run.hasCsv && (
                   <button
                     onClick={() => window.open(`/api/reports/${run.id}/csv`, '_blank')}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
                   >
-                    <Download size={9} /> CSV
+                    <Download size={11} /> CSV
                   </button>
                 )}
                 {!failed && (
                   <button
                     onClick={() => onDeepDive(run.id)}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors ml-auto"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors ml-auto"
                   >
-                    <FileText size={9} /> View
+                    <FileText size={11} /> View
                   </button>
                 )}
               </div>
@@ -162,9 +162,9 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
       )}
       <button
         onClick={onViewAll}
-        className="w-full flex items-center justify-center gap-1 px-3 py-2.5 text-[10px] font-semibold text-primary hover:bg-primary/5 transition-colors border-t border-border"
+        className="w-full flex items-center justify-center gap-1 px-3 py-2.5 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors border-t border-border"
       >
-        View all runs <ArrowRight size={9} />
+        View all runs <ArrowRight size={11} />
       </button>
     </div>
   </aside>
@@ -274,7 +274,7 @@ const GraderWorkspace: React.FC = () => {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">Auto-Grader</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-muted-foreground mt-1">
             Compile, test, and grade student Java submissions automatically.
           </p>
         </div>

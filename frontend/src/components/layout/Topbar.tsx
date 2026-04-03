@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Beaker } from 'lucide-react';
+import { ClipboardCheck, Wand2, History } from 'lucide-react';
 import React from 'react';
 import { useGraderStore } from '@/store/graderStore';
 
@@ -38,13 +38,16 @@ const Topbar: React.FC = () => {
       {/* Nav links */}
       <nav className="flex items-center gap-1">
         <NavLink to="/grader" className={linkClass}>
-          <LayoutDashboard size={13} />
+          <ClipboardCheck size={13} />
           Auto-Grader
-          {/* Grade & View Results */}
         </NavLink>
         <NavLink to="/test-generator" className={linkClass}>
-          <Beaker size={13} />
+          <Wand2 size={13} />
           AI Test Generator
+        </NavLink>
+        <NavLink to="/past-runs" className={linkClass}>
+          <History size={13} />
+          Past Runs
         </NavLink>
       </nav>
 
