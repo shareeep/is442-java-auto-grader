@@ -9,8 +9,10 @@ import com.is442.autograder.generation.TestGenerationService;
 import com.is442.autograder.generation.TesterFileWriter;
 
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -18,6 +20,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Duration;
 
 /**
  * Registers service classes as Spring beans. The LangChainService is created
@@ -42,9 +45,26 @@ public class WebConfig implements WebMvcConfigurer {
 		return new SessionDatabase(Paths.get("data"));
 	}
 
+	/** Vision model service — backed by the auto-configured ChatModel (xiaomi/mimo-v2-omni). */
 	@Bean
-	public LangChainService langChainService(ChatModel chatModel) {
+	@Qualifier("vision")
+	public LangChainService langChainServiceVision(ChatModel chatModel) {
 		return AiServices.create(LangChainService.class, chatModel);
+	}
+
+	/** Text-only model service — backed by MiniMax, used when no images are present. */
+	@Bean
+	@Qualifier("text")
+	public LangChainService langChainServiceText(AppConfig appConfig) {
+		String apiKey = System.getenv("OPENROUTER_API_KEY");
+		ChatModel textModel = OpenAiChatModel.builder()
+				.apiKey(apiKey != null ? apiKey : "no-key")
+				.baseUrl("https://openrouter.ai/api/v1")
+				.modelName(appConfig.getAiTextModel())
+				.maxTokens(appConfig.getAiMaxTokens())
+				.timeout(Duration.ofSeconds(180))
+				.build();
+		return AiServices.create(LangChainService.class, textModel);
 	}
 
 	@Bean
@@ -53,9 +73,9 @@ public class WebConfig implements WebMvcConfigurer {
 	}
 
 	@Bean
-	public TestGenerationService testGenerationService(LangChainService langChainService,
-			TesterFileWriter testerFileWriter) {
-		return new TestGenerationService(langChainService, testerFileWriter);
+	public TestGenerationService testGenerationService(@Qualifier("vision") LangChainService langChainServiceVision,
+			@Qualifier("text") LangChainService langChainServiceText, TesterFileWriter testerFileWriter) {
+		return new TestGenerationService(langChainServiceVision, langChainServiceText, testerFileWriter);
 	}
 
 	@Bean

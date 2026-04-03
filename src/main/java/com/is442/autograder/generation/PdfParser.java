@@ -69,7 +69,8 @@ public class PdfParser {
 			// EMBEDDED mode may not produce data URIs — log a sample of image refs found
 			Matcher sampleMatcher = Pattern.compile("!\\[[^\\]]*\\]\\([^)]+\\)").matcher(markdown);
 			if (sampleMatcher.find()) {
-				logger.info("[PDF] Image ref sample (not base64): {}", sampleMatcher.group().substring(0, Math.min(120, sampleMatcher.group().length())));
+				logger.info("[PDF] Image ref sample (not base64): {}",
+						sampleMatcher.group().substring(0, Math.min(120, sampleMatcher.group().length())));
 			}
 		}
 		return markdown;
@@ -162,12 +163,12 @@ public class PdfParser {
 	}
 
 	/**
-	 * Strip embedded base64 data URIs from markdown, replacing each with a
-	 * [diagram N] placeholder. Keeps the markdown readable for the text portion of
-	 * the LLM prompt.
+	 * Strip embedded base64 data URIs from markdown, replacing each with a [diagram
+	 * N] placeholder. Keeps the markdown readable for the text portion of the LLM
+	 * prompt.
 	 */
 	public static String stripInlineImages(String markdown) {
-		int[] counter = { 1 };
+		int[] counter = {1};
 		return IMAGE_DATA_URI_PATTERN.matcher(markdown).replaceAll(mr -> {
 			int n = counter[0]++;
 			return "![diagram " + n + "](diagram_" + n + ")";

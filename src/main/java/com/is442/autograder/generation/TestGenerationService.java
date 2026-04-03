@@ -40,17 +40,24 @@ public class TestGenerationService {
 	private static final double DEFAULT_WEIGHT = 1.0;
 	private static final Pattern TXT_FILENAME_PATTERN = Pattern.compile("\"([^\"]+\\.txt)\"");
 
-	private final LangChainService langChainService;
+	private final LangChainService langChainServiceVision;
+	private final LangChainService langChainServiceText;
 	private final TesterFileWriter testerFileWriter;
 	private final ObjectMapper objectMapper;
 
-	public TestGenerationService(LangChainService langChainService, TesterFileWriter testerFileWriter) {
-		this.langChainService = langChainService;
+	public TestGenerationService(LangChainService langChainServiceVision, LangChainService langChainServiceText,
+			TesterFileWriter testerFileWriter) {
+		this.langChainServiceVision = langChainServiceVision;
+		this.langChainServiceText = langChainServiceText;
 		this.testerFileWriter = testerFileWriter;
 		this.objectMapper = new ObjectMapper();
 	}
 
-/**
+	private LangChainService selectService(List<String> imageUris) {
+		return imageUris.isEmpty() ? langChainServiceText : langChainServiceVision;
+	}
+
+	/**
 	 * Generate test cases for a single question.
 	 *
 	 * @param question
@@ -86,9 +93,14 @@ public class TestGenerationService {
 				conceptsToCover, customSuggestions);
 		logger.info("[GEN] Calling AI  questionId={}", question.getQuestionId());
 
+		List<String> imageUris = PdfParser.extractBase64Images(examContext);
+		LangChainService svc = selectService(imageUris);
+		logger.info("[GEN] Using {} model  questionId={} images={}", imageUris.isEmpty() ? "text" : "vision",
+				question.getQuestionId(), imageUris.size());
+
 		String rawJson;
 		try {
-			rawJson = langChainService.generateTestCasesJson(buildVisionMessage(prompt, examContext));
+			rawJson = svc.generateTestCasesJson(buildVisionMessage(prompt, examContext, imageUris));
 		} catch (Exception e) {
 			logger.error("[GEN] AI call failed  questionId={}: {}", question.getQuestionId(), e.getMessage());
 			return new GenerationResult(question.getQuestionId(), List.of(), false,
@@ -133,7 +145,9 @@ public class TestGenerationService {
 			String existingTesterContent, int existingCaseCount) throws IOException, InterruptedException {
 
 		String prompt = buildRecommendPrompt(questionId, examContext, existingTesterContent, existingCaseCount);
-		String rawJson = langChainService.recommendJson(buildVisionMessage(prompt, examContext));
+		List<String> imageUris = PdfParser.extractBase64Images(examContext);
+		LangChainService svc = selectService(imageUris);
+		String rawJson = svc.recommendJson(buildVisionMessage(prompt, examContext, imageUris));
 		return parseRecommendation(rawJson, questionId, existingCaseCount);
 	}
 
@@ -144,7 +158,7 @@ public class TestGenerationService {
 			throws IOException, InterruptedException {
 
 		String prompt = buildRefinePrompt(questionId, currentCode, refinementPrompt, examContext);
-		return langChainService.refineCode(prompt);
+		return langChainServiceText.refineCode(prompt);
 	}
 
 	// ── Vision message builder ───────────────────────────────────────────────
@@ -155,20 +169,17 @@ public class TestGenerationService {
 	 * ImageContent, and replaces the raw base64 blobs in the text with [diagram N]
 	 * placeholders. Falls back to text-only if no images are present.
 	 */
-	private UserMessage buildVisionMessage(String textPrompt, String examContext) {
-		List<String> imageDataUris = PdfParser.extractBase64Images(examContext);
+	private UserMessage buildVisionMessage(String textPrompt, String examContext, List<String> imageUris) {
 		List<Content> contents = new ArrayList<>();
-
-		if (imageDataUris.isEmpty()) {
+		if (imageUris.isEmpty()) {
 			contents.add(TextContent.from(textPrompt));
 		} else {
 			String strippedContext = PdfParser.stripInlineImages(examContext);
 			String textWithStripped = textPrompt.replace(examContext, strippedContext);
 			contents.add(TextContent.from(textWithStripped));
-			for (String dataUri : imageDataUris) {
+			for (String dataUri : imageUris) {
 				contents.add(ImageContent.from(dataUri));
 			}
-			logger.info("[GEN] Vision message built with {} image(s)", imageDataUris.size());
 		}
 		return UserMessage.from(contents);
 	}
