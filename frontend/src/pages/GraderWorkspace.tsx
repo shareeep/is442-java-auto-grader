@@ -44,7 +44,7 @@ const UploadCard: React.FC<UploadCardProps> = ({
   return (
     <div
       onClick={() => inputRef.current?.click()}
-      className={`relative flex items-center gap-4 px-5 py-4 rounded-xl border cursor-pointer transition-all duration-200 group ${
+      className={`group relative flex cursor-pointer flex-col items-start gap-3 rounded-xl border px-4 py-4 transition-all duration-200 sm:flex-row sm:items-center sm:gap-4 sm:px-5 ${
         count > 0
           ? 'border-primary/40 bg-primary/5 hover:border-primary/60'
           : 'border-border bg-card hover:border-border/80 hover:bg-card/80'
@@ -74,7 +74,7 @@ const UploadCard: React.FC<UploadCardProps> = ({
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
       </div>
-      <div className="shrink-0">
+      <div className="shrink-0 sm:ml-auto">
         {count > 0 ? (
           <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
             <CheckCircle2 size={14} />
@@ -93,7 +93,7 @@ const UploadCard: React.FC<UploadCardProps> = ({
 const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: () => void; onDeepDive: (runId: string) => void }> = ({
   runs, loading, onViewAll, onDeepDive,
 }) => (
-  <aside className="w-64 shrink-0 flex flex-col gap-3">
+  <aside className="flex w-full shrink-0 flex-col gap-3 xl:w-72">
     <div className="flex items-center gap-2">
       <History size={13} className="text-muted-foreground" />
       <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recent Runs</span>
@@ -130,7 +130,7 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
                   {run.hasCsv && <span className="text-[10px] px-1 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {run.hasPdf && (
                   <button
                     onClick={() => window.open(`/api/reports/${run.id}/pdf`, '_blank')}
@@ -150,7 +150,7 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
                 {!failed && (
                   <button
                     onClick={() => onDeepDive(run.id)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors ml-auto"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors sm:ml-auto"
                   >
                     <FileText size={11} /> View
                   </button>
@@ -270,15 +270,15 @@ const GraderWorkspace: React.FC = () => {
   const showSidebar = phase === 'upload';
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto w-full px-8 py-6 pb-16">
-      <header className="flex items-start justify-between gap-4">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 pb-16 sm:px-6 sm:py-6 lg:px-8">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">Auto-Grader</h1>
           <p className="text-muted-foreground mt-1">
             Compile, test, and grade student Java submissions automatically.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 mt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-2 shrink-0">
           {phase === 'results' && !terminalOpen && (
             <button
               onClick={() => setTerminalOpen(true)}
@@ -335,7 +335,7 @@ const GraderWorkspace: React.FC = () => {
         </div>
       )}
 
-      <div className={showSidebar ? 'flex gap-6 items-start' : ''}>
+      <div className={showSidebar ? 'flex flex-col gap-6 xl:flex-row xl:items-start' : ''}>
         {showSidebar && (
           <RecentRunsPanel
             runs={pastRuns}
@@ -380,14 +380,14 @@ const GraderWorkspace: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                 {!canRun && (
                   <p className="text-xs text-muted-foreground">Add submissions and testers to enable grading.</p>
                 )}
                 <button
                   onClick={handleRun}
                   disabled={!canRun}
-                  className="flex items-center gap-2.5 px-6 py-3 bg-primary text-primary-foreground font-semibold text-sm rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ml-auto"
+                  className="ml-auto flex w-full items-center justify-center gap-2.5 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none sm:w-auto"
                 >
                   <Play size={16} fill="currentColor" />
                   Run Auto-Grader
@@ -413,7 +413,7 @@ const GraderWorkspace: React.FC = () => {
           {phase === 'results' && result && (
             <div className="flex flex-col gap-4">
               {/* Summary stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <StatCard icon={<TrendingUp size={20} />} label="Avg Score" value={`${avgPct}%`} sub={`${submissions.length} students`} />
                 <StatCard icon={<BarChart2 size={20} />} label="Pass Rate" value={`${passCount}/${submissions.length}`} sub="scored ≥ 50%" />
                 <StatCard icon={<TriangleAlert size={20} />} label="Anomalies" value={String(anomalyCount)} sub="across all students" />
@@ -427,7 +427,7 @@ const GraderWorkspace: React.FC = () => {
                 <div className="flex justify-end">
                   <button
                     onClick={() => navigate(`/past-runs/${runId}`)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:bg-primary/90 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
                   >
                     View Full Results
                     <ArrowRight size={15} />
