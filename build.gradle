@@ -5,6 +5,15 @@ buildscript {
             if (details.requested.group == 'org.eclipse.jgit') {
                 details.useVersion '7.6.0.202603022253-r'
             }
+            // CVE-2025-48924: commons-lang3 Uncontrolled Recursion (fixed in 3.18.0)
+            // spring-boot-gradle-plugin 3.5.12 introduces 3.16.0 via buildscript classpath
+            if (details.requested.group == 'org.apache.commons' && details.requested.name == 'commons-lang3') {
+                details.useVersion '3.20.0'
+            }
+            // GHSA-72hv-8253-57qq: jackson-core Async Parser DoS (fixed in 2.21.1)
+            if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                details.useVersion '2.21.1'
+            }
         }
     }
 }
@@ -21,6 +30,11 @@ plugins {
 group = 'com.is442'
 version = '1.0-SNAPSHOT'
 
+// Override Spring Boot BOM version pins for security patches
+// These properties are read by io.spring.dependency-management before resolving transitive deps
+ext['jackson-bom.version'] = '2.21.1'      // GHSA-72hv-8253-57qq: jackson-core Async Parser DoS
+ext['commons-lang3.version'] = '3.20.0'    // CVE-2025-48924: commons-lang3 Uncontrolled Recursion
+
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
@@ -34,9 +48,10 @@ repositories {
     mavenCentral()
 }
 
-configurations.all {
+// CVE-2025-48734: commons-beanutils Improper Access Control (fixed in 1.11.0)
+// Checkstyle pulls 1.9.4 transitively via checkstyle:10.12.5 — no higher version in tree to win naturally
+configurations.checkstyle {
     resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-        // CVE-2025-48734: commons-beanutils Improper Access Control (fixed in 1.11.0)
         if (details.requested.group == 'commons-beanutils' && details.requested.name == 'commons-beanutils') {
             details.useVersion '1.11.0'
         }
