@@ -49,8 +49,10 @@ configurations.all {
             details.useVersion '3.20.0'
         }
         // GHSA-72hv-8253-57qq: jackson-core Async Parser DoS (fixed in 2.21.1)
+        // Only jackson-core needs the patch; jackson-databind and jackson-annotations
+        // must stay at Spring Boot's managed version to avoid class-not-found errors.
         if (details.requested.group == 'com.fasterxml.jackson.core' &&
-                (details.requested.name == 'jackson-core' || details.requested.name == 'jackson-databind')) {
+                details.requested.name == 'jackson-core') {
             details.useVersion '2.21.1'
         }
     }
