@@ -451,7 +451,7 @@ const RunResults: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-[calc(100dvh-57px)] items-center justify-center bg-[#0d1117]">
         <Loader2 size={28} className="animate-spin text-primary/40" />
       </div>
     );
@@ -459,7 +459,7 @@ const RunResults: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-destructive">
+      <div className="flex h-[calc(100dvh-57px)] flex-col items-center justify-center gap-3 bg-[#0d1117] text-destructive">
         <AlertCircle size={28} />
         <p className="text-sm">{error}</p>
         <button onClick={() => navigate(-1)} className="text-xs text-muted-foreground underline">Go back</button>
@@ -468,10 +468,10 @@ const RunResults: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[#0d1117]">
+    <div className="flex h-[calc(100dvh-57px)] min-h-[calc(100dvh-57px)] flex-col overflow-hidden bg-[#0d1117]">
       {/* ── Header ── */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-white/[0.08] bg-[#161b22]">
-        <div className="flex items-center gap-3">
+      <div className="shrink-0 flex flex-col gap-3 border-b border-white/[0.08] bg-[#161b22] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-xs text-[#8b949e] hover:text-[#c9d1d9] transition-colors"
@@ -486,7 +486,7 @@ const RunResults: React.FC = () => {
             {students.length} students
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {runId && (
             <>
               <button
@@ -524,10 +524,10 @@ const RunResults: React.FC = () => {
       </div>
 
       {/* ── Three-pane body ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
 
         {/* ── Left: File Tree ── */}
-        <div className="w-[220px] shrink-0 border-r border-white/[0.06] bg-[#161b22] flex flex-col overflow-hidden">
+        <div className="flex w-full max-h-[34vh] shrink-0 flex-col overflow-hidden border-b border-white/[0.06] bg-[#161b22] lg:max-h-none lg:w-[220px] lg:border-b-0 lg:border-r">
           <div className="px-3 py-2 border-b border-white/[0.06] shrink-0 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#4d5566]">Files</span>
             <input
@@ -587,7 +587,7 @@ const RunResults: React.FC = () => {
         </div>
 
         {/* ── Center: Code Editor ── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex min-h-[320px] flex-1 flex-col overflow-hidden border-b border-white/[0.06] lg:border-b-0">
           {/* Tab bar */}
           <div className="shrink-0 flex items-center bg-[#161b22] border-b border-white/[0.06] overflow-x-auto">
             {openTabs.length === 0 ? (
@@ -639,7 +639,7 @@ const RunResults: React.FC = () => {
               {activeQResult && <TestOutputPanel qResult={activeQResult} />}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center bg-[#0d1117]">
+            <div className="flex min-h-[260px] flex-col items-center justify-center flex-1 gap-3 text-center bg-[#0d1117]">
               <FileIcon size={32} className="text-[#3d4451]" />
               <div>
                 <p className="text-sm text-[#4d5566]">Select a file to view</p>
@@ -650,7 +650,7 @@ const RunResults: React.FC = () => {
         </div>
 
         {/* ── Right: Scores Panel ── */}
-        <div className="w-[300px] shrink-0 border-l border-white/[0.06] bg-[#161b22] flex flex-col overflow-hidden">
+        <div className="flex w-full max-h-[40vh] shrink-0 flex-col overflow-hidden border-t border-white/[0.06] bg-[#161b22] lg:max-h-none lg:w-[300px] lg:border-l lg:border-t-0">
           <div className="px-3 py-2 border-b border-white/[0.06] shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#4d5566]">Scores</span>
           </div>
