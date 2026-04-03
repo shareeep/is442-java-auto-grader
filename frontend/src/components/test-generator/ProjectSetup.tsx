@@ -96,7 +96,7 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
                 : 'Click to select & upload folder'}
             </p>
             {uploadId && (
-              <p className="text-[10px] text-vsc-green mt-0.5">{fileCount > 0 ? `${fileCount} files uploaded ✓` : 'Uploaded ✓'}</p>
+              <p className="text-xs text-vsc-green mt-0.5">{fileCount > 0 ? `${fileCount} files uploaded ✓` : 'Uploaded ✓'}</p>
             )}
           </div>
           {!uploadId && !uploading && (
@@ -113,7 +113,7 @@ const FolderUploadCard: React.FC<FolderUploadCardProps> = ({ title, hint, upload
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
         {footer}
       </CardContent>
     </Card>

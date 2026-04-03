@@ -41,7 +41,7 @@ const Wizard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-16">
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto w-full px-8 py-6 pb-16">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">
@@ -112,7 +112,7 @@ const Wizard: React.FC = () => {
                 {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
               </div>
               <div className="hidden md:block">
-                <p className="text-[9px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
+                <p className="text-[10px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
                 <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
               </div>
             </button>

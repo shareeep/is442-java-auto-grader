@@ -33,7 +33,9 @@ export type TestCaseEntry = {
 export type SaveResponse = {
     savedPaths?: Array<string>;
     errors?: Array<string>;
-    fileContents?: Record<string, string>;
+    fileContents?: {
+        [key: string]: string;
+    };
 };
 
 export type ConfigConflict = {
@@ -393,6 +395,24 @@ export type AnalyzeSetupResponses = {
 
 export type AnalyzeSetupResponse = AnalyzeSetupResponses[keyof AnalyzeSetupResponses];
 
+export type GetBootIdData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/system/boot';
+};
+
+export type GetBootIdResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type GetBootIdResponse = GetBootIdResponses[keyof GetBootIdResponses];
+
 export type GetResultsData = {
     body?: never;
     path: {
@@ -412,6 +432,24 @@ export type GetResultsResponses = {
 };
 
 export type GetResultsResponse = GetResultsResponses[keyof GetResultsResponses];
+
+export type GetPlagiarismReportData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/plagiarism';
+};
+
+export type GetPlagiarismReportResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type GetPlagiarismReportResponse = GetPlagiarismReportResponses[keyof GetPlagiarismReportResponses];
 
 export type GetPdfData = {
     body?: never;

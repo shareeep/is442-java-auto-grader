@@ -5,6 +5,7 @@ import type { InferredConfig } from '../generated/types.gen';
 
 interface WizardStore {
   currentStep: number;
+  bootId: string | null;
   examId: string | null;
   templateId: string | null;
   testerId: string | null;
@@ -18,6 +19,7 @@ interface WizardStore {
   exportComplete: boolean;
   exportPath: string | null;
 
+  setBootId: (id: string | null) => void;
   setStep: (step: number) => void;
   setExamId: (id: string) => void;
   setTemplateId: (id: string | undefined) => void;
@@ -40,6 +42,7 @@ interface WizardStore {
 
 const initialState = {
   currentStep: 1,
+  bootId: null,
   examId: null,
   templateId: null,
   testerId: null,
@@ -59,6 +62,9 @@ export const useWizardStore = create<WizardStore>()(
     devtools(
       immer((set) => ({
         ...initialState,
+
+        setBootId: (id) =>
+          set((s) => { s.bootId = id; }, undefined, 'wizard/setBootId'),
 
         setStep: (step) =>
           set((s) => { s.currentStep = step; }, undefined, 'wizard/setStep'),
@@ -140,10 +146,11 @@ export const useWizardStore = create<WizardStore>()(
     ),
     {
       name: 'wizard-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => sessionStorage),
       version: 4,
       partialize: (state) => ({
         currentStep: state.currentStep,
+        bootId: state.bootId,
         examId: state.examId,
         templateId: state.templateId,
         testerId: state.testerId,
