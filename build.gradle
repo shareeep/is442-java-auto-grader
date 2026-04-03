@@ -41,6 +41,10 @@ dependencies {
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    
+    // JPlag plagiarism detection
+    implementation 'de.jplag:jplag:6.3.0'
+    implementation 'de.jplag:java:6.3.0'
 }
 
 tasks.named('test') {

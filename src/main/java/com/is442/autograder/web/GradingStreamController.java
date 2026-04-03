@@ -1,6 +1,5 @@
 package com.is442.autograder.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is442.autograder.GradingPipeline;
 import com.is442.autograder.config.AppConfig;
 import com.is442.autograder.generation.ConfigInferenceService;
@@ -20,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -134,7 +134,8 @@ public class GradingStreamController {
 							}
 						});
 
-				// Persist results.json + student code so the RunResults page can load them
+				// RunResults page can load them automatically because they are written by
+				// GradingPipeline
 				String runId = null;
 				if (Files.isDirectory(outputDir)) {
 					try (Stream<Path> ls = Files.list(outputDir)) {

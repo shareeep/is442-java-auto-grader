@@ -12,6 +12,7 @@ services:
     environment:
       - DOCLING_SERVE_URL=http://docling:5001
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - TZ=Asia/Singapore
     env_file:
       - .env
     depends_on:
@@ -23,8 +24,16 @@ services:
 
   frontend:
     build: ./frontend
-    ports: 
+    ports:
       - "5173:80"
+    depends_on:
+      - backend
+    restart: always
+
+  plagiarism-viewer:
+    build: ./plagiarism-viewer
+    ports:
+      - "1996:80"
     depends_on:
       - backend
     restart: always

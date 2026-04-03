@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Download, Eye, ChevronRight, ChevronDown, ChevronUp,
   FileCode2, Loader2, AlertCircle, User, CheckCircle2,
-  TriangleAlert, X, File as FileIcon, Plus, MessageSquare, Clock,
+  TriangleAlert, X, File as FileIcon, Plus, MessageSquare, ExternalLink, Clock,
 } from 'lucide-react';
 import { getStudentCode } from '../generated/sdk.gen';
-import { getResultsOptions } from '../generated/@tanstack/react-query.gen';
+import { getResultsOptions, listRunsOptions } from '../generated/@tanstack/react-query.gen';
 import { formatRunTimestamp } from '../lib/utils';
 
 interface QResult {
@@ -378,6 +378,11 @@ const RunResults: React.FC = () => {
   const students: Student[] = (resultsData as unknown as Student[]) ?? [];
   const error = queryError?.message ?? null;
 
+  const { data: runsData } = useQuery(listRunsOptions());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const runMeta = (runsData as unknown as any[])?.find((r: any) => r.id === runId);
+  const hasPlagiarism: boolean = runMeta?.hasPlagiarism ?? false;
+
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [studentCode, setStudentCode] = useState<Record<string, Record<string, string>>>({});
   const [loadingCode, setLoadingCode] = useState<Set<string>>(new Set());
@@ -496,6 +501,23 @@ const RunResults: React.FC = () => {
               >
                 <Download size={12} /> CSV
               </button>
+              {hasPlagiarism && (
+                <>
+                  <button
+                    onClick={() => window.open(`http://localhost:1996/?file=/api/reports/${runId}/plagiarism`, '_blank')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
+                  >
+                    <ExternalLink size={12} /> Plagiarism Report
+                  </button>
+                  <button
+                    onClick={() => window.open(`/api/reports/${runId}/plagiarism`, '_blank')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
+                    title="Download raw .jplag file"
+                  >
+                    <Download size={12} /> .jplag
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

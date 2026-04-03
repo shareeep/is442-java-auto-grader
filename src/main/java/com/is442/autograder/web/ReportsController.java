@@ -48,6 +48,7 @@ public class ReportsController {
 						run.put("hasPdf", Files.exists(dir.resolve("instructor-report.pdf")));
 						run.put("hasCsv", Files.exists(dir.resolve("IS442-ScoreSheet-Graded.csv"))
 								|| Files.exists(dir.resolve("detailed-report.csv")));
+						run.put("hasPlagiarism", Files.exists(dir.resolve("plagiarism-report.jplag")));
 
 						// Count students: prefer results.json (written after every run and
 						// accurate), fall back to logs/ subdirectories which may undercount if
@@ -110,6 +111,20 @@ public class ReportsController {
 		Resource resource = new FileSystemResource(csv);
 		return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/csv"))
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + csv.getFileName() + "\"")
+				.body(resource);
+	}
+
+	@GetMapping("/{id}/plagiarism")
+	public ResponseEntity<Resource> getPlagiarismReport(@PathVariable String id) {
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
+		Path report = OUTPUT_DIR.resolve(id).resolve("plagiarism-report.jplag");
+		if (!Files.exists(report)) {
+			return ResponseEntity.notFound().build();
+		}
+		Resource resource = new FileSystemResource(report);
+		return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"plagiarism-report-" + id + ".jplag\"")
 				.body(resource);
 	}
 
