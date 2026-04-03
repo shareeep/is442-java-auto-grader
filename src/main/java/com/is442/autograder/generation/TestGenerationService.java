@@ -8,6 +8,10 @@ import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StructuredTestCase;
 import com.is442.autograder.model.TestCaseRecommendation;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.UserMessage;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -46,7 +50,7 @@ public class TestGenerationService {
 		this.objectMapper = new ObjectMapper();
 	}
 
-	/**
+/**
 	 * Generate test cases for a single question.
 	 *
 	 * @param question
@@ -84,7 +88,7 @@ public class TestGenerationService {
 
 		String rawJson;
 		try {
-			rawJson = langChainService.generateTestCasesJson(prompt);
+			rawJson = langChainService.generateTestCasesJson(buildVisionMessage(prompt, examContext));
 		} catch (Exception e) {
 			logger.error("[GEN] AI call failed  questionId={}: {}", question.getQuestionId(), e.getMessage());
 			return new GenerationResult(question.getQuestionId(), List.of(), false,
@@ -129,7 +133,7 @@ public class TestGenerationService {
 			String existingTesterContent, int existingCaseCount) throws IOException, InterruptedException {
 
 		String prompt = buildRecommendPrompt(questionId, examContext, existingTesterContent, existingCaseCount);
-		String rawJson = langChainService.recommendJson(prompt);
+		String rawJson = langChainService.recommendJson(buildVisionMessage(prompt, examContext));
 		return parseRecommendation(rawJson, questionId, existingCaseCount);
 	}
 
@@ -141,6 +145,32 @@ public class TestGenerationService {
 
 		String prompt = buildRefinePrompt(questionId, currentCode, refinementPrompt, examContext);
 		return langChainService.refineCode(prompt);
+	}
+
+	// ── Vision message builder ───────────────────────────────────────────────
+
+	/**
+	 * Build a multimodal UserMessage from a text prompt and exam context markdown.
+	 * Extracts any embedded base64 images from the context, adds them as
+	 * ImageContent, and replaces the raw base64 blobs in the text with [diagram N]
+	 * placeholders. Falls back to text-only if no images are present.
+	 */
+	private UserMessage buildVisionMessage(String textPrompt, String examContext) {
+		List<String> imageDataUris = PdfParser.extractBase64Images(examContext);
+		List<Content> contents = new ArrayList<>();
+
+		if (imageDataUris.isEmpty()) {
+			contents.add(TextContent.from(textPrompt));
+		} else {
+			String strippedContext = PdfParser.stripInlineImages(examContext);
+			String textWithStripped = textPrompt.replace(examContext, strippedContext);
+			contents.add(TextContent.from(textWithStripped));
+			for (String dataUri : imageDataUris) {
+				contents.add(ImageContent.from(dataUri));
+			}
+			logger.info("[GEN] Vision message built with {} image(s)", imageDataUris.size());
+		}
+		return UserMessage.from(contents);
 	}
 
 	// ── Prompt builders ──────────────────────────────────────────────────────

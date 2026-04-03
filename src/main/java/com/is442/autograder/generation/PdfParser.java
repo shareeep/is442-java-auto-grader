@@ -6,7 +6,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,8 +62,16 @@ public class PdfParser {
 
 		Object rawResponse = api.convertSource(request);
 		String markdown = extractMarkdown(rawResponse);
-		logger.info("[PDF] Docling conversion complete  file={} markdownChars={}", pdfPath.getFileName(),
-				markdown.length());
+		long embeddedImageCount = extractBase64Images(markdown).size();
+		logger.info("[PDF] Docling conversion complete  file={} markdownChars={} embeddedImages={}",
+				pdfPath.getFileName(), markdown.length(), embeddedImageCount);
+		if (embeddedImageCount == 0 && markdown.contains("![")) {
+			// EMBEDDED mode may not produce data URIs — log a sample of image refs found
+			Matcher sampleMatcher = Pattern.compile("!\\[[^\\]]*\\]\\([^)]+\\)").matcher(markdown);
+			if (sampleMatcher.find()) {
+				logger.info("[PDF] Image ref sample (not base64): {}", sampleMatcher.group().substring(0, Math.min(120, sampleMatcher.group().length())));
+			}
+		}
 		return markdown;
 	}
 
@@ -129,8 +139,39 @@ public class PdfParser {
 				.source(FileSource.builder().base64String(Base64.getEncoder().encodeToString(pdfBytes))
 						.filename(dynamicFilename).build())
 				.options(ConvertDocumentOptions.builder().toFormat(OutputFormat.MARKDOWN)
-						.imageExportMode(ImageRefMode.REFERENCED).includeImages(true).doOcr(true).build())
+						.imageExportMode(ImageRefMode.EMBEDDED).includeImages(true).doOcr(true).build())
 				.target(InBodyTarget.builder().build()).build();
+	}
+
+	// ── Static image helpers (used by TestGenerationService) ────────────────
+
+	private static final Pattern IMAGE_DATA_URI_PATTERN = Pattern
+			.compile("!\\[[^\\]]*\\]\\((data:image/[^;]+;base64,[A-Za-z0-9+/=]+)\\)");
+
+	/**
+	 * Extract all base64 image data URIs embedded in the markdown (from EMBEDDED
+	 * mode). Returns a list of "data:image/png;base64,..." strings.
+	 */
+	public static List<String> extractBase64Images(String markdown) {
+		List<String> images = new ArrayList<>();
+		Matcher m = IMAGE_DATA_URI_PATTERN.matcher(markdown);
+		while (m.find()) {
+			images.add(m.group(1));
+		}
+		return images;
+	}
+
+	/**
+	 * Strip embedded base64 data URIs from markdown, replacing each with a
+	 * [diagram N] placeholder. Keeps the markdown readable for the text portion of
+	 * the LLM prompt.
+	 */
+	public static String stripInlineImages(String markdown) {
+		int[] counter = { 1 };
+		return IMAGE_DATA_URI_PATTERN.matcher(markdown).replaceAll(mr -> {
+			int n = counter[0]++;
+			return "![diagram " + n + "](diagram_" + n + ")";
+		});
 	}
 
 	private String extractMarkdown(Object rawResponse) throws IOException {
