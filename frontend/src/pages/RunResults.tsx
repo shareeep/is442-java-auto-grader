@@ -240,6 +240,7 @@ const RunResults: React.FC = () => {
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [studentCode, setStudentCode] = useState<Record<string, Record<string, string>>>({});
   const [loadingCode, setLoadingCode] = useState<Set<string>>(new Set());
+  const [studentSearch, setStudentSearch] = useState('');
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const [expandedScore, setExpandedScore] = useState<string | null>(null);
@@ -283,6 +284,14 @@ const RunResults: React.FC = () => {
   };
 
   const activeTab = openTabs.find(t => t.key === activeTabKey) ?? null;
+
+  // Auto-expand the matching student in the Scores panel when the active file tab changes
+  useEffect(() => {
+    if (activeTabKey) {
+      const username = activeTabKey.split('::')[0];
+      setExpandedScore(username);
+    }
+  }, [activeTabKey]);
 
   if (loading) {
     return (
@@ -363,11 +372,20 @@ const RunResults: React.FC = () => {
 
         {/* ── Left: File Tree ── */}
         <div className="w-[220px] shrink-0 border-r border-white/[0.06] bg-[#161b22] flex flex-col overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/[0.06] shrink-0">
+          <div className="px-3 py-2 border-b border-white/[0.06] shrink-0 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#4d5566]">Files</span>
+            <input
+              type="search"
+              placeholder="Filter students..."
+              value={studentSearch}
+              onChange={e => setStudentSearch(e.target.value)}
+              className="w-full text-[11px] bg-[#0d1117] border border-white/[0.06] rounded px-2 py-1 text-[#8b949e] outline-none focus:border-white/20 placeholder:text-[#3d4451]"
+            />
           </div>
           <div className="flex-1 overflow-auto py-1.5 font-mono text-xs">
-            {students.map(s => {
+            {students.filter(s =>
+              (s.displayName || s.username).toLowerCase().includes(studentSearch.toLowerCase())
+            ).map(s => {
               const expanded = expandedStudents.has(s.username);
               const files = studentCode[s.username] ?? {};
               const isLoading = loadingCode.has(s.username);
@@ -488,10 +506,8 @@ const RunResults: React.FC = () => {
                         ? <ChevronDown size={11} className="text-[#4d5566] shrink-0" />
                         : <ChevronRight size={11} className="text-[#4d5566] shrink-0" />}
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-[#c9d1d9] truncate">{s.displayName || s.username}</p>
-                        {s.displayName && s.displayName !== s.username && (
-                          <p className="text-[10px] text-[#4d5566] truncate font-mono">{s.username}</p>
-                        )}
+                        <p className="text-xs font-medium text-[#c9d1d9] truncate">{s.name || s.displayName || s.username}</p>
+                        <p className="text-[10px] text-[#4d5566] truncate font-mono">{s.username}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -510,9 +526,15 @@ const RunResults: React.FC = () => {
                     <div className="px-3 pb-3 space-y-1.5">
                       {s.results.map(r => {
                         const qPct = r.maxScore > 0 ? r.score / r.maxScore : 0;
+                        const qid = r.questionId.toLowerCase();
+                        const activeFilename = activeTabKey?.split('::')[1]?.split(/[\\/]/).pop()?.replace(/\.java$/i, '').toLowerCase() ?? '';
+                        const isActiveQ = expandedScore === s.username && activeFilename === qid;
                         return (
-                          <div key={r.questionId} className="flex items-center justify-between text-xs gap-2">
-                            <span className="font-mono text-[#4d5566] w-8 shrink-0">{r.questionId}</span>
+                          <div
+                            key={r.questionId}
+                            className={`flex items-center justify-between text-xs gap-2 rounded px-1.5 py-0.5 -mx-1.5 transition-colors ${isActiveQ ? 'bg-white/[0.07] border-l-2 border-[#e8e3d5]/60 pl-2' : ''}`}
+                          >
+                            <span className={`font-mono w-8 shrink-0 ${isActiveQ ? 'text-[#e8e3d5]' : 'text-[#4d5566]'}`}>{r.questionId}</span>
                             <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${qPct === 1 ? 'bg-vsc-green' : qPct > 0 ? 'bg-[#e8e3d5]' : 'bg-vsc-red/40'}`}

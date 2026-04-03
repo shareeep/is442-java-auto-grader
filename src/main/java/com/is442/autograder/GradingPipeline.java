@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -55,6 +56,11 @@ public class GradingPipeline {
 	private final ConsoleReporter consoleReporter;
 	private final ScoresheetEnricher scoresheetEnricher;
 	private List<QuestionConfig> inferredQuestionConfigs;
+	private final AtomicBoolean cancelled = new AtomicBoolean(false);
+
+	public void cancel() {
+		cancelled.set(true);
+	}
 
 	public GradingPipeline(AppConfig config) {
 		this.config = config;
@@ -134,8 +140,8 @@ public class GradingPipeline {
 
 			// 2. Process each ZIP
 			for (int i = 0; i < zipFiles.size(); i++) {
-				// Honour a stop request (user pressed 'q' during grading)
-				if (consoleReporter.isStopRequested()) {
+				// Honour a stop request (user pressed 'q' or cancel via web UI)
+				if (consoleReporter.isStopRequested() || cancelled.get()) {
 					break;
 				}
 
@@ -199,7 +205,8 @@ public class GradingPipeline {
 			consoleReporter.endProgress();
 			System.out.println();
 
-			if (consoleReporter.isStopRequested()) {
+			boolean stopped = consoleReporter.isStopRequested() || cancelled.get();
+			if (stopped) {
 				System.out.println(
 						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
 			}
@@ -213,7 +220,7 @@ public class GradingPipeline {
 			consoleReporter.printSummary(submissions, questionConfigs);
 
 			// 6. Export scoresheet (if template provided)
-			if (!consoleReporter.isStopRequested() && scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
+			if (!stopped && scoresheetPath != null && Files.isRegularFile(scoresheetPath)) {
 				Path outputCsv = runOutputDir.resolve("IS442-ScoreSheet-Graded.csv");
 				csvExporter.export(scoresheetPath, outputCsv, submissions, questionConfigs);
 				System.out.println("\nScoresheet exported to: " + outputCsv);
@@ -230,7 +237,7 @@ public class GradingPipeline {
 			System.out.println("Run log exported to: " + runOutputDir.resolve("logs").resolve("run.log"));
 
 			// 7. Export PDF report
-			if (!consoleReporter.isStopRequested()) {
+			if (!stopped) {
 				Path pdfReport = runOutputDir.resolve("instructor-report.pdf");
 				new PdfReportGenerator(config.getAssessmentName()).generate(submissions, questionConfigs, pdfReport);
 				System.out.println("PDF report exported to: " + pdfReport);

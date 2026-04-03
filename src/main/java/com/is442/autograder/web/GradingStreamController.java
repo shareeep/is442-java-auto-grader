@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,8 +36,9 @@ public class GradingStreamController {
 	private final ExecutorService executor = Executors.newFixedThreadPool(4);
 	private final AppConfig appConfig;
 
-	// Stores emitters for active grading sessions
+	// Stores emitters and pipelines for active grading sessions
 	private static final Map<String, SseEmitter> ACTIVE_SESSIONS = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<String, com.is442.autograder.GradingPipeline> ACTIVE_PIPELINES = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public GradingStreamController(AppConfig appConfig) {
 		this.appConfig = appConfig;
@@ -56,8 +59,14 @@ public class GradingStreamController {
 		String sessionId = UUID.randomUUID().toString();
 		ACTIVE_SESSIONS.put(sessionId, emitter);
 
-		emitter.onCompletion(() -> ACTIVE_SESSIONS.remove(sessionId));
-		emitter.onTimeout(() -> ACTIVE_SESSIONS.remove(sessionId));
+		emitter.onCompletion(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
+		emitter.onTimeout(() -> {
+			ACTIVE_SESSIONS.remove(sessionId);
+			ACTIVE_PIPELINES.remove(sessionId);
+		});
 
 		// Save uploaded files to temp dirs
 		Path submissionsDir = Files.createTempDirectory("autograder-stream-submissions-");
@@ -104,6 +113,7 @@ public class GradingStreamController {
 
 				GradingPipeline pipeline = new GradingPipeline(appConfig);
 				pipeline.setInferredQuestionConfigs(inferredConfigs);
+				ACTIVE_PIPELINES.put(sessionId, pipeline);
 
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "grading", "message", "Starting grading...")));
@@ -132,6 +142,7 @@ public class GradingStreamController {
 						Path runDir = ls.filter(Files::isDirectory).max(Comparator.naturalOrder()).orElse(null);
 						if (runDir != null) {
 							runId = runDir.getFileName().toString();
+							persistRunArtifacts(runDir, submissions);
 						}
 					} catch (IOException e) {
 						logger.warn("Could not locate run output directory", e);
@@ -158,6 +169,61 @@ public class GradingStreamController {
 		});
 
 		return emitter;
+	}
+
+	@PostMapping("/stop/{sessionId}")
+	public org.springframework.http.ResponseEntity<?> stopGrading(@PathVariable String sessionId) {
+		GradingPipeline pipeline = ACTIVE_PIPELINES.get(sessionId);
+		if (pipeline == null) {
+			return org.springframework.http.ResponseEntity.notFound().build();
+		}
+		pipeline.cancel();
+		SseEmitter emitter = ACTIVE_SESSIONS.get(sessionId);
+		if (emitter != null) {
+			try {
+				emitter.send(SseEmitter.event().name("status")
+						.data(Map.of("phase", "cancelled", "message", "Grading cancelled.")));
+			} catch (IOException e) {
+				logger.warn("Could not send cancel event for session {}", sessionId);
+			}
+			emitter.complete();
+		}
+		return org.springframework.http.ResponseEntity.ok(Map.of("cancelled", true));
+	}
+
+	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
+		try {
+			List<Map<String, Object>> payloads = submissions.stream().map(this::buildStudentPayload).toList();
+			String json = new ObjectMapper().writeValueAsString(payloads);
+			Files.writeString(runDir.resolve("results.json"), json);
+		} catch (Exception e) {
+			logger.warn("Failed to write results.json", e);
+		}
+
+		for (StudentSubmission sub : submissions) {
+			Path root = sub.getRootPath();
+			if (root == null || !Files.exists(root))
+				continue;
+			String username = sub.getUsername() != null ? sub.getUsername() : sub.getDisplayName();
+			String safeUser = username.replaceAll("[^a-zA-Z0-9._-]", "_");
+			Path codeDir = runDir.resolve("code").resolve(safeUser);
+			try {
+				Files.createDirectories(codeDir);
+				try (Stream<Path> walk = Files.walk(root)) {
+					walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).forEach(src -> {
+						try {
+							Path dest = codeDir.resolve(root.relativize(src));
+							Files.createDirectories(dest.getParent());
+							Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+						} catch (IOException e) {
+							logger.warn("Failed to copy {}", src, e);
+						}
+					});
+				}
+			} catch (IOException e) {
+				logger.warn("Failed to copy code for {}", safeUser, e);
+			}
+		}
 	}
 
 	private Map<String, Object> buildStudentPayload(StudentSubmission sub) {

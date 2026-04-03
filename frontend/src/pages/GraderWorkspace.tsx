@@ -239,6 +239,16 @@ const GraderWorkspace: React.FC = () => {
     setStreamFormData(null);
   };
 
+  const handleCancel = () => {
+    graderReset();
+    setError(null);
+    setStreamFormData(null);
+    setSubmissionFiles([]);
+    setTesterFiles([]);
+    setScoresheetFiles([]);
+    setTerminalOpen(true);
+  };
+
   const handleReset = () => {
     graderReset();
     setError(null);
@@ -394,6 +404,7 @@ const GraderWorkspace: React.FC = () => {
                 onComplete={handleStreamComplete}
                 onError={handleStreamError}
                 onClose={phase === 'results' ? () => setTerminalOpen(false) : undefined}
+                onCancel={phase === 'grading' ? handleCancel : undefined}
               />
             </div>
           )}

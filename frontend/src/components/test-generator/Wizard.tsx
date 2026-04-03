@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, GraduationCap, LayoutPanelLeft, ListChecks, FileCheck, RotateCcw } from 'lucide-react';
 
@@ -20,8 +20,15 @@ const Wizard: React.FC = () => {
   const setStep = useWizardStore((s) => s.setStep);
   const reset = useWizardStore((s) => s.reset);
 
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
   const nextStep = () => setStep(Math.min(currentStep + 1, STEPS.length));
   const prevStep = () => setStep(Math.max(currentStep - 1, 1));
+
+  const handleReset = () => {
+    reset();
+    setConfirmingReset(false);
+  };
 
   const renderStep = () => {
     switch (currentStep) {
@@ -45,14 +52,36 @@ const Wizard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={reset}
-            className="text-muted-foreground hover:text-foreground gap-1.5"
-          >
-            <RotateCcw size={13} /> Start Over
-          </Button>
+          {confirmingReset ? (
+            <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-md px-3 py-1.5">
+              <span className="text-xs text-destructive font-medium">All progress will be lost. Are you sure?</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/20"
+              >
+                Yes, reset
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmingReset(false)}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingReset(true)}
+              className="text-muted-foreground hover:text-foreground gap-1.5"
+            >
+              <RotateCcw size={13} /> Start Over
+            </Button>
+          )}
           <div className="flex items-center gap-2 text-xs font-mono text-primary bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20">
             Step {currentStep} of {STEPS.length}
           </div>
@@ -67,23 +96,26 @@ const Wizard: React.FC = () => {
           const isCompleted = currentStep > step.id;
 
           return (
-            <div key={step.id}>
-              <div className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 border ${
+            <button
+              key={step.id}
+              onClick={() => isCompleted && setStep(step.id)}
+              disabled={!isCompleted && !isActive}
+              className={`w-full text-left flex items-center gap-3 p-3 rounded-md transition-all duration-200 border ${
                 isActive
                   ? 'bg-primary/15 text-primary border-primary/30 glow-blue -translate-y-0.5'
                   : isCompleted
-                    ? 'bg-vsc-green/10 text-vsc-green border-vsc-green/20'
-                    : 'bg-card text-muted-foreground border-border'
-              }`}>
-                <div className={`p-1.5 rounded ${isActive ? 'bg-primary/20' : isCompleted ? 'bg-vsc-green/10' : 'bg-secondary'}`}>
-                  {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-[9px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
-                  <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
-                </div>
+                    ? 'bg-vsc-green/10 text-vsc-green border-vsc-green/20 hover:bg-vsc-green/20 cursor-pointer'
+                    : 'bg-card text-muted-foreground border-border cursor-default'
+              }`}
+            >
+              <div className={`p-1.5 rounded ${isActive ? 'bg-primary/20' : isCompleted ? 'bg-vsc-green/10' : 'bg-secondary'}`}>
+                {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
               </div>
-            </div>
+              <div className="hidden md:block">
+                <p className="text-[9px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
+                <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
+              </div>
+            </button>
           );
         })}
       </div>
