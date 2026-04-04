@@ -29,7 +29,7 @@ import java.util.stream.Stream;
  * SSE endpoint that streams grading progress in real time.
  */
 @RestController
-@RequestMapping("/api/grade")
+@RequestMapping("/api/grading")
 public class GradingStreamController {
 
 	private static final Logger logger = LoggerFactory.getLogger(GradingStreamController.class);
@@ -206,7 +206,7 @@ public class GradingStreamController {
 		return emitter;
 	}
 
-	@PostMapping("/stop/{sessionId}")
+	@PostMapping("/{sessionId}/stop")
 	public org.springframework.http.ResponseEntity<?> stopGrading(@PathVariable String sessionId) {
 		GradingPipeline pipeline = ACTIVE_PIPELINES.get(sessionId);
 		if (pipeline == null) {

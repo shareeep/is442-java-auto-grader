@@ -3,69 +3,13 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { analyzeSetup, execute, generate, generateQuestion, getAiSettings, getBootId, getCsv, getLogs, getPdf, getPdfWithName, getPlagiarismReport, getQuestions, getResults, getStudentCode, getTemplateSource, getTester, listRuns, type Options, preparsePdf, recommend, refine, runGrading, save, saveSetup, stopGrading, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponse, ExecuteData, ExecuteResponse, GenerateData, GenerateQuestionData, GenerateQuestionResponse, GenerateResponse, GetAiSettingsData, GetAiSettingsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetLogsData, GetLogsResponse, GetPdfData, GetPdfResponse, GetPdfWithNameData, GetPdfWithNameResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetQuestionsData, GetQuestionsResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTemplateSourceData, GetTemplateSourceResponse, GetTesterData, GetTesterResponse, ListRunsData, ListRunsResponse, PreparsePdfData, PreparsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, RunGradingData, RunGradingResponse, SaveData, SaveResponse2, SaveSetupData, SaveSetupResponse, StopGradingData, StopGradingResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
-
-export const runGradingMutation = (options?: Partial<Options<RunGradingData>>): UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> => {
-    const mutationOptions: UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await runGrading({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const streamGradingMutation = (options?: Partial<Options<StreamGradingData>>): UseMutationOptions<StreamGradingResponse, DefaultError, Options<StreamGradingData>> => {
-    const mutationOptions: UseMutationOptions<StreamGradingResponse, DefaultError, Options<StreamGradingData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await streamGrading({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const stopGradingMutation = (options?: Partial<Options<StopGradingData>>): UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> => {
-    const mutationOptions: UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await stopGrading({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
+import { analyzeSetup, downloadRun, generateTests, getBootId, getCsv, getPdf, getPdfWithName, getPlagiarismReport, getResults, getStudentCode, getTester, getTesterFiles, listRuns, type Options, parsePdf, recommend, refine, save, stopGrading, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponse, DownloadRunData, DownloadRunResponse, GenerateTestsData, GenerateTestsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetPdfData, GetPdfResponse, GetPdfWithNameData, GetPdfWithNameResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTesterData, GetTesterFilesData, GetTesterFilesResponse, GetTesterResponse, ListRunsData, ListRunsResponse, ParsePdfData, ParsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, SaveData, SaveResponse2, StopGradingData, StopGradingResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
 
 export const uploadTestersMutation = (options?: Partial<Options<UploadTestersData>>): UseMutationOptions<UploadTestersResponse, DefaultError, Options<UploadTestersData>> => {
     const mutationOptions: UseMutationOptions<UploadTestersResponse, DefaultError, Options<UploadTestersData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await uploadTesters({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const uploadTemplateMutation = (options?: Partial<Options<UploadTemplateData>>): UseMutationOptions<UploadTemplateResponse, DefaultError, Options<UploadTemplateData>> => {
-    const mutationOptions: UseMutationOptions<UploadTemplateResponse, DefaultError, Options<UploadTemplateData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await uploadTemplate({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -90,10 +34,52 @@ export const saveMutation = (options?: Partial<Options<SaveData>>): UseMutationO
     return mutationOptions;
 };
 
-export const saveSetupMutation = (options?: Partial<Options<SaveSetupData>>): UseMutationOptions<SaveSetupResponse, DefaultError, Options<SaveSetupData>> => {
-    const mutationOptions: UseMutationOptions<SaveSetupResponse, DefaultError, Options<SaveSetupData>> = {
+export const uploadTemplateMutation = (options?: Partial<Options<UploadTemplateData>>): UseMutationOptions<UploadTemplateResponse, DefaultError, Options<UploadTemplateData>> => {
+    const mutationOptions: UseMutationOptions<UploadTemplateResponse, DefaultError, Options<UploadTemplateData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await saveSetup({
+            const { data } = await uploadTemplate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const stopGradingMutation = (options?: Partial<Options<StopGradingData>>): UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> => {
+    const mutationOptions: UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await stopGrading({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const streamGradingMutation = (options?: Partial<Options<StreamGradingData>>): UseMutationOptions<StreamGradingResponse, DefaultError, Options<StreamGradingData>> => {
+    const mutationOptions: UseMutationOptions<StreamGradingResponse, DefaultError, Options<StreamGradingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await streamGrading({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const generateTestsMutation = (options?: Partial<Options<GenerateTestsData>>): UseMutationOptions<GenerateTestsResponse, DefaultError, Options<GenerateTestsData>> => {
+    const mutationOptions: UseMutationOptions<GenerateTestsResponse, DefaultError, Options<GenerateTestsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await generateTests({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -132,66 +118,10 @@ export const recommendMutation = (options?: Partial<Options<RecommendData>>): Us
     return mutationOptions;
 };
 
-export const preparsePdfMutation = (options?: Partial<Options<PreparsePdfData>>): UseMutationOptions<PreparsePdfResponse, DefaultError, Options<PreparsePdfData>> => {
-    const mutationOptions: UseMutationOptions<PreparsePdfResponse, DefaultError, Options<PreparsePdfData>> = {
+export const parsePdfMutation = (options?: Partial<Options<ParsePdfData>>): UseMutationOptions<ParsePdfResponse, DefaultError, Options<ParsePdfData>> => {
+    const mutationOptions: UseMutationOptions<ParsePdfResponse, DefaultError, Options<ParsePdfData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await preparsePdf({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const generateMutation = (options?: Partial<Options<GenerateData>>): UseMutationOptions<GenerateResponse, DefaultError, Options<GenerateData>> => {
-    const mutationOptions: UseMutationOptions<GenerateResponse, DefaultError, Options<GenerateData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await generate({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const generateQuestionMutation = (options?: Partial<Options<GenerateQuestionData>>): UseMutationOptions<GenerateQuestionResponse, DefaultError, Options<GenerateQuestionData>> => {
-    const mutationOptions: UseMutationOptions<GenerateQuestionResponse, DefaultError, Options<GenerateQuestionData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await generateQuestion({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const executeMutation = (options?: Partial<Options<ExecuteData>>): UseMutationOptions<ExecuteResponse, DefaultError, Options<ExecuteData>> => {
-    const mutationOptions: UseMutationOptions<ExecuteResponse, DefaultError, Options<ExecuteData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await execute({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const uploadExamMutation = (options?: Partial<Options<UploadExamData>>): UseMutationOptions<UploadExamResponse, DefaultError, Options<UploadExamData>> => {
-    const mutationOptions: UseMutationOptions<UploadExamResponse, DefaultError, Options<UploadExamData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await uploadExam({
+            const { data } = await parsePdf({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -206,6 +136,20 @@ export const analyzeSetupMutation = (options?: Partial<Options<AnalyzeSetupData>
     const mutationOptions: UseMutationOptions<AnalyzeSetupResponse, DefaultError, Options<AnalyzeSetupData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await analyzeSetup({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const uploadExamMutation = (options?: Partial<Options<UploadExamData>>): UseMutationOptions<UploadExamResponse, DefaultError, Options<UploadExamData>> => {
+    const mutationOptions: UseMutationOptions<UploadExamResponse, DefaultError, Options<UploadExamData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await uploadExam({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -249,6 +193,21 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
     return [params];
 };
 
+export const getTesterQueryKey = (options: Options<GetTesterData>) => createQueryKey('getTester', options);
+
+export const getTesterOptions = (options: Options<GetTesterData>) => queryOptions<GetTesterResponse, DefaultError, GetTesterResponse, ReturnType<typeof getTesterQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getTester({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getTesterQueryKey(options)
+});
+
 export const getBootIdQueryKey = (options?: Options<GetBootIdData>) => createQueryKey('getBootId', options);
 
 export const getBootIdOptions = (options?: Options<GetBootIdData>) => queryOptions<GetBootIdResponse, DefaultError, GetBootIdResponse, ReturnType<typeof getBootIdQueryKey>>({
@@ -262,6 +221,21 @@ export const getBootIdOptions = (options?: Options<GetBootIdData>) => queryOptio
         return data;
     },
     queryKey: getBootIdQueryKey(options)
+});
+
+export const getTesterFilesQueryKey = (options: Options<GetTesterFilesData>) => createQueryKey('getTesterFiles', options);
+
+export const getTesterFilesOptions = (options: Options<GetTesterFilesData>) => queryOptions<GetTesterFilesResponse, DefaultError, GetTesterFilesResponse, ReturnType<typeof getTesterFilesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getTesterFiles({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getTesterFilesQueryKey(options)
 });
 
 export const getResultsQueryKey = (options: Options<GetResultsData>) => createQueryKey('getResults', options);
@@ -324,11 +298,11 @@ export const getPdfWithNameOptions = (options: Options<GetPdfWithNameData>) => q
     queryKey: getPdfWithNameQueryKey(options)
 });
 
-export const getLogsQueryKey = (options: Options<GetLogsData>) => createQueryKey('getLogs', options);
+export const downloadRunQueryKey = (options: Options<DownloadRunData>) => createQueryKey('downloadRun', options);
 
-export const getLogsOptions = (options: Options<GetLogsData>) => queryOptions<GetLogsResponse, DefaultError, GetLogsResponse, ReturnType<typeof getLogsQueryKey>>({
+export const downloadRunOptions = (options: Options<DownloadRunData>) => queryOptions<DownloadRunResponse, DefaultError, DownloadRunResponse, ReturnType<typeof downloadRunQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getLogs({
+        const { data } = await downloadRun({
             ...options,
             ...queryKey[0],
             signal,
@@ -336,7 +310,7 @@ export const getLogsOptions = (options: Options<GetLogsData>) => queryOptions<Ge
         });
         return data;
     },
-    queryKey: getLogsQueryKey(options)
+    queryKey: downloadRunQueryKey(options)
 });
 
 export const getCsvQueryKey = (options: Options<GetCsvData>) => createQueryKey('getCsv', options);
@@ -382,64 +356,4 @@ export const listRunsOptions = (options?: Options<ListRunsData>) => queryOptions
         return data;
     },
     queryKey: listRunsQueryKey(options)
-});
-
-export const getTesterQueryKey = (options: Options<GetTesterData>) => createQueryKey('getTester', options);
-
-export const getTesterOptions = (options: Options<GetTesterData>) => queryOptions<GetTesterResponse, DefaultError, GetTesterResponse, ReturnType<typeof getTesterQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getTester({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getTesterQueryKey(options)
-});
-
-export const getTemplateSourceQueryKey = (options: Options<GetTemplateSourceData>) => createQueryKey('getTemplateSource', options);
-
-export const getTemplateSourceOptions = (options: Options<GetTemplateSourceData>) => queryOptions<GetTemplateSourceResponse, DefaultError, GetTemplateSourceResponse, ReturnType<typeof getTemplateSourceQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getTemplateSource({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getTemplateSourceQueryKey(options)
-});
-
-export const getQuestionsQueryKey = (options?: Options<GetQuestionsData>) => createQueryKey('getQuestions', options);
-
-export const getQuestionsOptions = (options?: Options<GetQuestionsData>) => queryOptions<GetQuestionsResponse, DefaultError, GetQuestionsResponse, ReturnType<typeof getQuestionsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getQuestions({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getQuestionsQueryKey(options)
-});
-
-export const getAiSettingsQueryKey = (options?: Options<GetAiSettingsData>) => createQueryKey('getAiSettings', options);
-
-export const getAiSettingsOptions = (options?: Options<GetAiSettingsData>) => queryOptions<GetAiSettingsResponse, DefaultError, GetAiSettingsResponse, ReturnType<typeof getAiSettingsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getAiSettings({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getAiSettingsQueryKey(options)
 });

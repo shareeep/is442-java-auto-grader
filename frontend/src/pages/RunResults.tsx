@@ -276,7 +276,7 @@ const RunResults: React.FC = () => {
     if (testerFiles.length === 0 && !loadingTesterFiles) {
       setLoadingTesterFiles(true);
       try {
-        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as { data: Array<{ name: string; content: string }> };
+        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as unknown as { data: Array<{ name: string; content: string }> };
         setTesterFiles(data ?? []);
       } catch {
         setTesterFiles([]);

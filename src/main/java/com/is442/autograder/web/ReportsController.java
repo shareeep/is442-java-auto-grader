@@ -211,53 +211,6 @@ public class ReportsController {
 		}
 	}
 
-	@GetMapping("/{id}/logs")
-	public ResponseEntity<?> getLogs(@PathVariable String id) {
-		if (isUnsafePathSegment(id))
-			return ResponseEntity.badRequest().build();
-		Path logsDir = OUTPUT_DIR.resolve(id).resolve("logs");
-		if (!Files.isDirectory(logsDir)) {
-			return ResponseEntity.ok(Map.of("runLog", "", "students", List.of()));
-		}
-
-		try {
-			Map<String, Object> result = new LinkedHashMap<>();
-
-			// Read main run log
-			Path runLog = logsDir.resolve("run.log");
-			result.put("runLog", Files.exists(runLog) ? Files.readString(runLog) : "");
-
-			// List student log folders
-			try (Stream<Path> stream = Files.list(logsDir)) {
-				List<Map<String, Object>> students = stream.filter(Files::isDirectory).sorted().map(studentDir -> {
-					Map<String, Object> student = new LinkedHashMap<>();
-					student.put("username", studentDir.getFileName().toString());
-					try (Stream<Path> logFiles = Files.list(studentDir)) {
-						List<Map<String, String>> logs = logFiles.filter(f -> f.toString().endsWith(".log")).sorted()
-								.map(f -> {
-									try {
-										return Map.of("name", f.getFileName().toString(), "content",
-												Files.readString(f));
-									} catch (IOException e) {
-										return Map.of("name", f.getFileName().toString(), "content",
-												"Error reading: " + e.getMessage());
-									}
-								}).toList();
-						student.put("logs", logs);
-					} catch (IOException e) {
-						student.put("logs", List.of());
-					}
-					return student;
-				}).toList();
-				result.put("students", students);
-			}
-
-			return ResponseEntity.ok(result);
-		} catch (IOException e) {
-			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-		}
-	}
-
 	@GetMapping("/{id}/testers")
 	public ResponseEntity<?> getTesterFiles(@PathVariable String id) {
 		if (isUnsafePathSegment(id))
@@ -281,19 +234,6 @@ public class ReportsController {
 		} catch (IOException e) {
 			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
 		}
-	}
-
-	@GetMapping("/{id}/testers/{filename}")
-	public ResponseEntity<Resource> getTesterFile(@PathVariable String id, @PathVariable String filename) {
-		if (isUnsafePathSegment(id) || isUnsafePathSegment(filename))
-			return ResponseEntity.badRequest().build();
-		Path testerFile = OUTPUT_DIR.resolve(id).resolve("testers").resolve(filename);
-		if (!Files.isRegularFile(testerFile)) {
-			return ResponseEntity.notFound().build();
-		}
-		Resource resource = new FileSystemResource(testerFile);
-		return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/x-java-source"))
-				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"").body(resource);
 	}
 
 	@GetMapping("/{id}/download")

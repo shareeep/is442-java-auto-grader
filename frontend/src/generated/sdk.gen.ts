@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponses, ExecuteData, ExecuteResponses, GenerateData, GenerateQuestionData, GenerateQuestionResponses, GenerateResponses, GetAiSettingsData, GetAiSettingsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetLogsData, GetLogsResponses, GetPdfData, GetPdfResponses, GetPdfWithNameData, GetPdfWithNameResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetQuestionsData, GetQuestionsResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTemplateSourceData, GetTemplateSourceResponses, GetTesterData, GetTesterResponses, GetTesterFilesData, GetTesterFilesResponses, GetTesterFileData, GetTesterFileResponses, DownloadRunData, DownloadRunResponses, ListRunsData, ListRunsResponses, PreparsePdfData, PreparsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, RunGradingData, RunGradingResponses, SaveData, SaveResponses, SaveSetupData, SaveSetupResponses, StopGradingData, StopGradingResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponses, DownloadRunData, DownloadRunResponses, GenerateTestsData, GenerateTestsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetPdfData, GetPdfResponses, GetPdfWithNameData, GetPdfWithNameResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTesterData, GetTesterFilesData, GetTesterFilesResponses, GetTesterResponses, ListRunsData, ListRunsResponses, ParsePdfData, ParsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, SaveData, SaveResponses, StopGradingData, StopGradingResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -18,40 +18,9 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: Record<string, unknown>;
 };
 
-export const runGrading = <ThrowOnError extends boolean = false>(options: Options<RunGradingData, ThrowOnError>) => (options.client ?? client).post<RunGradingResponses, unknown, ThrowOnError>({
-    ...formDataBodySerializer,
-    url: '/api/grade',
-    ...options,
-    headers: {
-        'Content-Type': null,
-        ...options.headers
-    }
-});
-
-export const streamGrading = <ThrowOnError extends boolean = false>(options: Options<StreamGradingData, ThrowOnError>) => (options.client ?? client).post<StreamGradingResponses, unknown, ThrowOnError>({
-    url: '/api/grade/stream',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const stopGrading = <ThrowOnError extends boolean = false>(options: Options<StopGradingData, ThrowOnError>) => (options.client ?? client).post<StopGradingResponses, unknown, ThrowOnError>({ url: '/api/grade/stop/{sessionId}', ...options });
-
 export const uploadTesters = <ThrowOnError extends boolean = false>(options?: Options<UploadTestersData, ThrowOnError>) => (options?.client ?? client).post<UploadTestersResponses, unknown, ThrowOnError>({
     ...formDataBodySerializer,
-    url: '/api/generation/testers/upload',
-    ...options,
-    headers: {
-        'Content-Type': null,
-        ...options?.headers
-    }
-});
-
-export const uploadTemplate = <ThrowOnError extends boolean = false>(options?: Options<UploadTemplateData, ThrowOnError>) => (options?.client ?? client).post<UploadTemplateResponses, unknown, ThrowOnError>({
-    ...formDataBodySerializer,
-    url: '/api/generation/template/upload',
+    url: '/api/testers/upload',
     ...options,
     headers: {
         'Content-Type': null,
@@ -60,7 +29,7 @@ export const uploadTemplate = <ThrowOnError extends boolean = false>(options?: O
 });
 
 export const save = <ThrowOnError extends boolean = false>(options: Options<SaveData, ThrowOnError>) => (options.client ?? client).post<SaveResponses, unknown, ThrowOnError>({
-    url: '/api/generation/save',
+    url: '/api/testers/save',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -68,8 +37,29 @@ export const save = <ThrowOnError extends boolean = false>(options: Options<Save
     }
 });
 
-export const saveSetup = <ThrowOnError extends boolean = false>(options: Options<SaveSetupData, ThrowOnError>) => (options.client ?? client).post<SaveSetupResponses, unknown, ThrowOnError>({
-    url: '/api/generation/save-setup',
+export const uploadTemplate = <ThrowOnError extends boolean = false>(options?: Options<UploadTemplateData, ThrowOnError>) => (options?.client ?? client).post<UploadTemplateResponses, unknown, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/templates/upload',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options?.headers
+    }
+});
+
+export const stopGrading = <ThrowOnError extends boolean = false>(options: Options<StopGradingData, ThrowOnError>) => (options.client ?? client).post<StopGradingResponses, unknown, ThrowOnError>({ url: '/api/grading/{sessionId}/stop', ...options });
+
+export const streamGrading = <ThrowOnError extends boolean = false>(options: Options<StreamGradingData, ThrowOnError>) => (options.client ?? client).post<StreamGradingResponses, unknown, ThrowOnError>({
+    url: '/api/grading/stream',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const generateTests = <ThrowOnError extends boolean = false>(options: Options<GenerateTestsData, ThrowOnError>) => (options.client ?? client).post<GenerateTestsResponses, unknown, ThrowOnError>({
+    url: '/api/generation/tests',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -78,7 +68,7 @@ export const saveSetup = <ThrowOnError extends boolean = false>(options: Options
 });
 
 export const refine = <ThrowOnError extends boolean = false>(options: Options<RefineData, ThrowOnError>) => (options.client ?? client).post<RefineResponses, unknown, ThrowOnError>({
-    url: '/api/generation/refine',
+    url: '/api/generation/refinements',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -87,7 +77,7 @@ export const refine = <ThrowOnError extends boolean = false>(options: Options<Re
 });
 
 export const recommend = <ThrowOnError extends boolean = false>(options: Options<RecommendData, ThrowOnError>) => (options.client ?? client).post<RecommendResponses, unknown, ThrowOnError>({
-    url: '/api/generation/recommend',
+    url: '/api/generation/recommendations',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -95,35 +85,10 @@ export const recommend = <ThrowOnError extends boolean = false>(options: Options
     }
 });
 
-export const preparsePdf = <ThrowOnError extends boolean = false>(options: Options<PreparsePdfData, ThrowOnError>) => (options.client ?? client).post<PreparsePdfResponses, unknown, ThrowOnError>({
-    url: '/api/generation/preparse-pdf',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+export const parsePdf = <ThrowOnError extends boolean = false>(options: Options<ParsePdfData, ThrowOnError>) => (options.client ?? client).post<ParsePdfResponses, unknown, ThrowOnError>({ url: '/api/exams/{examId}/parse', ...options });
 
-export const generate = <ThrowOnError extends boolean = false>(options: Options<GenerateData, ThrowOnError>) => (options.client ?? client).post<GenerateResponses, unknown, ThrowOnError>({
-    url: '/api/generation/generate',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const generateQuestion = <ThrowOnError extends boolean = false>(options: Options<GenerateQuestionData, ThrowOnError>) => (options.client ?? client).post<GenerateQuestionResponses, unknown, ThrowOnError>({
-    url: '/api/generation/generate-question',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const execute = <ThrowOnError extends boolean = false>(options: Options<ExecuteData, ThrowOnError>) => (options.client ?? client).post<ExecuteResponses, unknown, ThrowOnError>({
-    url: '/api/generation/execute',
+export const analyzeSetup = <ThrowOnError extends boolean = false>(options: Options<AnalyzeSetupData, ThrowOnError>) => (options.client ?? client).post<AnalyzeSetupResponses, unknown, ThrowOnError>({
+    url: '/api/exams/{examId}/analyze',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -133,7 +98,7 @@ export const execute = <ThrowOnError extends boolean = false>(options: Options<E
 
 export const uploadExam = <ThrowOnError extends boolean = false>(options?: Options<UploadExamData, ThrowOnError>) => (options?.client ?? client).post<UploadExamResponses, unknown, ThrowOnError>({
     ...formDataBodySerializer,
-    url: '/api/generation/exam/upload',
+    url: '/api/exams/upload',
     ...options,
     headers: {
         'Content-Type': null,
@@ -141,16 +106,11 @@ export const uploadExam = <ThrowOnError extends boolean = false>(options?: Optio
     }
 });
 
-export const analyzeSetup = <ThrowOnError extends boolean = false>(options: Options<AnalyzeSetupData, ThrowOnError>) => (options.client ?? client).post<AnalyzeSetupResponses, unknown, ThrowOnError>({
-    url: '/api/generation/analyze-setup',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+export const getTester = <ThrowOnError extends boolean = false>(options: Options<GetTesterData, ThrowOnError>) => (options.client ?? client).get<GetTesterResponses, unknown, ThrowOnError>({ url: '/api/testers/{className}', ...options });
 
-export const getBootId = <ThrowOnError extends boolean = false>(options?: Options<GetBootIdData, ThrowOnError>) => (options?.client ?? client).get<GetBootIdResponses, unknown, ThrowOnError>({ url: '/api/system/boot', ...options });
+export const getBootId = <ThrowOnError extends boolean = false>(options?: Options<GetBootIdData, ThrowOnError>) => (options?.client ?? client).get<GetBootIdResponses, unknown, ThrowOnError>({ url: '/api/system/boot-id', ...options });
+
+export const getTesterFiles = <ThrowOnError extends boolean = false>(options: Options<GetTesterFilesData, ThrowOnError>) => (options.client ?? client).get<GetTesterFilesResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/testers', ...options });
 
 export const getResults = <ThrowOnError extends boolean = false>(options: Options<GetResultsData, ThrowOnError>) => (options.client ?? client).get<GetResultsResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/results', ...options });
 
@@ -160,24 +120,10 @@ export const getPdf = <ThrowOnError extends boolean = false>(options: Options<Ge
 
 export const getPdfWithName = <ThrowOnError extends boolean = false>(options: Options<GetPdfWithNameData, ThrowOnError>) => (options.client ?? client).get<GetPdfWithNameResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/pdf/{filename}', ...options });
 
-export const getLogs = <ThrowOnError extends boolean = false>(options: Options<GetLogsData, ThrowOnError>) => (options.client ?? client).get<GetLogsResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/logs', ...options });
+export const downloadRun = <ThrowOnError extends boolean = false>(options: Options<DownloadRunData, ThrowOnError>) => (options.client ?? client).get<DownloadRunResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/download', ...options });
 
 export const getCsv = <ThrowOnError extends boolean = false>(options: Options<GetCsvData, ThrowOnError>) => (options.client ?? client).get<GetCsvResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/csv', ...options });
 
 export const getStudentCode = <ThrowOnError extends boolean = false>(options: Options<GetStudentCodeData, ThrowOnError>) => (options.client ?? client).get<GetStudentCodeResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/code/{username}', ...options });
 
 export const listRuns = <ThrowOnError extends boolean = false>(options?: Options<ListRunsData, ThrowOnError>) => (options?.client ?? client).get<ListRunsResponses, unknown, ThrowOnError>({ url: '/api/reports/list', ...options });
-
-export const getTester = <ThrowOnError extends boolean = false>(options: Options<GetTesterData, ThrowOnError>) => (options.client ?? client).get<GetTesterResponses, unknown, ThrowOnError>({ url: '/api/generation/tester/{className}', ...options });
-
-export const getTemplateSource = <ThrowOnError extends boolean = false>(options: Options<GetTemplateSourceData, ThrowOnError>) => (options.client ?? client).get<GetTemplateSourceResponses, unknown, ThrowOnError>({ url: '/api/generation/template-source', ...options });
-
-export const getQuestions = <ThrowOnError extends boolean = false>(options?: Options<GetQuestionsData, ThrowOnError>) => (options?.client ?? client).get<GetQuestionsResponses, unknown, ThrowOnError>({ url: '/api/generation/config/questions', ...options });
-
-export const getAiSettings = <ThrowOnError extends boolean = false>(options?: Options<GetAiSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetAiSettingsResponses, unknown, ThrowOnError>({ url: '/api/generation/config/ai', ...options });
-
-export const getTesterFiles = <ThrowOnError extends boolean = false>(options: Options<GetTesterFilesData, ThrowOnError>) => (options.client ?? client).get<GetTesterFilesResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/testers', ...options });
-
-export const getTesterFile = <ThrowOnError extends boolean = false>(options: Options<GetTesterFileData, ThrowOnError>) => (options.client ?? client).get<GetTesterFileResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/testers/{filename}', ...options });
-
-export const downloadRun = <ThrowOnError extends boolean = false>(options: Options<DownloadRunData, ThrowOnError>) => (options.client ?? client).get<DownloadRunResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/download', ...options });

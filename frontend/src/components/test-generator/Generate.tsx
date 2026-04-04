@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { FastForward, Play, ChevronLeft, ChevronRight, BrainCircuit, Code, ListChecks, CheckCircle2, X, Plus, RotateCcw, Loader2 } from 'lucide-react';
-import { recommend, execute } from '@/generated/sdk.gen';
+import { recommend, generateTests } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '@/components/ui/toast';
@@ -188,7 +188,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     const numCases = Math.min(5, totalSuggestions > 0 ? totalSuggestions : Math.max(3, rec?.recommendedCount || 3));
 
     try {
-      const { data: result } = await execute({
+      const { data: result } = await generateTests({
         body: {
           examId: examId!,
           testerId: testerId ?? undefined,

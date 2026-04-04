@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     proxy: {
       // SSE endpoint — must not be buffered by the proxy
-      "/api/grade/stream": {
+      "/api/grading/stream": {
         target: "http://localhost:8080",
         changeOrigin: true,
         configure: (proxy) => {

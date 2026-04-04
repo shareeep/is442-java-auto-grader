@@ -51,7 +51,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
       addLog({ type: 'info', timestamp: now(), message: 'Connecting to grading stream...' });
 
       try {
-        const res = await fetch('/api/grade/stream', {
+        const res = await fetch('/api/grading/stream', {
           method: 'POST',
           body: formData,
           signal: controller.signal,
@@ -155,7 +155,7 @@ const GradingTerminal: React.FC<GradingTerminalProps> = ({ formData, onComplete,
     const sessionId = sessionIdRef.current;
     if (sessionId) {
       try {
-        await fetch(`/api/grade/stop/${sessionId}`, { method: 'POST' });
+        await fetch(`/api/grading/${sessionId}/stop`, { method: 'POST' });
       } catch {
         // ignore — abort below will clean up regardless
       }
