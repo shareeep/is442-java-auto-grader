@@ -165,10 +165,10 @@ Output: `frontend/src/generated/` — types, SDK functions, `useQuery`/`useMutat
 
 | Document | Description |
 |----------|-------------|
+| [design-overview.md](docs/design-overview.md) | Current system design, architecture, and runtime data flows |
 | [UPDATES.md](docs/[new]%20UPDATES.md) | Modernization summary, phase status, file inventory, WIP tasks |
 | [ai-processing-flow.md](docs/[for-ref]%20ai-processing-flow.md) | AI generation architecture, flow, and configuration for reference |
 | [TESTCASES.md](docs/TESTCASES.md) | 18 test submissions and edge case coverage |
-| [design-overview.md](docs/[old]%20design-overview.md) | Original 5-layer architecture (historical) |
 
 ## Tech Stack
 
