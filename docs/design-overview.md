@@ -406,7 +406,7 @@ report.include.anomalies=true
 ### Environment Variables (`.env`)
 
 ```
-OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_API_KEY=contact us for access
 DOCLING_SERVE_URL=http://localhost:5001   # [optional, overrides config]
 ```
 
