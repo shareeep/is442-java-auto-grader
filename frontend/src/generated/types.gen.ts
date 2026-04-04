@@ -663,3 +663,49 @@ export type GetAiSettingsResponses = {
 };
 
 export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+
+export type GetTesterFilesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/testers';
+};
+
+export type GetTesterFilesResponses = {
+    200: Array<{ name: string; content: string }>;
+};
+
+export type GetTesterFilesResponse = GetTesterFilesResponses[keyof GetTesterFilesResponses];
+
+export type GetTesterFileData = {
+    body?: never;
+    path: {
+        id: string;
+        filename: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/testers/{filename}';
+};
+
+export type GetTesterFileResponses = {
+    200: string;
+};
+
+export type GetTesterFileResponse = GetTesterFileResponses[keyof GetTesterFileResponses];
+
+export type DownloadRunData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/download';
+};
+
+export type DownloadRunResponses = {
+    200: Blob;
+};
+
+export type DownloadRunResponse = DownloadRunResponses[keyof DownloadRunResponses];

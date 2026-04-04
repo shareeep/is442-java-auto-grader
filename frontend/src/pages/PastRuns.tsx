@@ -84,6 +84,17 @@ const PastRuns: React.FC = () => {
                   </button>
                 )}
                 <button
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = `/api/reports/${run.id}/download`;
+                    a.download = `run-${run.id}.zip`;
+                    a.click();
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:w-auto"
+                >
+                  <Download size={12} /> ZIP
+                </button>
+                <button
                   onClick={() => navigate(`/past-runs/${run.id}`)}
                   className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
                 >

@@ -69,9 +69,7 @@ public class TestGenerationService {
 		// Build context + prompt once (not per retry)
 		String existingCode = loadExistingTesterCode(question, existingTesterFile);
 		String additionalContext = buildAdditionalContext(question, existingCode, existingTesterFile, templateDir);
-		String apiDocsContext = templateDir != null
-				? buildApiDocsContext(templateDir.resolve(question.getFolder()), existingCode)
-				: "";
+		String apiDocsContext = buildApiDocsContext(question, templateDir, existingCode);
 		logger.info("[GEN] Context sizes  questionId={}  additionalContext={}chars  apiDocsContext={}chars", qid,
 				additionalContext.length(), apiDocsContext.length());
 		if (!apiDocsContext.isBlank()) {
@@ -414,7 +412,7 @@ public class TestGenerationService {
 		StringBuilder ctx = new StringBuilder();
 
 		if (templateDir != null) {
-			Path questionFolder = templateDir.resolve(question.getFolder());
+			Path questionFolder = findQuestionFolder(templateDir, question.getFolder());
 			if (Files.isDirectory(questionFolder)) {
 				ctx.append("Original student code (the method students must implement):\n\n");
 				try (var files = Files.list(questionFolder)) {
@@ -489,18 +487,78 @@ public class TestGenerationService {
 		return ctx.toString();
 	}
 
-	private String buildApiDocsContext(Path questionFolder, String existingCode) {
-		if (questionFolder == null || existingCode == null) {
+	private Path findQuestionFolder(Path templateDir, String folderName) {
+		// Try direct path first (flat structure: templateDir/Q3)
+		Path direct = templateDir.resolve(folderName);
+		if (Files.isDirectory(direct)) {
+			return direct;
+		}
+
+		// Search one level deep (nested structure: templateDir/RenameToYourUsername/Q3)
+		try (var files = Files.list(templateDir)) {
+			for (Path parent : files.filter(Files::isDirectory).toList()) {
+				Path candidate = parent.resolve(folderName);
+				if (Files.isDirectory(candidate)) {
+					logger.info("[GEN] findQuestionFolder: found {} at {}", folderName, candidate);
+					return candidate;
+				}
+			}
+		} catch (IOException e) {
+			logger.info("[GEN] findQuestionFolder: error searching {}", templateDir);
+		}
+
+		// Not found - return direct path (caller will handle missing folder)
+		logger.info("[GEN] findQuestionFolder: {} not found, using direct path {}", folderName, direct);
+		return direct;
+	}
+
+	private String buildApiDocsContext(QuestionConfig question, Path templateDir, String existingCode) {
+		if (question == null || templateDir == null) {
+			logger.info("[GEN] API docs skipped: question or templateDir is null");
 			return "";
+		}
+
+		Path questionFolder = findQuestionFolder(templateDir, question.getFolder());
+		logger.info("[GEN] API docs: looking for question folder: {}", questionFolder);
+
+		// List contents of question folder for debugging
+		try (var files = Files.list(questionFolder)) {
+			logger.info("[GEN] API docs: question folder contents: {}",
+					files.map(p -> p.getFileName().toString()).toList());
+		} catch (IOException e) {
+			logger.info("[GEN] API docs: could not list question folder: {}", e.getMessage());
 		}
 
 		Path apiFolder = questionFolder.resolve("api");
+		logger.info("[GEN] API docs: looking for api folder: {}", apiFolder);
 		if (!Files.isDirectory(apiFolder)) {
+			logger.info("[GEN] API docs: api folder does not exist");
 			return "";
 		}
 
-		Set<String> classes = extractClasses(existingCode);
+		// Primary: extract class names from .class files in question folder
+		Set<String> classes = new LinkedHashSet<>();
+		classes.addAll(extractClassNamesFromFolder(questionFolder));
+		logger.info("[GEN] API docs: classes from question folder: {}", classes);
+
+		// Also scan dependency folder if specified
+		if (question.getDependencyFolder() != null) {
+			Path depFolder = templateDir.resolve(question.getDependencyFolder());
+			logger.info("[GEN] API docs: dependency folder config: {}", question.getDependencyFolder());
+			Set<String> depClasses = extractClassNamesFromFolder(depFolder);
+			logger.info("[GEN] API docs: classes from dependency folder {}: {}", depFolder, depClasses);
+			classes.addAll(depClasses);
+		}
+
+		// Additionally include classes found in existing tester code
+		if (existingCode != null && !existingCode.isBlank()) {
+			classes.addAll(extractClasses(existingCode));
+		}
+
+		logger.info("[GEN] API docs: final class set: {}", classes);
+
 		if (classes.isEmpty()) {
+			logger.info("[GEN] API docs: no classes found");
 			return "";
 		}
 
@@ -523,6 +581,32 @@ public class TestGenerationService {
 		}
 
 		return ctx.toString();
+	}
+
+	private Set<String> extractClassNamesFromFolder(Path folder) {
+		Set<String> classes = new LinkedHashSet<>();
+		if (folder == null || !Files.isDirectory(folder)) {
+			logger.info("[GEN] extractClassNamesFromFolder: folder is null or not a directory: {}", folder);
+			return classes;
+		}
+		logger.info("[GEN] extractClassNamesFromFolder: scanning {}", folder);
+		try (var files = Files.list(folder)) {
+			List<Path> allFiles = files.toList();
+			logger.info("[GEN] extractClassNamesFromFolder: found {} files", allFiles.size());
+			for (Path f : allFiles) {
+				String name = f.getFileName().toString();
+				logger.info("[GEN] extractClassNamesFromFolder: checking file: {}", name);
+				if (name.endsWith(".class")) {
+					String className = name.substring(0, name.length() - 6);
+					logger.info("[GEN] extractClassNamesFromFolder: found class: {}", className);
+					classes.add(className);
+				}
+			}
+		} catch (IOException e) {
+			logger.info("[GEN] extractClassNamesFromFolder: error listing files: {}", e.getMessage());
+		}
+		logger.info("[GEN] extractClassNamesFromFolder: returning classes: {}", classes);
+		return classes;
 	}
 
 	private Set<String> extractClasses(String code) {

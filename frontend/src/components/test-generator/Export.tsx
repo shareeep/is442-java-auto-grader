@@ -129,28 +129,6 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     setLocalCode(qid, patched);
   };
 
-  const handleWeightChange = (qid: string, caseIdx: number, newWeight: number) => {
-    if (isNaN(newWeight) || newWeight < 0) return;
-    // Update cases state
-    const updated = (localCases[qid] || []).map((c: any, i: number) =>
-      i === caseIdx ? { ...c, weight: newWeight } : c
-    );
-    setLocalCases(qid, updated);
-    // Patch the N-th `score += X;` in the GENERATED section only (not original test cases)
-    const code = localCode[qid] || '';
-    const genMarker = '// ── Generated test cases';
-    const markerPos = code.indexOf(genMarker);
-    if (markerPos === -1) return;
-    const before = code.substring(0, markerPos);
-    const after = code.substring(markerPos);
-    let count = 0;
-    const patchedAfter = after.replace(/score \+= [\d.]+;/g, (match) => {
-      if (count++ === caseIdx) return `score += ${newWeight};`;
-      return match;
-    });
-    setLocalCode(qid, before + patchedAfter);
-  };
-
   const handleExport = async () => {
     if (!('showDirectoryPicker' in window)) {
       toast({ title: 'Browser not supported', description: 'Use Chrome or Edge to save files locally.', variant: 'destructive' });
@@ -171,7 +149,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
             description: c.description || '',
             inputArgs: c.inputArgs || '',
             expectedOutput: c.expectedOutput || '',
-            weight: c.weight ?? 1,
+            weight: 1,
           })),
         };
       });
@@ -264,7 +242,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
   const activeResult = activeQid ? results[activeQid] : null;
   const activeCode = activeQid ? (localCode[activeQid] || activeResult?.generatedCode || '') : '';
   const activeCases = activeQid ? (localCases[activeQid] || activeResult?.cases || []) : [];
-  const generatedWeight = activeCases.reduce((s: number, c: any) => s + (c.weight ?? 1), 0);
+  const generatedWeight = activeCases.length;
   const originalWeight = activeQid
     ? (inferredConfig?.questions?.find((q: any) => q.questionId === activeQid)?.maxScore ?? 0)
     : 0;
@@ -291,19 +269,21 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
           <Button variant="outline" onClick={onBack} disabled={exporting} className="rounded-md">
             <ChevronLeft size={16} className="mr-1" /> Generation Hub
           </Button>
-          <Button
-            onClick={handleExport}
-            disabled={exporting || questionIds.length === 0}
-            className={`rounded-md px-6 ${exportComplete ? 'bg-vsc-green hover:bg-vsc-green/90' : 'glow-accent bg-accent hover:bg-accent/90'}`}
-          >
-            {exporting ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Exporting...</>
-            ) : exportComplete ? (
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Re-export</span>
-            ) : (
-              <><Download size={16} className="mr-1.5" /> Export Project</>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleExport}
+              disabled={exporting || questionIds.length === 0}
+              className={`rounded-md px-6 ${exportComplete ? 'bg-vsc-green hover:bg-vsc-green/90' : 'glow-accent bg-accent hover:bg-accent/90'}`}
+            >
+              {exporting ? (
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Exporting...</>
+              ) : exportComplete ? (
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Re-export</span>
+              ) : (
+                <><Download size={16} className="mr-1.5" /> Export Project</>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -415,11 +395,11 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] font-mono text-muted-foreground">
                           {originalWeight > 0 && (
-                            <>Original: <span className="text-foreground font-bold">{originalWeight.toFixed(1)}</span> · </>
+                            <>Original: <span className="text-foreground font-bold">{originalWeight}</span> · </>
                           )}
-                          Generated: <span className="text-foreground font-bold">{generatedWeight.toFixed(1)}</span>
+                          Generated: <span className="text-foreground font-bold">{generatedWeight}</span>
                           {originalWeight > 0 && (
-                            <> · Total: <span className="text-accent font-bold">{totalWeight.toFixed(1)}</span></>
+                            <> · Total: <span className="text-vsc-green font-bold">{totalWeight}</span></>
                           )}
                         </span>
                         {casesExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
@@ -432,15 +412,6 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
                             <div key={i} className="flex items-center gap-3 px-4 py-2.5 group">
                               <span className="w-5 h-5 shrink-0 bg-secondary rounded flex items-center justify-center font-mono text-[9px] text-muted-foreground border border-border">{i + 1}</span>
                               <p className="flex-1 text-xs text-muted-foreground truncate font-mono">{tc.description || `Test case ${i + 1}`}</p>
-                              <input
-                                type="number"
-                                min={0}
-                                step={0.5}
-                                value={tc.weight ?? 1}
-                                onChange={(e) => handleWeightChange(activeQid, i, parseFloat(e.target.value))}
-                                className="w-16 h-7 text-center font-mono text-xs bg-card border border-border rounded text-foreground outline-none focus:border-primary"
-                              />
-                              <span className="text-[9px] text-muted-foreground font-mono w-4 shrink-0">pts</span>
                               <button
                                 onClick={() => handleDeleteCase(activeQid, i)}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"

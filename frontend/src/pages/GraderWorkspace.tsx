@@ -270,6 +270,7 @@ const GraderWorkspace: React.FC = () => {
     setTesterFiles([]);
     setScoresheetFiles([]);
     setTerminalOpen(true);
+    refetchRuns();
   };
 
   const handleReset = () => {
@@ -415,7 +416,15 @@ const GraderWorkspace: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed mt-1">
+                    If uploaded, scores will only be filled in for names that appear in the scoresheet.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed mt-1">
+                    If left empty, a new CSV file containing all graded results will be generated.
+                  </p>
+                </div>
                 <UploadCard
                   label="Grade Mapping (CSV)"
                   hint="IS442-ScoreSheet.csv — maps student IDs to names"

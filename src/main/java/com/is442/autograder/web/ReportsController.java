@@ -64,6 +64,7 @@ public class ReportsController {
 
 		try (Stream<Path> stream = Files.list(OUTPUT_DIR)) {
 			List<Map<String, Object>> runs = stream.filter(Files::isDirectory).sorted(Comparator.reverseOrder())
+					.filter(dir -> !isRunCancelled(dir)) // Filter out cancelled runs
 					.map(dir -> {
 						Map<String, Object> run = new LinkedHashMap<>();
 						String id = dir.getFileName().toString();
@@ -96,6 +97,19 @@ public class ReportsController {
 			return ResponseEntity.ok(runs);
 		} catch (IOException e) {
 			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	private boolean isRunCancelled(Path runDir) {
+		Path runJson = runDir.resolve("run.json");
+		if (!Files.exists(runJson)) {
+			return false; // No run.json means old run, include it
+		}
+		try {
+			Map<?, ?> meta = new ObjectMapper().readValue(runJson.toFile(), Map.class);
+			return "cancelled".equals(meta.get("status"));
+		} catch (Exception e) {
+			return false; // If we can't read it, include the run
 		}
 	}
 
@@ -241,6 +255,77 @@ public class ReportsController {
 			return ResponseEntity.ok(result);
 		} catch (IOException e) {
 			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	@GetMapping("/{id}/testers")
+	public ResponseEntity<?> getTesterFiles(@PathVariable String id) {
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
+		Path testersDir = OUTPUT_DIR.resolve(id).resolve("testers");
+		if (!Files.isDirectory(testersDir)) {
+			return ResponseEntity.ok(List.of());
+		}
+		try {
+			List<Map<String, String>> files = new ArrayList<>();
+			try (Stream<Path> walk = Files.walk(testersDir)) {
+				walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).sorted().forEach(p -> {
+					try {
+						files.add(Map.of("name", p.getFileName().toString(), "content", Files.readString(p)));
+					} catch (IOException e) {
+						logger.warn("Could not read {}", p, e);
+					}
+				});
+			}
+			return ResponseEntity.ok(files);
+		} catch (IOException e) {
+			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	@GetMapping("/{id}/testers/{filename}")
+	public ResponseEntity<Resource> getTesterFile(@PathVariable String id, @PathVariable String filename) {
+		if (isUnsafePathSegment(id) || isUnsafePathSegment(filename))
+			return ResponseEntity.badRequest().build();
+		Path testerFile = OUTPUT_DIR.resolve(id).resolve("testers").resolve(filename);
+		if (!Files.isRegularFile(testerFile)) {
+			return ResponseEntity.notFound().build();
+		}
+		Resource resource = new FileSystemResource(testerFile);
+		return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/x-java-source"))
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"").body(resource);
+	}
+
+	@GetMapping("/{id}/download")
+	public ResponseEntity<Resource> downloadRun(@PathVariable String id) {
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
+		Path runDir = OUTPUT_DIR.resolve(id);
+		if (!Files.isDirectory(runDir)) {
+			return ResponseEntity.notFound().build();
+		}
+		try {
+			// Create a temporary zip file
+			Path tempZip = Files.createTempFile("run-" + id + "-", ".zip");
+			try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+					Files.newOutputStream(tempZip))) {
+				Files.walk(runDir).filter(Files::isRegularFile).forEach(file -> {
+					try {
+						String entryName = runDir.relativize(file).toString().replace("\\", "/");
+						zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+						Files.copy(file, zos);
+						zos.closeEntry();
+					} catch (IOException e) {
+						logger.warn("Failed to add {} to zip", file, e);
+					}
+				});
+			}
+			Resource resource = new FileSystemResource(tempZip);
+			return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"run-" + id + ".zip\"")
+					.body(resource);
+		} catch (IOException e) {
+			return ResponseEntity.internalServerError().body(null);
 		}
 	}
 }

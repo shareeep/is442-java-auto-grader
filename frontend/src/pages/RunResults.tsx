@@ -4,9 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Download, Eye, ChevronRight, ChevronDown, ChevronUp,
   FileCode2, Loader2, AlertCircle, User, CheckCircle2,
-  TriangleAlert, X, File as FileIcon, ExternalLink, Clock,
+  TriangleAlert, X, File as FileIcon, ExternalLink, Clock, Folder,
 } from 'lucide-react';
-import { getStudentCode } from '../generated/sdk.gen';
+import { getStudentCode, getTesterFiles, downloadRun } from '../generated/sdk.gen';
 import { getResultsOptions, listRunsOptions } from '../generated/@tanstack/react-query.gen';
 import { formatRunTimestamp, pdfUrl } from '../lib/utils';
 
@@ -231,6 +231,9 @@ const RunResults: React.FC = () => {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const [expandedScore, setExpandedScore] = useState<string | null>(null);
+  const [expandedTesterFiles, setExpandedTesterFiles] = useState(false);
+  const [testerFiles, setTesterFiles] = useState<Array<{ name: string; content: string }>>([]);
+  const [loadingTesterFiles, setLoadingTesterFiles] = useState(false);
 
   const toggleStudent = useCallback(async (username: string) => {
     setExpandedStudents(prev => {
@@ -266,6 +269,45 @@ const RunResults: React.FC = () => {
       if (activeTabKey === key) setActiveTabKey(next[next.length - 1]?.key ?? null);
       return next;
     });
+  };
+
+  const toggleTesterFiles = useCallback(async () => {
+    setExpandedTesterFiles(prev => !prev);
+    if (testerFiles.length === 0 && !loadingTesterFiles) {
+      setLoadingTesterFiles(true);
+      try {
+        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as { data: Array<{ name: string; content: string }> };
+        setTesterFiles(data ?? []);
+      } catch {
+        setTesterFiles([]);
+      } finally {
+        setLoadingTesterFiles(false);
+      }
+    }
+  }, [runId, testerFiles.length, loadingTesterFiles]);
+
+  const openTesterFile = (file: { name: string; content: string }) => {
+    const key = `tester::${file.name}`;
+    if (!openTabs.find(t => t.key === key)) {
+      setOpenTabs(prev => [...prev, { key, label: `Tester / ${file.name}`, content: file.content }]);
+    }
+    setActiveTabKey(key);
+  };
+
+  const handleDownloadRun = async () => {
+    try {
+      const { data } = await downloadRun({ path: { id: runId! }, throwOnError: true }) as { data: Blob };
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `run-${runId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download run:', error);
+    }
   };
 
   const activeTab = openTabs.find(t => t.key === activeTabKey) ?? null;
@@ -340,6 +382,12 @@ const RunResults: React.FC = () => {
               >
                 <Download size={12} /> CSV
               </button>
+              <button
+                onClick={handleDownloadRun}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
+              >
+                <Download size={12} /> Download ZIP
+              </button>
               {hasPlagiarism && (
                 <>
                   <button
@@ -378,6 +426,43 @@ const RunResults: React.FC = () => {
             />
           </div>
           <div className="flex-1 overflow-auto py-1.5 font-mono text-xs">
+            {/* Tester Files folder */}
+            <div className="mb-1">
+              <button
+                onClick={toggleTesterFiles}
+                className="flex items-center gap-1.5 w-full text-left px-2 py-1 transition-colors text-[#8b949e] hover:text-[#c9d1d9] hover:bg-white/[0.04]"
+              >
+                {expandedTesterFiles
+                  ? <ChevronDown size={11} className="shrink-0 text-[#4d5566]" />
+                  : <ChevronRight size={11} className="shrink-0 text-[#4d5566]" />}
+                <Folder size={11} className="shrink-0 text-[#f78166]" />
+                <span className="truncate flex-1">Tester Files</span>
+                {loadingTesterFiles && <Loader2 size={10} className="animate-spin shrink-0 text-[#4d5566]" />}
+              </button>
+              {expandedTesterFiles && !loadingTesterFiles && testerFiles.length === 0 && (
+                <p className="pl-8 py-0.5 text-[10px] text-[#4d5566] italic">No tester files</p>
+              )}
+              {expandedTesterFiles && testerFiles.map((file) => {
+                const key = `tester::${file.name}`;
+                const isActive = activeTabKey === key;
+                return (
+                  <button
+                    key={file.name}
+                    onClick={() => openTesterFile(file)}
+                    className={`flex items-center gap-1.5 w-full text-left py-0.5 pl-8 pr-2 rounded-sm transition-colors ${
+                      isActive
+                        ? 'bg-[#e8e3d5]/10 text-[#e8e3d5]'
+                        : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <FileCode2 size={10} className="text-[#f78166] shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Student list */}
             {students.filter(s =>
               (s.displayName || s.username).toLowerCase().includes(studentSearch.toLowerCase())
             ).map(s => {

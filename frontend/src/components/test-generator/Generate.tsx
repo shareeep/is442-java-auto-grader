@@ -35,7 +35,7 @@ function useAnimatedText(active: boolean, msgs: string[], ms = 2000) {
   return msgs[idx];
 }
 
-function CustomSuggestionInput({ qid }: { qid: string }) {
+function CustomSuggestionInput({ qid, disabled }: { qid: string; disabled?: boolean }) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const addCustomSuggestion = useWizardStore((s) => s.addCustomSuggestion);
@@ -47,6 +47,8 @@ function CustomSuggestionInput({ qid }: { qid: string }) {
     setValue('');
     inputRef.current?.focus();
   };
+
+  if (disabled) return null;
 
   return (
     <div className="flex gap-2 mt-2">
@@ -294,7 +296,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
 
       {recProgress && (
         <div className="space-y-1.5 px-4 py-3 rounded-md border border-accent/20 bg-accent/5 animate-in fade-in">
-          <div className="flex justify-between items-center text-xs font-mono text-accent">
+          <div className="flex justify-between items-center text-xs font-mono text-foreground">
             <span className="flex items-center gap-2">
               {recProgress.done < recProgress.total
                 ? <Loader2 size={12} className="animate-spin" />
@@ -556,7 +558,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 </span>
               ))}
             </div>
-            <CustomSuggestionInput qid={qid} />
+            <CustomSuggestionInput qid={qid} disabled={isGenerating || !!result} />
           </div>
         ) : (
           <div className="p-3 bg-secondary/50 rounded-md border border-border">
@@ -580,7 +582,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 ))}
               </div>
             )}
-            <CustomSuggestionInput qid={qid} />
+            <CustomSuggestionInput qid={qid} disabled={isGenerating || !!result} />
           </div>
         )}
 
@@ -614,10 +616,18 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         )}
 
         {/* Empty state */}
-        {!rec && !isGenerating && !result && customs.length === 0 && (
+        {!rec && !isGenerating && !isRecLoading && !result && customs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-6 opacity-30">
             <Code size={28} />
             <p className="text-xs mt-2 font-mono">Ready</p>
+          </div>
+        )}
+
+        {/* Loading recommendation state */}
+        {isRecLoading && !rec && !result && (
+          <div className="flex flex-col items-center justify-center py-6 opacity-30">
+            <Loader2 size={28} className="animate-spin" />
+            <p className="text-xs mt-2 font-mono">Recommending...</p>
           </div>
         )}
       </CardContent>

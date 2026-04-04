@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.is442.autograder.config.EnvLoader;
 
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.service.AiServices;
@@ -65,7 +66,7 @@ class LangChainServiceIntegrationTest {
 				""";
 
 		logger.info("[TEST] Calling generateTestCasesJson...");
-		String rawJson = langChainService.generateTestCasesJson(prompt);
+		String rawJson = langChainService.generateTestCasesJson(UserMessage.from(prompt));
 
 		assertNotNull(rawJson, "API returned null response");
 		logger.info("[TEST] Raw response ({} chars): {}", rawJson.length(),
@@ -96,7 +97,7 @@ class LangChainServiceIntegrationTest {
 				""";
 
 		logger.info("[TEST] Calling recommendJson...");
-		String rawJson = langChainService.recommendJson(prompt);
+		String rawJson = langChainService.recommendJson(UserMessage.from(prompt));
 
 		logger.info("[TEST] Raw response ({} chars): {}", rawJson.length(),
 				rawJson.length() > 300 ? rawJson.substring(0, 300) + "..." : rawJson);
