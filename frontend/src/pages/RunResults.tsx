@@ -136,7 +136,7 @@ const TestOutputPanel: React.FC<TestOutputPanelProps> = ({ qResult }) => {
     if (!expanded && canExpand) setExpanded(true);
   };
 
-  const passedCount = (qResult.output ?? '').split('\n').filter(l => l.trim() === 'Passed').length;
+  const passedCount = (qResult.output ?? '').split('\n').filter(l => l.trim().endsWith('Passed')).length;
   const totalTests = Math.round(qResult.maxScore);
   const earnedScore = Math.round(qResult.score);
 
