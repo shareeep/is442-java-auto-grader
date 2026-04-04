@@ -45,25 +45,26 @@ public class WebConfig implements WebMvcConfigurer {
 		return new SessionDatabase(Paths.get("data"));
 	}
 
-	/** Vision model service — backed by the auto-configured ChatModel (xiaomi/mimo-v2-omni). */
+	/**
+	 * Vision model service — backed by the auto-configured ChatModel
+	 * (xiaomi/mimo-v2-omni).
+	 */
 	@Bean
 	@Qualifier("vision")
 	public LangChainService langChainServiceVision(ChatModel chatModel) {
 		return AiServices.create(LangChainService.class, chatModel);
 	}
 
-	/** Text-only model service — backed by MiniMax, used when no images are present. */
+	/**
+	 * Text-only model service — backed by MiniMax, used when no images are present.
+	 */
 	@Bean
 	@Qualifier("text")
 	public LangChainService langChainServiceText(AppConfig appConfig) {
 		String apiKey = System.getenv("OPENROUTER_API_KEY");
-		ChatModel textModel = OpenAiChatModel.builder()
-				.apiKey(apiKey != null ? apiKey : "no-key")
-				.baseUrl("https://openrouter.ai/api/v1")
-				.modelName(appConfig.getAiTextModel())
-				.maxTokens(appConfig.getAiMaxTokens())
-				.timeout(Duration.ofSeconds(180))
-				.build();
+		ChatModel textModel = OpenAiChatModel.builder().apiKey(apiKey != null ? apiKey : "no-key")
+				.baseUrl("https://openrouter.ai/api/v1").modelName(appConfig.getAiTextModel())
+				.maxTokens(appConfig.getAiMaxTokens()).timeout(Duration.ofSeconds(180)).build();
 		return AiServices.create(LangChainService.class, textModel);
 	}
 

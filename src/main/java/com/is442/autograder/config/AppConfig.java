@@ -157,7 +157,10 @@ public class AppConfig {
 		return properties.getProperty("ai.model", "claude-sonnet-4-6");
 	}
 
-	/** Text-only AI model name used when no images are present (default: minimax/minimax-m2.7). */
+	/**
+	 * Text-only AI model name used when no images are present (default:
+	 * minimax/minimax-m2.7).
+	 */
 	public String getAiTextModel() {
 		return properties.getProperty("ai.text-model", "minimax/minimax-m2.7");
 	}

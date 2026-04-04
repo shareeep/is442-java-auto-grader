@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -231,19 +232,20 @@ public class PdfReportGenerator {
 
 		// Key insight bullets
 		if (!qcs.isEmpty()) {
-			PdfReportAnalytics.InsightStats insightStats = PdfReportAnalytics.computeInsightStats(subs, qcs,
-					STRUCTURAL_TYPES, METADATA_TYPES);
-			QuestionConfig hardest = insightStats.hardestQuestion();
-			QuestionConfig easiest = insightStats.easiestQuestion();
-			if (hardest != null) {
+			List<QuestionConfig> hardestQuestions = lowestPassRateQuestions(subs, qcs);
+			List<QuestionConfig> easiestQuestions = highestPassRateQuestions(subs, qcs);
+			if (!hardestQuestions.isEmpty()) {
 				addSubHeading(doc, "Key Insight");
 				StringBuilder insight = new StringBuilder();
-				insight.append("• ").append(hardest.getQuestionId()).append(" had the lowest full-pass rate (")
-						.append(pct(PdfReportAnalytics.passRateForQuestion(subs, hardest)))
-						.append(") — students struggled most here.");
-				if (easiest != null && !easiest.getQuestionId().equals(hardest.getQuestionId())) {
-					insight.append("\n• ").append(easiest.getQuestionId()).append(" had the highest full-pass rate (")
-							.append(pct(PdfReportAnalytics.passRateForQuestion(subs, easiest))).append(").");
+				double hardestRate = PdfReportAnalytics.passRateForQuestion(subs, hardestQuestions.get(0));
+				insight.append("• ").append(buildPassRateInsight(hardestQuestions, hardestRate, "lowest"))
+						.append(hardestQuestions.size() == 1
+								? " — students struggled most here."
+								: " — students struggled most on these questions.");
+				if (!easiestQuestions.isEmpty() && !sameQuestionSet(hardestQuestions, easiestQuestions)) {
+					double easiestRate = PdfReportAnalytics.passRateForQuestion(subs, easiestQuestions.get(0));
+					insight.append("\n• ").append(buildPassRateInsight(easiestQuestions, easiestRate, "highest"))
+							.append(".");
 				}
 				long zeroScore = subs.stream().filter(s -> s.getTotalScore() == 0).count();
 				if (zeroScore > 0) {
@@ -744,8 +746,9 @@ public class PdfReportGenerator {
 		long zeroScore = insightStats.zeroScore();
 		long passing = insightStats.passing();
 
+		List<QuestionConfig> hardestQuestions = lowestPassRateQuestions(subs, qcs);
+		List<QuestionConfig> easiestQuestions = highestPassRateQuestions(subs, qcs);
 		QuestionConfig hardestQ = insightStats.hardestQuestion();
-		QuestionConfig easiestQ = insightStats.easiestQuestion();
 
 		// ── Key Observations ────────────────────────────────────────────────
 		addSubHeading(doc, "Key Observations");
@@ -772,13 +775,13 @@ public class PdfReportGenerator {
 			observations.add((zeroScore == 1 ? "1 submission scored" : zeroScore + " submissions scored")
 					+ " zero — may require immediate follow-up.");
 		}
-		if (hardestQ != null) {
-			observations.add(hardestQ.getQuestionId() + " had the lowest full-pass rate ("
-					+ pct(PdfReportAnalytics.passRateForQuestion(subs, hardestQ)) + ").");
+		if (!hardestQuestions.isEmpty()) {
+			double hardestRate = PdfReportAnalytics.passRateForQuestion(subs, hardestQuestions.get(0));
+			observations.add(buildPassRateInsight(hardestQuestions, hardestRate, "lowest") + ".");
 		}
-		if (easiestQ != null && hardestQ != null && !easiestQ.getQuestionId().equals(hardestQ.getQuestionId())) {
-			observations.add(easiestQ.getQuestionId() + " had the highest full-pass rate ("
-					+ pct(PdfReportAnalytics.passRateForQuestion(subs, easiestQ)) + ").");
+		if (!easiestQuestions.isEmpty() && !sameQuestionSet(hardestQuestions, easiestQuestions)) {
+			double easiestRate = PdfReportAnalytics.passRateForQuestion(subs, easiestQuestions.get(0));
+			observations.add(buildPassRateInsight(easiestQuestions, easiestRate, "highest") + ".");
 		}
 
 		PdfPTable obsTbl = newTable(new float[]{30, 420});
@@ -1089,6 +1092,66 @@ public class PdfReportGenerator {
 	// ══════════════════════════════════════════════════════════════════════════
 	// Statistics helpers
 	// ══════════════════════════════════════════════════════════════════════════
+
+	private List<QuestionConfig> lowestPassRateQuestions(List<StudentSubmission> subs, List<QuestionConfig> qcs) {
+		return extremePassRateQuestions(subs, qcs, false);
+	}
+
+	private List<QuestionConfig> highestPassRateQuestions(List<StudentSubmission> subs, List<QuestionConfig> qcs) {
+		return extremePassRateQuestions(subs, qcs, true);
+	}
+
+	private List<QuestionConfig> extremePassRateQuestions(List<StudentSubmission> subs, List<QuestionConfig> qcs,
+			boolean highest) {
+		if (qcs.isEmpty()) {
+			return List.of();
+		}
+
+		Map<QuestionConfig, Double> passRates = qcs.stream()
+				.collect(Collectors.toMap(question -> question,
+						question -> PdfReportAnalytics.passRateForQuestion(subs, question), (left, right) -> left,
+						LinkedHashMap::new));
+
+		int extremePct = highest
+				? passRates.values().stream().mapToInt(this::toRoundedPercent).max().orElse(0)
+				: passRates.values().stream().mapToInt(this::toRoundedPercent).min().orElse(0);
+
+		return passRates.entrySet().stream().filter(entry -> toRoundedPercent(entry.getValue()) == extremePct)
+				.map(Map.Entry::getKey).collect(Collectors.toList());
+	}
+
+	private int toRoundedPercent(double ratio) {
+		return (int) Math.round(ratio * 100);
+	}
+
+	private boolean sameQuestionSet(List<QuestionConfig> left, List<QuestionConfig> right) {
+		if (left.size() != right.size()) {
+			return false;
+		}
+		Set<String> leftIds = left.stream().map(QuestionConfig::getQuestionId).collect(Collectors.toSet());
+		Set<String> rightIds = right.stream().map(QuestionConfig::getQuestionId).collect(Collectors.toSet());
+		return leftIds.equals(rightIds);
+	}
+
+	private String buildPassRateInsight(List<QuestionConfig> questions, double passRate, String extremum) {
+		if (questions.size() == 1) {
+			return questions.get(0).getQuestionId() + " had the " + extremum + " full-pass rate (" + pct(passRate)
+					+ ")";
+		}
+		return joinQuestionIds(questions) + " were tied for the " + extremum + " full-pass rate (" + pct(passRate)
+				+ ")";
+	}
+
+	private String joinQuestionIds(List<QuestionConfig> questions) {
+		List<String> ids = questions.stream().map(QuestionConfig::getQuestionId).collect(Collectors.toList());
+		if (ids.size() == 2) {
+			return ids.get(0) + " and " + ids.get(1);
+		}
+		if (ids.size() <= 1) {
+			return ids.isEmpty() ? "" : ids.get(0);
+		}
+		return String.join(", ", ids.subList(0, ids.size() - 1)) + ", and " + ids.get(ids.size() - 1);
+	}
 
 	// ══════════════════════════════════════════════════════════════════════════
 	// Formatting utilities
