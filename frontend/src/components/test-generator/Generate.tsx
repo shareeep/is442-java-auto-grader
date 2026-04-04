@@ -161,22 +161,14 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     );
   };
 
-  const MAX_ATTEMPTS = 4; // 1 original + 3 retries
-
   const getRecommendation = async (qid: string, onDone?: () => void) => {
     setLoadingRec((prev) => ({ ...prev, [qid]: true }));
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
-        setRecommendation(qid, rec);
-        break;
-      } catch (err) {
-        if (handleStaleSession(err)) break;
-        if (attempt < MAX_ATTEMPTS) {
-          toast({ title: `Recommendation failed for ${qid} — retrying ${attempt}/3`, description: 'The AI returned an error, retrying automatically…', variant: 'destructive' });
-        } else {
-          toast({ title: `Recommendation failed for ${qid}`, description: 'AI failed after 3 retries. Please try again.', variant: 'destructive' });
-        }
+    try {
+      const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
+      setRecommendation(qid, rec);
+    } catch (err) {
+      if (!handleStaleSession(err)) {
+        toast({ title: `Recommendation failed for ${qid}`, description: 'Please try again.', variant: 'destructive' });
       }
     }
     setLoadingRec((prev) => { const next = { ...prev }; delete next[qid]; return next; });
@@ -193,31 +185,23 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     const totalSuggestions = conceptsToCover.length + customs.length;
     const numCases = Math.min(5, totalSuggestions > 0 ? totalSuggestions : Math.max(3, rec?.recommendedCount || 3));
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      if (cancelledQids.current.has(qid)) break;
-      try {
-        const { data: result } = await execute({
-          body: {
-            examId: examId!,
-            testerId: testerId ?? undefined,
-            templateId: templateId ?? undefined,
-            numCases,
-            question: question!,
-            conceptsToCover,
-            customSuggestions: customs,
-          },
-          throwOnError: true,
-        });
-        if (!cancelledQids.current.has(qid)) setResult(qid, result);
-        break;
-      } catch (err) {
-        if (cancelledQids.current.has(qid)) break;
-        if (handleStaleSession(err)) break;
-        if (attempt < MAX_ATTEMPTS) {
-          toast({ title: `Generation failed for ${qid} — retrying ${attempt}/3`, description: 'The AI returned an error, retrying automatically…', variant: 'destructive' });
-        } else {
-          toast({ title: `Generation failed for ${qid}`, description: 'AI failed after 3 retries. Click Generate to try again.', variant: 'destructive' });
-        }
+    try {
+      const { data: result } = await execute({
+        body: {
+          examId: examId!,
+          testerId: testerId ?? undefined,
+          templateId: templateId ?? undefined,
+          numCases,
+          question: question!,
+          conceptsToCover,
+          customSuggestions: customs,
+        },
+        throwOnError: true,
+      });
+      if (!cancelledQids.current.has(qid)) setResult(qid, result);
+    } catch (err) {
+      if (!cancelledQids.current.has(qid) && !handleStaleSession(err)) {
+        toast({ title: `Generation failed for ${qid}`, description: 'Click Generate to try again.', variant: 'destructive' });
       }
     }
     cancelledQids.current.delete(qid);

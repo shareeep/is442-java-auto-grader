@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is442.autograder.model.GeneratedTestCase;
 import com.is442.autograder.model.GenerationResult;
-import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.StructuredTestCase;
 import com.is442.autograder.model.TestCaseRecommendation;
@@ -17,7 +16,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,10 +30,12 @@ import org.slf4j.LoggerFactory;
 /**
  * UI-agnostic orchestrator for AI-assisted test case generation. Coordinates
  * prompt building, LLM calls via LangChain4j, and deterministic code assembly.
+ * Retries AI calls up to MAX_AI_ATTEMPTS times on failure/null/parse errors.
  */
 public class TestGenerationService {
 
 	private static final Logger logger = LoggerFactory.getLogger(TestGenerationService.class);
+	private static final int MAX_AI_ATTEMPTS = 3;
 	private static final int DEFAULT_RECOMMENDED_COUNT = 3;
 	private static final double DEFAULT_WEIGHT = 1.0;
 	private static final Pattern TXT_FILENAME_PATTERN = Pattern.compile("\"([^\"]+\\.txt)\"");
@@ -53,122 +53,195 @@ public class TestGenerationService {
 		this.objectMapper = new ObjectMapper();
 	}
 
-	private LangChainService selectService(List<String> imageUris) {
-		return imageUris.isEmpty() ? langChainServiceText : langChainServiceVision;
-	}
+	// ── Public API ───────────────────────────────────────────────────────────
 
 	/**
-	 * Generate test cases for a single question.
-	 *
-	 * @param question
-	 *            question configuration
-	 * @param examContext
-	 *            pre-loaded question markdown (from DB cache or PDF parser)
-	 * @param existingTesterFile
-	 *            path to existing tester file (null = from scratch)
-	 * @param numCases
-	 *            number of new test cases to generate
-	 * @param templateDir
-	 *            path to template directory with student code, or null
-	 * @return generation result containing code and compile status
+	 * Generate test cases for a single question with retry.
 	 */
-	public GenerationResult generateForQuestion(QuestionConfig question, String examContext, Path existingTesterFile,
+	public GenerationResult generateTestCases(QuestionConfig question, String examContext, Path existingTesterFile,
 			int numCases, Path templateDir, List<String> conceptsToCover, List<String> customSuggestions)
 			throws IOException, InterruptedException {
 
-		logger.info("[GEN] Starting generation  questionId={} numCases={}", question.getQuestionId(), numCases);
+		String qid = question.getQuestionId();
+		logger.info("[GEN] Starting generation  questionId={} numCases={} conceptsToCover={} customSuggestions={}", qid, numCases, conceptsToCover, customSuggestions);
 
-		// 1. Read existing tester if provided
+		// Build context + prompt once (not per retry)
 		String existingCode = loadExistingTesterCode(question, existingTesterFile);
-
-		// 2. Build additional context from template dir and data files
 		String additionalContext = buildAdditionalContext(question, existingCode, existingTesterFile, templateDir);
-		if (!additionalContext.isBlank()) {
-			logger.debug("[GEN] Additional context built  questionId={} chars={}", question.getQuestionId(),
-					additionalContext.length());
+		String apiDocsContext = templateDir != null
+				? buildApiDocsContext(templateDir.resolve(question.getFolder()), existingCode)
+				: "";
+		logger.info("[GEN] Context sizes  questionId={}  additionalContext={}chars  apiDocsContext={}chars",
+				qid, additionalContext.length(), apiDocsContext.length());
+		if (!apiDocsContext.isBlank()) {
+			logger.info("[GEN] API docs included  questionId={}", qid);
+		} else {
+			logger.warn("[GEN] No API docs found  questionId={}  templateDir={}  folder={}", qid, templateDir, question.getFolder());
 		}
 
-		// 3. Build user prompt and call LLM
 		String prompt = buildGeneratePrompt(question, examContext, existingCode, numCases, additionalContext,
-				conceptsToCover, customSuggestions);
-		logger.info("[GEN] Calling AI  questionId={}", question.getQuestionId());
+				apiDocsContext, conceptsToCover, customSuggestions);
+		logger.info("[GEN] Final prompt size  questionId={}  chars={}", qid, prompt.length());
 
 		List<String> imageUris = PdfParser.extractBase64Images(examContext);
 		LangChainService svc = selectService(imageUris);
-		logger.info("[GEN] Using {} model  questionId={} images={}", imageUris.isEmpty() ? "text" : "vision",
-				question.getQuestionId(), imageUris.size());
+		UserMessage message = buildVisionMessage(prompt, examContext, imageUris);
+		logAiCall("GEN", qid, prompt, imageUris);
 
-		String rawJson;
-		try {
-			rawJson = svc.generateTestCasesJson(buildVisionMessage(prompt, examContext, imageUris));
-		} catch (Exception e) {
-			logger.error("[GEN] AI call failed  questionId={}: {}", question.getQuestionId(), e.getMessage());
-			return new GenerationResult(question.getQuestionId(), List.of(), false,
-					"API call failed: " + e.getMessage(), "");
+		// Retry loop: call AI → null guard → parse → empty guard
+		for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
+			if (attempt > 1) sleepBeforeRetry("GEN", qid, attempt - 1);
+			String rawJson;
+			try {
+				rawJson = svc.generateTestCasesJson(message);
+				logger.info("[GEN] AI response  questionId={} attempt={}\n{}", qid, attempt, rawJson);
+			} catch (Exception e) {
+				logger.error("[GEN] AI call failed  questionId={} attempt={}/{}: {}", qid, attempt, MAX_AI_ATTEMPTS,
+						e.getMessage());
+				if (attempt == MAX_AI_ATTEMPTS)
+					return failResult(qid, "AI call failed after " + MAX_AI_ATTEMPTS + " attempts: " + e.getMessage());
+				continue;
+			}
+
+			if (rawJson == null || rawJson.isBlank()) {
+				logger.warn("[GEN] AI returned null/blank  questionId={} attempt={}/{}", qid, attempt, MAX_AI_ATTEMPTS);
+				if (attempt == MAX_AI_ATTEMPTS)
+					return failResult(qid, "AI returned empty response after " + MAX_AI_ATTEMPTS + " attempts");
+				continue;
+			}
+
+			List<StructuredTestCase> structured;
+			try {
+				structured = parseStructuredCases(rawJson);
+			} catch (Exception e) {
+				logger.warn("[GEN] Parse failed  questionId={} attempt={}/{}: {}", qid, attempt, MAX_AI_ATTEMPTS,
+						e.getMessage());
+				if (attempt == MAX_AI_ATTEMPTS)
+					return failResult(qid, "AI returned unparseable output after " + MAX_AI_ATTEMPTS + " attempts");
+				continue;
+			}
+
+			if (structured.isEmpty()) {
+				logger.warn("[GEN] AI returned 0 cases  questionId={} attempt={}/{}", qid, attempt, MAX_AI_ATTEMPTS);
+				if (attempt == MAX_AI_ATTEMPTS)
+					return failResult(qid, "AI returned no test cases after " + MAX_AI_ATTEMPTS + " attempts");
+				continue;
+			}
+
+			// Success
+			String generatedCode = testerFileWriter.buildCodeFromStructured(structured);
+			List<GeneratedTestCase> cases = structured.stream().map(this::toGeneratedTestCase)
+					.collect(Collectors.toList());
+			logger.info("[GEN] Generation complete  questionId={} cases={} codeChars={}", qid, cases.size(),
+					generatedCode.length());
+			return new GenerationResult(qid, cases, true, "", generatedCode);
 		}
 
-		// 4. Parse structured test cases from JSON
-		List<StructuredTestCase> structured = parseStructuredCases(rawJson, numCases);
-		logger.info("[GEN] Parsed {} test cases  questionId={}", structured.size(), question.getQuestionId());
-
-		// 5. Build deterministic Java code from structured cases
-		String generatedCode = testerFileWriter.buildCodeFromStructured(structured);
-
-		// 6. Convert to GeneratedTestCase for the API response
-		List<GeneratedTestCase> cases = structured.stream().map(this::toGeneratedTestCase).collect(Collectors.toList());
-
-		logger.info("[GEN] Generation complete  questionId={} codeChars={}", question.getQuestionId(),
-				generatedCode.length());
-		return new GenerationResult(question.getQuestionId(), cases, true, "", generatedCode);
+		return failResult(qid, "Generation failed"); // unreachable
 	}
 
 	/**
-	 * Generate test cases using an InferredQuestionConfig (from the Phase 2
-	 * analyze-setup flow). Converts to QuestionConfig and delegates.
-	 */
-	public GenerationResult generateForInferredQuestion(InferredQuestionConfig iqc, String examContext,
-			Path existingTesterFile, int numCases, Path templateDir, List<String> conceptsToCover,
-			List<String> customSuggestions) throws IOException, InterruptedException {
-		QuestionConfig qc = new QuestionConfig(iqc.getQuestionId(),
-				iqc.getFolder() != null ? iqc.getFolder() : iqc.getQuestionId(),
-				iqc.getTester() != null ? iqc.getTester() : iqc.getQuestionId() + "Tester", iqc.getMaxScore(),
-				iqc.getDependencyFolder(),
-				iqc.getDependencyFiles() != null ? iqc.getDependencyFiles() : Collections.emptyList());
-		return generateForQuestion(qc, examContext, existingTesterFile, numCases, templateDir, conceptsToCover,
-				customSuggestions);
-	}
-
-	/**
-	 * Delegate to the AI for test case count and concept recommendations.
+	 * Ask the AI to recommend test count and concepts for a question with retry.
 	 */
 	public TestCaseRecommendation recommendTestCases(String questionId, String examContext,
 			String existingTesterContent, int existingCaseCount) throws IOException, InterruptedException {
 
 		String prompt = buildRecommendPrompt(questionId, examContext, existingTesterContent, existingCaseCount);
+
 		List<String> imageUris = PdfParser.extractBase64Images(examContext);
 		LangChainService svc = selectService(imageUris);
-		String rawJson = svc.recommendJson(buildVisionMessage(prompt, examContext, imageUris));
-		return parseRecommendation(rawJson, questionId, existingCaseCount);
+		UserMessage message = buildVisionMessage(prompt, examContext, imageUris);
+		logAiCall("GEN][RECOMMEND", questionId, prompt, imageUris);
+
+		for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
+			if (attempt > 1) sleepBeforeRetry("GEN][RECOMMEND", questionId, attempt - 1);
+			String rawJson;
+			try {
+				rawJson = svc.recommendJson(message);
+				logger.info("[GEN][RECOMMEND] AI response  questionId={} attempt={}\n{}", questionId, attempt, rawJson);
+			} catch (Exception e) {
+				logger.error("[GEN][RECOMMEND] AI call failed  questionId={} attempt={}/{}: {}", questionId, attempt,
+						MAX_AI_ATTEMPTS, e.getMessage());
+				if (attempt == MAX_AI_ATTEMPTS)
+					throw new RuntimeException(
+							"Recommendation failed after " + MAX_AI_ATTEMPTS + " attempts: " + e.getMessage(), e);
+				continue;
+			}
+
+			if (rawJson == null || rawJson.isBlank()) {
+				logger.warn("[GEN][RECOMMEND] AI returned null/blank  questionId={} attempt={}/{}", questionId, attempt,
+						MAX_AI_ATTEMPTS);
+				if (attempt == MAX_AI_ATTEMPTS)
+					throw new RuntimeException(
+							"AI returned empty recommendation after " + MAX_AI_ATTEMPTS + " attempts");
+				continue;
+			}
+
+			try {
+				return parseRecommendation(rawJson, questionId, existingCaseCount);
+			} catch (Exception e) {
+				logger.warn("[GEN][RECOMMEND] Parse failed  questionId={} attempt={}/{}: {}", questionId, attempt,
+						MAX_AI_ATTEMPTS, e.getMessage());
+				if (attempt == MAX_AI_ATTEMPTS)
+					throw new RuntimeException(
+							"Recommendation parse failed after " + MAX_AI_ATTEMPTS + " attempts: " + e.getMessage(), e);
+			}
+		}
+
+		throw new RuntimeException("Recommendation failed for " + questionId); // unreachable
 	}
 
 	/**
-	 * Delegate to the AI for code refinement.
+	 * Delegate to the AI for code refinement (no retry — single-shot).
 	 */
 	public String refineCode(String questionId, String currentCode, String refinementPrompt, String examContext)
 			throws IOException, InterruptedException {
 
 		String prompt = buildRefinePrompt(questionId, currentCode, refinementPrompt, examContext);
-		return langChainServiceText.refineCode(prompt);
+		logger.info("[GEN][REFINE] === PROMPT START ===  questionId={}\n{}\n[GEN][REFINE] === PROMPT END ===",
+				questionId, PdfParser.stripInlineImages(prompt));
+
+		String result = langChainServiceText.refineCode(prompt);
+		logger.info("[GEN][REFINE] === AI RESPONSE START ===  questionId={}\n{}\n[GEN][REFINE] === AI RESPONSE END ===",
+				questionId, result);
+
+		return result;
+	}
+
+	// ── Helpers ──────────────────────────────────────────────────────────────
+
+	private void sleepBeforeRetry(String tag, String questionId, int attempt) {
+		long delayMs = 3000L * attempt;
+		logger.info("[{}] Waiting {}ms before retry  questionId={} attempt={}", tag, delayMs, questionId, attempt);
+		try {
+			Thread.sleep(delayMs);
+		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private LangChainService selectService(List<String> imageUris) {
+		return imageUris.isEmpty() ? langChainServiceText : langChainServiceVision;
+	}
+
+	private GenerationResult failResult(String questionId, String message) {
+		return new GenerationResult(questionId, List.of(), false, message, "");
+	}
+
+	private void logAiCall(String tag, String questionId, String prompt, List<String> imageUris) {
+		logger.info("[{}] Calling AI  questionId={}", tag, questionId);
+		logger.info("[{}] === PROMPT START ===  questionId={}\n{}\n[{}] === PROMPT END ===", tag, questionId,
+				PdfParser.stripInlineImages(prompt), tag);
+		String imageLog = imageUris.isEmpty()
+				? "none"
+				: imageUris.stream().map(uri -> uri.length() > 50 ? uri.substring(0, 50) + "..." : uri)
+						.collect(Collectors.joining(", "));
+		logger.info("[{}] Using {} model  questionId={} images={} ({})", tag, imageUris.isEmpty() ? "text" : "vision",
+				questionId, imageUris.size(), imageLog);
 	}
 
 	// ── Vision message builder ───────────────────────────────────────────────
 
-	/**
-	 * Build a multimodal UserMessage from a text prompt and exam context markdown.
-	 * Extracts any embedded base64 images from the context, adds them as
-	 * ImageContent, and replaces the raw base64 blobs in the text with [diagram N]
-	 * placeholders. Falls back to text-only if no images are present.
-	 */
 	private UserMessage buildVisionMessage(String textPrompt, String examContext, List<String> imageUris) {
 		List<Content> contents = new ArrayList<>();
 		if (imageUris.isEmpty()) {
@@ -187,7 +260,8 @@ public class TestGenerationService {
 	// ── Prompt builders ──────────────────────────────────────────────────────
 
 	private String buildGeneratePrompt(QuestionConfig question, String examContext, String existingTesterCode,
-			int numCases, String additionalContext, List<String> conceptsToCover, List<String> customSuggestions) {
+			int numCases, String additionalContext, String apiDocsContext, List<String> conceptsToCover,
+			List<String> customSuggestions) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("Question ID: ").append(question.getQuestionId()).append("\n");
 		sb.append("Tester class: ").append(question.getTesterClassName()).append("\n\n");
@@ -200,6 +274,10 @@ public class TestGenerationService {
 
 		if (additionalContext != null && !additionalContext.isBlank()) {
 			sb.append(additionalContext).append("\n\n");
+		}
+
+		if (apiDocsContext != null && !apiDocsContext.isBlank()) {
+			sb.append(apiDocsContext).append("\n\n");
 		}
 
 		if (conceptsToCover != null && !conceptsToCover.isEmpty()) {
@@ -261,7 +339,7 @@ public class TestGenerationService {
 	// ── JSON parsing ─────────────────────────────────────────────────────────
 
 	@SuppressWarnings("unchecked")
-	private List<StructuredTestCase> parseStructuredCases(String json, int numCases) {
+	private List<StructuredTestCase> parseStructuredCases(String json) {
 		try {
 			String cleaned = stripMarkdownFences(json);
 			List<Map<String, Object>> raw = objectMapper.readValue(cleaned, new TypeReference<>() {
@@ -327,16 +405,10 @@ public class TestGenerationService {
 
 	// ── Additional context builder ───────────────────────────────────────────
 
-	/**
-	 * Build additional context for the AI prompt by reading: 1. Original student
-	 * code from the template directory 2. Data files (.txt) referenced in the
-	 * tester code 3. Data files from the question's subfolder in the template dir
-	 */
 	private String buildAdditionalContext(QuestionConfig question, String existingCode, Path existingTesterFile,
 			Path templateDir) {
 		StringBuilder ctx = new StringBuilder();
 
-		// Read original student code from template dir
 		if (templateDir != null) {
 			Path questionFolder = templateDir.resolve(question.getFolder());
 			if (Files.isDirectory(questionFolder)) {
@@ -353,7 +425,6 @@ public class TestGenerationService {
 					// skip
 				}
 
-				// Read .txt data files from the question folder
 				try (var files = Files.list(questionFolder)) {
 					List<Path> dataFiles = files.filter(f -> f.getFileName().toString().endsWith(".txt")).toList();
 					if (!dataFiles.isEmpty()) {
@@ -369,7 +440,6 @@ public class TestGenerationService {
 			}
 		}
 
-		// Extract referenced .txt filenames from the existing tester code
 		if (existingCode != null) {
 			Set<String> filenames = new LinkedHashSet<>();
 			Matcher m = TXT_FILENAME_PATTERN.matcher(existingCode);
@@ -381,7 +451,6 @@ public class TestGenerationService {
 				ctx.append("IMPORTANT — Data files referenced by the existing tester:\n");
 				ctx.append("You may ONLY use these filenames. Do NOT invent new filenames.\n\n");
 
-				// Try to find data files from multiple locations
 				List<Path> searchDirs = new ArrayList<>();
 				if (existingTesterFile != null && existingTesterFile.getParent() != null) {
 					searchDirs.add(existingTesterFile.getParent());
@@ -414,6 +483,69 @@ public class TestGenerationService {
 		}
 
 		return ctx.toString();
+	}
+
+	private String buildApiDocsContext(Path questionFolder, String existingCode) {
+		if (questionFolder == null || existingCode == null) {
+			return "";
+		}
+
+		Path apiFolder = questionFolder.resolve("api");
+		if (!Files.isDirectory(apiFolder)) {
+			return "";
+		}
+
+		Set<String> classes = extractClasses(existingCode);
+		if (classes.isEmpty()) {
+			return "";
+		}
+
+		StringBuilder ctx = new StringBuilder();
+		ctx.append(
+				"API Documentation (available classes and their methods — DO NOT invent methods not listed here):\n\n");
+
+		try (var files = Files.list(apiFolder)) {
+			for (Path f : files.filter(p -> p.toString().endsWith(".html")).toList()) {
+				String filename = f.getFileName().toString();
+				String className = filename.replace(".html", "");
+
+				if (classes.contains(className)) {
+					ctx.append("--- ").append(filename).append(" ---\n");
+					ctx.append(Files.readString(f)).append("\n\n");
+				}
+			}
+		} catch (IOException e) {
+			logger.debug("[GEN] Could not read api folder: {}", apiFolder);
+		}
+
+		return ctx.toString();
+	}
+
+	private Set<String> extractClasses(String code) {
+		Set<String> classes = new LinkedHashSet<>();
+		if (code == null || code.isBlank()) {
+			return classes;
+		}
+
+		Pattern importP = Pattern.compile("import\\s+[^;]*\\.(\\w+);");
+		for (Matcher m = importP.matcher(code); m.find();) {
+			String c = m.group(1);
+			if (!c.equals("util") && !c.equals("lang") && !c.equals("io")) {
+				classes.add(c);
+			}
+		}
+
+		Pattern newP = Pattern.compile("new\\s+(\\w+)\\s*\\(");
+		for (Matcher m = newP.matcher(code); m.find();) {
+			classes.add(m.group(1));
+		}
+
+		Pattern genP = Pattern.compile("<(\\w+)>");
+		for (Matcher m = genP.matcher(code); m.find();) {
+			classes.add(m.group(1));
+		}
+
+		return classes;
 	}
 
 	private String loadExistingTesterCode(QuestionConfig question, Path existingTesterFile) throws IOException {

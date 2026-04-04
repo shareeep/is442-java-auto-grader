@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponses, ExecuteData, ExecuteResponses, GenerateData, GenerateQuestionData, GenerateQuestionResponses, GenerateResponses, GetAiSettingsData, GetAiSettingsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetLogsData, GetLogsResponses, GetPdfData, GetPdfResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetQuestionsData, GetQuestionsResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTemplateSourceData, GetTemplateSourceResponses, GetTesterData, GetTesterResponses, ListRunsData, ListRunsResponses, PreparsePdfData, PreparsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, RunGradingData, RunGradingResponses, SaveData, SaveResponses, SaveSetupData, SaveSetupResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponses, ExecuteData, ExecuteResponses, GenerateData, GenerateQuestionData, GenerateQuestionResponses, GenerateResponses, GetAiSettingsData, GetAiSettingsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetLogsData, GetLogsResponses, GetPdfData, GetPdfResponses, GetPdfWithNameData, GetPdfWithNameResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetQuestionsData, GetQuestionsResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTemplateSourceData, GetTemplateSourceResponses, GetTesterData, GetTesterResponses, ListRunsData, ListRunsResponses, PreparsePdfData, PreparsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, RunGradingData, RunGradingResponses, SaveData, SaveResponses, SaveSetupData, SaveSetupResponses, StopGradingData, StopGradingResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -36,6 +36,8 @@ export const streamGrading = <ThrowOnError extends boolean = false>(options: Opt
         ...options.headers
     }
 });
+
+export const stopGrading = <ThrowOnError extends boolean = false>(options: Options<StopGradingData, ThrowOnError>) => (options.client ?? client).post<StopGradingResponses, unknown, ThrowOnError>({ url: '/api/grade/stop/{sessionId}', ...options });
 
 export const uploadTesters = <ThrowOnError extends boolean = false>(options?: Options<UploadTestersData, ThrowOnError>) => (options?.client ?? client).post<UploadTestersResponses, unknown, ThrowOnError>({
     ...formDataBodySerializer,
@@ -155,6 +157,8 @@ export const getResults = <ThrowOnError extends boolean = false>(options: Option
 export const getPlagiarismReport = <ThrowOnError extends boolean = false>(options: Options<GetPlagiarismReportData, ThrowOnError>) => (options.client ?? client).get<GetPlagiarismReportResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/plagiarism', ...options });
 
 export const getPdf = <ThrowOnError extends boolean = false>(options: Options<GetPdfData, ThrowOnError>) => (options.client ?? client).get<GetPdfResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/pdf', ...options });
+
+export const getPdfWithName = <ThrowOnError extends boolean = false>(options: Options<GetPdfWithNameData, ThrowOnError>) => (options.client ?? client).get<GetPdfWithNameResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/pdf/{filename}', ...options });
 
 export const getLogs = <ThrowOnError extends boolean = false>(options: Options<GetLogsData, ThrowOnError>) => (options.client ?? client).get<GetLogsResponses, unknown, ThrowOnError>({ url: '/api/reports/{id}/logs', ...options });
 

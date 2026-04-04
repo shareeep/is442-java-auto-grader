@@ -171,6 +171,26 @@ export type StreamGradingResponses = {
 
 export type StreamGradingResponse = StreamGradingResponses[keyof StreamGradingResponses];
 
+export type StopGradingData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/grade/stop/{sessionId}';
+};
+
+export type StopGradingResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type StopGradingResponse = StopGradingResponses[keyof StopGradingResponses];
+
 export type UploadTestersData = {
     body?: {
         files: Array<Blob | File>;
@@ -468,6 +488,25 @@ export type GetPdfResponses = {
 };
 
 export type GetPdfResponse = GetPdfResponses[keyof GetPdfResponses];
+
+export type GetPdfWithNameData = {
+    body?: never;
+    path: {
+        id: string;
+        filename: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/pdf/{filename}';
+};
+
+export type GetPdfWithNameResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type GetPdfWithNameResponse = GetPdfWithNameResponses[keyof GetPdfWithNameResponses];
 
 export type GetLogsData = {
     body?: never;

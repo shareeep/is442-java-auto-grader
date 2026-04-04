@@ -149,17 +149,23 @@ frontend/
 
 ## API Type Generation
 
-Types and query hooks are auto-generated from the backend OpenAPI spec:
+Types and query hooks are auto-generated from the backend OpenAPI spec (`frontend/src/generated/openapi-spec.json`).
 
 ```bash
-# 1. Start backend
-./gradlew bootRun
-
-# 2. Generate types + hooks
+# Generate types + hooks from committed spec
 cd frontend && npm run generate:api
 ```
 
 Output: `frontend/src/generated/` — types, SDK functions, `useQuery`/`useMutation` hooks.
+
+**When you change backend endpoints, request/response types:** re-fetch the spec from the running backend, then regenerate:
+
+```bash
+curl -s http://localhost:8080/v3/api-docs -o frontend/src/generated/openapi-spec.json
+cd frontend && npm run generate:api
+```
+
+Commit both `openapi-spec.json` and the regenerated files together.
 
 ## Documentation
 
