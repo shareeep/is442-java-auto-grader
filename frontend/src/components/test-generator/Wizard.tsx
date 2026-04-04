@@ -19,8 +19,13 @@ const Wizard: React.FC = () => {
   const currentStep = useWizardStore((s) => s.currentStep);
   const setStep = useWizardStore((s) => s.setStep);
   const reset = useWizardStore((s) => s.reset);
+  const examId = useWizardStore((s) => s.examId);
+  const templateId = useWizardStore((s) => s.templateId);
+  const testerId = useWizardStore((s) => s.testerId);
 
   const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const hasNoData = !examId && !templateId && !testerId;
 
   const nextStep = () => setStep(Math.min(currentStep + 1, STEPS.length));
   const prevStep = () => setStep(Math.max(currentStep - 1, 1));
@@ -42,12 +47,12 @@ const Wizard: React.FC = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 pb-16 sm:px-6 sm:py-6 lg:px-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">
             AI Test Generator
           </h1>
-          <p className="text-muted-foreground font-sans">
+          <p className="text-muted-foreground mt-1">
             Generalized grading pipeline with automated inference.
           </p>
         </div>
@@ -77,7 +82,8 @@ const Wizard: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={() => setConfirmingReset(true)}
-              className="text-muted-foreground hover:text-foreground gap-1.5"
+              disabled={hasNoData}
+              className="text-muted-foreground hover:text-foreground gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <RotateCcw size={13} /> Start Over
             </Button>
@@ -112,7 +118,7 @@ const Wizard: React.FC = () => {
                 {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
               </div>
               <div className="hidden md:block">
-                <p className="text-[10px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
+                <p className="text-[10px] uppercase tracking-wider font-mono opacity-60">Phase {step.id}</p>
                 <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
               </div>
             </button>

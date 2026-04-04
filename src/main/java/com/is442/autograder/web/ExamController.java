@@ -1,46 +1,51 @@
 package com.is442.autograder.web;
 
+import com.is442.autograder.config.AppConfig;
+import com.is442.autograder.data.SessionDatabase;
+import com.is442.autograder.generation.ConfigInferenceService;
+import com.is442.autograder.generation.PdfParser;
+import com.is442.autograder.model.InferredConfig;
+import com.is442.autograder.model.InferredQuestionConfig;
+import com.is442.autograder.web.dto.AnalyzeSetupRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Handles file uploads for the test generator wizard. All uploads are stored in
- * temp directories keyed by UUID, cleaned up on JVM shutdown.
+ * Handles exam PDF uploads and exam-level operations (parse, analyze).
  */
 @RestController
-@RequestMapping("/api/generation")
+@RequestMapping("/api/exams")
 public class ExamController {
 
 	private static final Logger logger = LoggerFactory.getLogger(ExamController.class);
 
-	/** Maps examId → exam PDF temp path. */
-	static final ConcurrentHashMap<String, Path> EXAM_FILES = new ConcurrentHashMap<>();
+	private final UploadRegistry uploadRegistry;
+	private final AppConfig appConfig;
+	private final SessionDatabase sessionDb;
+	private final PdfParser pdfParser;
+	private final ConfigInferenceService configInferenceService;
 
-	/** Maps templateId → extracted template directory. */
-	static final ConcurrentHashMap<String, Path> TEMPLATE_DIRS = new ConcurrentHashMap<>();
+	public ExamController(UploadRegistry uploadRegistry, AppConfig appConfig, SessionDatabase sessionDb,
+			PdfParser pdfParser, ConfigInferenceService configInferenceService) {
+		this.uploadRegistry = uploadRegistry;
+		this.appConfig = appConfig;
+		this.sessionDb = sessionDb;
+		this.pdfParser = pdfParser;
+		this.configInferenceService = configInferenceService;
+	}
 
-	/** Maps testerId → directory containing uploaded Tester.java files. */
-	static final ConcurrentHashMap<String, Path> TESTER_DIRS = new ConcurrentHashMap<>();
-
-	@PostMapping(value = "/exam/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<Map<String, String>> uploadExam(@RequestPart("file") MultipartFile file) throws IOException {
 		if (file.isEmpty()) {
 			return ResponseEntity.badRequest().body(Map.of("error", "No file provided"));
@@ -56,7 +61,7 @@ public class ExamController {
 		Path tempFile = tempDir.resolve(originalName);
 		file.transferTo(tempFile.toFile());
 
-		EXAM_FILES.put(examId, tempFile);
+		uploadRegistry.getExamFiles().put(examId, tempFile);
 		tempFile.toFile().deleteOnExit();
 		tempDir.toFile().deleteOnExit();
 
@@ -66,71 +71,73 @@ public class ExamController {
 	}
 
 	/**
-	 * Accepts the contents of a template directory (uploaded via webkitdirectory).
-	 * Each file's relative path is encoded in its filename using "__SEP__" as the
-	 * directory separator so the server can reconstruct the folder structure.
+	 * Pre-parse PDF after upload (non-blocking warm-up for the Docling cache).
 	 */
-	@PostMapping(value = "/template/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<Map<String, Object>> uploadTemplate(@RequestPart("files") MultipartFile[] files)
-			throws IOException {
-
-		String templateId = UUID.randomUUID().toString();
-		Path tempDir = Files.createTempDirectory("autograder-template-");
-
-		int saved = 0;
-		List<String> savedPaths = new ArrayList<>();
-		for (MultipartFile file : files) {
-			if (file.isEmpty() || file.getOriginalFilename() == null)
-				continue;
-			if (file.getOriginalFilename().contains(".DS_Store"))
-				continue;
-
-			// Decode the path separator we encoded on the client side
-			String originalName = file.getOriginalFilename();
-			String relativePath = originalName.replace("__SEP__", File.separator);
-			Path dest = tempDir.resolve(relativePath);
-			Files.createDirectories(dest.getParent());
-			file.transferTo(dest.toFile());
-			dest.toFile().deleteOnExit();
-			saved++;
-			savedPaths.add(relativePath);
+	@PostMapping("/{examId}/parse")
+	public ResponseEntity<?> parsePdf(@PathVariable String examId) {
+		Path examPdf = uploadRegistry.getExamFiles().get(examId);
+		if (examPdf == null || !Files.exists(examPdf)) {
+			return ResponseEntity.badRequest().body(Map.of("error", "Exam not found."));
 		}
 
-		TEMPLATE_DIRS.put(templateId, tempDir);
-		tempDir.toFile().deleteOnExit();
+		try {
+			String existingMarkdown = sessionDb.getParsedMarkdown(examId);
+			if (existingMarkdown != null) {
+				logger.info("[CONTROLLER] PDF already parsed for exam {}", examId);
+				return ResponseEntity.ok(Map.of("status", "already_cached"));
+			}
 
-		logger.info("[UPLOAD] Template dir stored  templateId={} files={} path={}", templateId, saved, tempDir);
-		logger.info("[UPLOAD] Template files: {}", savedPaths);
-		return ResponseEntity.ok(Map.of("templateId", templateId, "fileCount", saved));
+			logger.info("[CONTROLLER] Starting background PDF parse for exam {}", examId);
+			String markdown = pdfParser.extractAllText(examPdf);
+			sessionDb.saveParsedExam(examId, examPdf.getFileName().toString(), markdown);
+			logger.info("[CONTROLLER] PDF parsed and cached for exam {}", examId);
+			return ResponseEntity.ok(Map.of("status", "parsed"));
+		} catch (Exception e) {
+			logger.error("[CONTROLLER] PDF parse failed: {}", e.getMessage());
+			return ResponseEntity.ok(Map.of("status", "error", "message", e.getMessage()));
+		}
 	}
 
 	/**
-	 * Accepts tester .java files (flat directory — no subdirectories needed).
+	 * Analyze the uploaded exam PDF alongside the uploaded template and tester
+	 * directories to produce an InferredConfig.
 	 */
-	@PostMapping(value = "/testers/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<Map<String, Object>> uploadTesters(@RequestPart("files") MultipartFile[] files)
-			throws IOException {
-
-		String testerId = UUID.randomUUID().toString();
-		Path tempDir = Files.createTempDirectory("autograder-testers-");
-
-		int saved = 0;
-		for (MultipartFile file : files) {
-			if (file.isEmpty() || file.getOriginalFilename() == null)
-				continue;
-			if (file.getOriginalFilename().contains(".DS_Store"))
-				continue;
-
-			Path dest = tempDir.resolve(Paths.get(file.getOriginalFilename()).getFileName());
-			file.transferTo(dest.toFile());
-			dest.toFile().deleteOnExit();
-			saved++;
+	@PostMapping("/{examId}/analyze")
+	public ResponseEntity<?> analyzeSetup(@PathVariable String examId, @RequestBody AnalyzeSetupRequest request) {
+		Path examPdf = uploadRegistry.getExamFiles().get(examId);
+		if (examPdf == null || !Files.exists(examPdf)) {
+			return ResponseEntity.badRequest().body(Map.of("error", "Exam not found. Please upload first."));
 		}
 
-		TESTER_DIRS.put(testerId, tempDir);
-		tempDir.toFile().deleteOnExit();
+		String templateId = request.getTemplateId();
+		String testerId = request.getTesterId();
+		Path templateDir = templateId != null ? uploadRegistry.getTemplateDirs().get(templateId) : null;
+		Path testersDir = testerId != null ? uploadRegistry.getTesterDirs().get(testerId) : null;
 
-		logger.info("[UPLOAD] Testers dir stored  testerId={} files={} path={}", testerId, saved, tempDir);
-		return ResponseEntity.ok(Map.of("testerId", testerId, "fileCount", saved));
+		try {
+			String markdown;
+			String existingMarkdown = sessionDb.getParsedMarkdown(examId);
+			if (existingMarkdown != null) {
+				logger.info("[CONTROLLER] Using cached markdown for exam {}", examId);
+				markdown = existingMarkdown;
+			} else {
+				markdown = pdfParser.extractAllText(examPdf);
+				sessionDb.saveParsedExam(examId, examPdf.getFileName().toString(), markdown);
+			}
+
+			InferredConfig config = configInferenceService.inferConfig(markdown,
+					templateDir != null ? templateDir.toString() : null,
+					testersDir != null ? testersDir.toString() : null);
+
+			for (InferredQuestionConfig qc : config.getQuestions()) {
+				String qMarkdown = pdfParser.extractQuestionSectionFromMarkdown(markdown, qc.getQuestionId());
+				sessionDb.saveQuestion(examId, qc.getQuestionId(), qMarkdown, qc.getFolder(), qc.getTester(),
+						qc.getMaxScore(), qc.isInferredFromPdf());
+			}
+
+			return ResponseEntity.ok(config);
+		} catch (Exception e) {
+			return ResponseEntity.internalServerError().body(Map.of("error", "Analysis failed: " + e.getMessage()));
+		}
 	}
 }

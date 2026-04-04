@@ -138,10 +138,6 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
                     }
                   </p>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  {run.hasPdf && <span className="text-[10px] px-1 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>}
-                  {run.hasCsv && <span className="text-[10px] px-1 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>}
-                </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {run.hasPdf && (

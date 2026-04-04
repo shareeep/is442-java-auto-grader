@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUp, FolderOpen, AlertCircle, CheckCircle2, Loader2, Upload, ChevronRight } from 'lucide-react';
 import { uploadTemplate } from '@/api/uploadTemplate';
-import { analyzeSetup, preparsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
+import { analyzeSetup, parsePdf, uploadExam, uploadTesters } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -146,12 +146,13 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
     setParsingPdf(false);
     try {
       const { data: uploaded } = await uploadExam({ body: { file: selectedFile }, throwOnError: true });
-      setExamId(uploaded!['examId']);
+      const eid = uploaded!['examId'];
+      setExamId(eid);
       setParsingPdf(true);
-      preparsePdf({ body: { examId: uploaded.examId }, throwOnError: true }).then(({ data: result }) => {
-        if ((result as any).status === 'error') console.warn('PDF parsing failed, will retry on inference');
+      parsePdf({ path: { examId: eid }, throwOnError: true }).then(({ data: result }: any) => {
+        if (result?.status === 'error') console.warn('PDF parsing failed, will retry on inference');
         setParsingPdf(false);
-      }).catch(err => {
+      }).catch((err: any) => {
         console.warn('Background PDF parse failed:', err);
         setParsingPdf(false);
       });
@@ -184,7 +185,7 @@ const ProjectSetup: React.FC<ProjectSetupProps> = ({ onNext }) => {
     setInferring(true);
     setInferError(null);
     try {
-      const { data: inferredConfig } = await analyzeSetup({ body: { examId, templateId: templateId ?? undefined, testerId: testerId ?? undefined }, throwOnError: true });
+      const { data: inferredConfig } = await analyzeSetup({ path: { examId: examId! }, body: { templateId: templateId ?? undefined, testerId: testerId ?? undefined }, throwOnError: true });
       setInferredConfig(inferredConfig);
       onNext();
     } catch (err: any) {

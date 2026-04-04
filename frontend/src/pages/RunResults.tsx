@@ -136,7 +136,7 @@ const TestOutputPanel: React.FC<TestOutputPanelProps> = ({ qResult }) => {
     if (!expanded && canExpand) setExpanded(true);
   };
 
-  const passedCount = (qResult.output ?? '').split('\n').filter(l => l.trim() === 'Passed').length;
+  const passedCount = (qResult.output ?? '').split('\n').filter(l => l.trim().endsWith('Passed')).length;
   const totalTests = Math.round(qResult.maxScore);
   const earnedScore = Math.round(qResult.score);
 
@@ -276,7 +276,7 @@ const RunResults: React.FC = () => {
     if (testerFiles.length === 0 && !loadingTesterFiles) {
       setLoadingTesterFiles(true);
       try {
-        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as { data: Array<{ name: string; content: string }> };
+        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as unknown as { data: Array<{ name: string; content: string }> };
         setTesterFiles(data ?? []);
       } catch {
         setTesterFiles([]);

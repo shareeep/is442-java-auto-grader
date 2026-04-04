@@ -4,10 +4,6 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:8080' | (string & {});
 };
 
-export type SseEmitter = {
-    timeout?: number;
-};
-
 export type ResultEntry = {
     questionId?: string;
     testerClassName?: string;
@@ -38,18 +34,18 @@ export type SaveResponse = {
     };
 };
 
-export type ConfigConflict = {
-    questionId?: string;
-    type?: 'MISSING_FOLDER' | 'MISSING_TESTER' | 'ORPHAN_TESTER' | 'INCOMPLETE_DEPENDENCIES' | 'MISSING_TEMPLATE';
-    message?: string;
-    suggestion?: string;
+export type SseEmitter = {
+    timeout?: number;
 };
 
-export type InferredConfig = {
-    assessmentName?: string;
-    templateFolder?: string;
-    questions?: Array<InferredQuestionConfig>;
-    conflicts?: Array<ConfigConflict>;
+export type ExecuteRequest = {
+    examId?: string;
+    testerId?: string;
+    templateId?: string;
+    numCases?: number;
+    question?: InferredQuestionConfig;
+    conceptsToCover?: Array<string>;
+    customSuggestions?: Array<string>;
 };
 
 export type InferredQuestionConfig = {
@@ -76,120 +72,10 @@ export type RecommendRequest = {
     testerId?: string;
 };
 
-export type PreparsePdfRequest = {
-    examId?: string;
-};
-
-export type GenerateRequest = {
-    examId?: string;
-    testerId?: string;
-    templateId?: string;
-    questions?: Array<QuestionSelection>;
-};
-
-export type QuestionSelection = {
-    questionId?: string;
-    numCases?: number;
-};
-
-export type GenerateQuestionRequest = {
-    examId?: string;
-    testerId?: string;
-    templateId?: string;
-    questionId?: string;
-    numCases?: number;
-};
-
-export type ExecuteRequest = {
-    examId?: string;
-    testerId?: string;
-    templateId?: string;
-    numCases?: number;
-    question?: InferredQuestionConfig;
-    conceptsToCover?: Array<string>;
-    customSuggestions?: Array<string>;
-};
-
 export type AnalyzeSetupRequest = {
-    examId?: string;
     templateId?: string;
     testerId?: string;
 };
-
-export type QuestionConfig = {
-    questionId?: string;
-    folder?: string;
-    testerClassName?: string;
-    maxScore?: number;
-    dependencyFolder?: string;
-    dependencyFiles?: Array<string>;
-};
-
-export type RunGradingData = {
-    body?: {
-        scoresheet?: Blob | File;
-    };
-    path?: never;
-    query: {
-        submissions: Array<Blob | File>;
-        testers: Array<Blob | File>;
-    };
-    url: '/api/grade';
-};
-
-export type RunGradingResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: {
-            [key: string]: unknown;
-        };
-    };
-};
-
-export type RunGradingResponse = RunGradingResponses[keyof RunGradingResponses];
-
-export type StreamGradingData = {
-    body?: {
-        scoresheet?: Blob | File;
-    };
-    path?: never;
-    query: {
-        submissions: Array<Blob | File>;
-        testers: Array<Blob | File>;
-    };
-    url: '/api/grade/stream';
-};
-
-export type StreamGradingResponses = {
-    /**
-     * OK
-     */
-    200: SseEmitter;
-};
-
-export type StreamGradingResponse = StreamGradingResponses[keyof StreamGradingResponses];
-
-export type StopGradingData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/api/grade/stop/{sessionId}';
-};
-
-export type StopGradingResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type StopGradingResponse = StopGradingResponses[keyof StopGradingResponses];
 
 export type UploadTestersData = {
     body?: {
@@ -197,7 +83,7 @@ export type UploadTestersData = {
     };
     path?: never;
     query?: never;
-    url: '/api/generation/testers/upload';
+    url: '/api/testers/upload';
 };
 
 export type UploadTestersResponses = {
@@ -213,13 +99,29 @@ export type UploadTestersResponses = {
 
 export type UploadTestersResponse = UploadTestersResponses[keyof UploadTestersResponses];
 
+export type SaveData = {
+    body: SaveRequest;
+    path?: never;
+    query?: never;
+    url: '/api/testers/save';
+};
+
+export type SaveResponses = {
+    /**
+     * OK
+     */
+    200: SaveResponse;
+};
+
+export type SaveResponse2 = SaveResponses[keyof SaveResponses];
+
 export type UploadTemplateData = {
     body?: {
         files: Array<Blob | File>;
     };
     path?: never;
     query?: never;
-    url: '/api/generation/template/upload';
+    url: '/api/templates/upload';
 };
 
 export type UploadTemplateResponses = {
@@ -235,30 +137,16 @@ export type UploadTemplateResponses = {
 
 export type UploadTemplateResponse = UploadTemplateResponses[keyof UploadTemplateResponses];
 
-export type SaveData = {
-    body: SaveRequest;
-    path?: never;
+export type StopGradingData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
     query?: never;
-    url: '/api/generation/save';
+    url: '/api/grading/{sessionId}/stop';
 };
 
-export type SaveResponses = {
-    /**
-     * OK
-     */
-    200: SaveResponse;
-};
-
-export type SaveResponse2 = SaveResponses[keyof SaveResponses];
-
-export type SaveSetupData = {
-    body: InferredConfig;
-    path?: never;
-    query?: never;
-    url: '/api/generation/save-setup';
-};
-
-export type SaveSetupResponses = {
+export type StopGradingResponses = {
     /**
      * OK
      */
@@ -267,13 +155,52 @@ export type SaveSetupResponses = {
     };
 };
 
-export type SaveSetupResponse = SaveSetupResponses[keyof SaveSetupResponses];
+export type StopGradingResponse = StopGradingResponses[keyof StopGradingResponses];
+
+export type StreamGradingData = {
+    body?: {
+        scoresheet?: Blob | File;
+    };
+    path?: never;
+    query: {
+        submissions: Array<Blob | File>;
+        testers: Array<Blob | File>;
+    };
+    url: '/api/grading/stream';
+};
+
+export type StreamGradingResponses = {
+    /**
+     * OK
+     */
+    200: SseEmitter;
+};
+
+export type StreamGradingResponse = StreamGradingResponses[keyof StreamGradingResponses];
+
+export type GenerateTestsData = {
+    body: ExecuteRequest;
+    path?: never;
+    query?: never;
+    url: '/api/generation/tests';
+};
+
+export type GenerateTestsResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GenerateTestsResponse = GenerateTestsResponses[keyof GenerateTestsResponses];
 
 export type RefineData = {
     body: RefineRequest;
     path?: never;
     query?: never;
-    url: '/api/generation/refine';
+    url: '/api/generation/refinements';
 };
 
 export type RefineResponses = {
@@ -291,7 +218,7 @@ export type RecommendData = {
     body: RecommendRequest;
     path?: never;
     query?: never;
-    url: '/api/generation/recommend';
+    url: '/api/generation/recommendations';
 };
 
 export type RecommendResponses = {
@@ -305,14 +232,16 @@ export type RecommendResponses = {
 
 export type RecommendResponse = RecommendResponses[keyof RecommendResponses];
 
-export type PreparsePdfData = {
-    body: PreparsePdfRequest;
-    path?: never;
+export type ParsePdfData = {
+    body?: never;
+    path: {
+        examId: string;
+    };
     query?: never;
-    url: '/api/generation/preparse-pdf';
+    url: '/api/exams/{examId}/parse';
 };
 
-export type PreparsePdfResponses = {
+export type ParsePdfResponses = {
     /**
      * OK
      */
@@ -321,87 +250,15 @@ export type PreparsePdfResponses = {
     };
 };
 
-export type PreparsePdfResponse = PreparsePdfResponses[keyof PreparsePdfResponses];
-
-export type GenerateData = {
-    body: GenerateRequest;
-    path?: never;
-    query?: never;
-    url: '/api/generation/generate';
-};
-
-export type GenerateResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GenerateResponse = GenerateResponses[keyof GenerateResponses];
-
-export type GenerateQuestionData = {
-    body: GenerateQuestionRequest;
-    path?: never;
-    query?: never;
-    url: '/api/generation/generate-question';
-};
-
-export type GenerateQuestionResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GenerateQuestionResponse = GenerateQuestionResponses[keyof GenerateQuestionResponses];
-
-export type ExecuteData = {
-    body: ExecuteRequest;
-    path?: never;
-    query?: never;
-    url: '/api/generation/execute';
-};
-
-export type ExecuteResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type ExecuteResponse = ExecuteResponses[keyof ExecuteResponses];
-
-export type UploadExamData = {
-    body?: {
-        file: Blob | File;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/generation/exam/upload';
-};
-
-export type UploadExamResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: string;
-    };
-};
-
-export type UploadExamResponse = UploadExamResponses[keyof UploadExamResponses];
+export type ParsePdfResponse = ParsePdfResponses[keyof ParsePdfResponses];
 
 export type AnalyzeSetupData = {
     body: AnalyzeSetupRequest;
-    path?: never;
+    path: {
+        examId: string;
+    };
     query?: never;
-    url: '/api/generation/analyze-setup';
+    url: '/api/exams/{examId}/analyze';
 };
 
 export type AnalyzeSetupResponses = {
@@ -415,11 +272,53 @@ export type AnalyzeSetupResponses = {
 
 export type AnalyzeSetupResponse = AnalyzeSetupResponses[keyof AnalyzeSetupResponses];
 
+export type UploadExamData = {
+    body?: {
+        file: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/exams/upload';
+};
+
+export type UploadExamResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type UploadExamResponse = UploadExamResponses[keyof UploadExamResponses];
+
+export type GetTesterData = {
+    body?: never;
+    path: {
+        className: string;
+    };
+    query: {
+        testerId: string;
+    };
+    url: '/api/testers/{className}';
+};
+
+export type GetTesterResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetTesterResponse = GetTesterResponses[keyof GetTesterResponses];
+
 export type GetBootIdData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/system/boot';
+    url: '/api/system/boot-id';
 };
 
 export type GetBootIdResponses = {
@@ -432,6 +331,26 @@ export type GetBootIdResponses = {
 };
 
 export type GetBootIdResponse = GetBootIdResponses[keyof GetBootIdResponses];
+
+export type GetTesterFilesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/testers';
+};
+
+export type GetTesterFilesResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetTesterFilesResponse = GetTesterFilesResponses[keyof GetTesterFilesResponses];
 
 export type GetResultsData = {
     body?: never;
@@ -508,25 +427,23 @@ export type GetPdfWithNameResponses = {
 
 export type GetPdfWithNameResponse = GetPdfWithNameResponses[keyof GetPdfWithNameResponses];
 
-export type GetLogsData = {
+export type DownloadRunData = {
     body?: never;
     path: {
         id: string;
     };
     query?: never;
-    url: '/api/reports/{id}/logs';
+    url: '/api/reports/{id}/download';
 };
 
-export type GetLogsResponses = {
+export type DownloadRunResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Blob | File;
 };
 
-export type GetLogsResponse = GetLogsResponses[keyof GetLogsResponses];
+export type DownloadRunResponse = DownloadRunResponses[keyof DownloadRunResponses];
 
 export type GetCsvData = {
     body?: never;
@@ -584,128 +501,3 @@ export type ListRunsResponses = {
 };
 
 export type ListRunsResponse = ListRunsResponses[keyof ListRunsResponses];
-
-export type GetTesterData = {
-    body?: never;
-    path: {
-        className: string;
-    };
-    query: {
-        testerId: string;
-    };
-    url: '/api/generation/tester/{className}';
-};
-
-export type GetTesterResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetTesterResponse = GetTesterResponses[keyof GetTesterResponses];
-
-export type GetTemplateSourceData = {
-    body?: never;
-    path?: never;
-    query: {
-        templateId: string;
-        folder: string;
-    };
-    url: '/api/generation/template-source';
-};
-
-export type GetTemplateSourceResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetTemplateSourceResponse = GetTemplateSourceResponses[keyof GetTemplateSourceResponses];
-
-export type GetQuestionsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/generation/config/questions';
-};
-
-export type GetQuestionsResponses = {
-    /**
-     * OK
-     */
-    200: Array<QuestionConfig>;
-};
-
-export type GetQuestionsResponse = GetQuestionsResponses[keyof GetQuestionsResponses];
-
-export type GetAiSettingsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/generation/config/ai';
-};
-
-export type GetAiSettingsResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: {
-            [key: string]: unknown;
-        };
-    };
-};
-
-export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
-
-export type GetTesterFilesData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/reports/{id}/testers';
-};
-
-export type GetTesterFilesResponses = {
-    200: Array<{ name: string; content: string }>;
-};
-
-export type GetTesterFilesResponse = GetTesterFilesResponses[keyof GetTesterFilesResponses];
-
-export type GetTesterFileData = {
-    body?: never;
-    path: {
-        id: string;
-        filename: string;
-    };
-    query?: never;
-    url: '/api/reports/{id}/testers/{filename}';
-};
-
-export type GetTesterFileResponses = {
-    200: string;
-};
-
-export type GetTesterFileResponse = GetTesterFileResponses[keyof GetTesterFileResponses];
-
-export type DownloadRunData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/reports/{id}/download';
-};
-
-export type DownloadRunResponses = {
-    200: Blob;
-};
-
-export type DownloadRunResponse = DownloadRunResponses[keyof DownloadRunResponses];

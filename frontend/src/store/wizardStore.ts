@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { InferredConfig } from '../generated/types.gen';
+/** Returned by POST /api/exams/{examId}/analyze — not in the generated SDK
+ *  because the endpoint returns a raw Map, so we type it loosely here. */
+type InferredConfig = Record<string, any>;
 
 interface WizardStore {
   currentStep: number;

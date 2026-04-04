@@ -13,7 +13,7 @@ public class SystemController {
 
 	public static final String BOOT_ID = UUID.randomUUID().toString();
 
-	@GetMapping("/boot")
+	@GetMapping("/boot-id")
 	public Map<String, String> getBootId() {
 		return Map.of("bootId", BOOT_ID);
 	}

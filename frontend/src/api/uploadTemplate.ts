@@ -30,7 +30,7 @@ export async function uploadTemplate(files: File[]): Promise<UploadDirResponse> 
     const encodedName = file.webkitRelativePath.replace(/\//g, "__SEP__");
     form.append("files", file, encodedName);
   }
-  const res = await fetch(`/api/generation/template/upload`, {
+  const res = await fetch(`/api/templates/upload`, {
     method: "POST",
     body: form,
   });
