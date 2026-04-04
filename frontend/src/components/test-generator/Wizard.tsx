@@ -118,7 +118,7 @@ const Wizard: React.FC = () => {
                 {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={16} />}
               </div>
               <div className="hidden md:block">
-                <p className="text-[10px] uppercase tracking-wider font-mono opacity-60">Phase 0{step.id}</p>
+                <p className="text-[10px] uppercase tracking-wider font-mono opacity-60">Phase {step.id}</p>
                 <p className="text-xs font-bold whitespace-nowrap">{step.title}</p>
               </div>
             </button>

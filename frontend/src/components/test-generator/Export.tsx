@@ -105,11 +105,11 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     let needsCasesInit = false;
 
     for (const qid of questionIds) {
-      if (results[qid]?.generatedCode && !localCode[qid]) {
+      if (results[qid]?.generatedCode && localCode[qid] == null) {
         initialCode[qid] = results[qid].generatedCode;
         needsCodeInit = true;
       }
-      if (!localCases[qid]) {
+      if (localCases[qid] == null) {
         initialCases[qid] = (results[qid]?.cases || []).map((c: any) => ({ ...c }));
         needsCasesInit = true;
       }
@@ -117,7 +117,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
     if (needsCodeInit) initLocalCode({ ...localCode, ...initialCode });
     if (needsCasesInit) initLocalCases(initialCases);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [results]);
 
   const handleDeleteCase = (qid: string, caseIdx: number) => {
     // Remove from cases list
