@@ -517,10 +517,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       <CardContent className="p-4 space-y-3">
         {/* AI suggestions + custom suggestions */}
         {rec ? (
-          <div className="p-3 bg-accent/5 rounded-md border border-accent/10 animate-in slide-in-from-top-2">
+          <div className="p-3 bg-white/5 rounded-md border border-white/10 animate-in slide-in-from-top-2">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[9px] uppercase font-mono text-accent tracking-wider">AI Suggestions</p>
-              <span className="text-[9px] bg-accent/10 px-2 py-0.5 rounded font-mono text-accent">
+              <p className="text-[9px] uppercase font-mono text-white/80 tracking-wider">AI Suggestions</p>
+              <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded font-mono text-white/80">
                 {(rec.conceptsToCover?.length ?? 0) + customs.length} concepts
               </span>
             </div>
@@ -530,7 +530,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                   key={idx}
                   className="text-[10px] px-2 py-0.5 bg-card rounded border border-accent/10 text-muted-foreground font-mono flex items-center gap-1 group"
                 >
-                  <span className="w-1 h-1 bg-accent rounded-full shrink-0" />
+                  <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                   {c}
                   <button
                     onClick={() => onDeleteConcept(idx)}
@@ -545,7 +545,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                   key={`custom-${idx}`}
                   className="text-[10px] px-2 py-0.5 bg-primary/5 rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
                 >
-                  <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                  <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                   Custom #{idx + 1} — {c}
                   <button
                     onClick={() => onDeleteCustom(idx)}
@@ -568,7 +568,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                     key={idx}
                     className="text-[10px] px-2 py-0.5 bg-card rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
                   >
-                    <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                    <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                     Custom #{idx + 1} — {c}
                     <button
                       onClick={() => onDeleteCustom(idx)}
@@ -597,22 +597,18 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         {/* Result preview */}
         {result && (
           <div className="space-y-3 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
+            <div className="flex items-center p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
               <div className="flex items-center gap-2 text-xs font-mono font-bold">
-                <CheckCircle2 size={14} /> Gen-Ready ({result.cases.length} cases)
+                <CheckCircle2 size={14} /> Generation Complete ({result.cases.length} cases)
               </div>
-              <div className="text-[9px] font-mono">Strict Schema: ON</div>
             </div>
             <div className="grid grid-cols-1 gap-1.5">
-              {result.cases.slice(0, 3).map((tc: any, idx: number) => (
+              {result.cases.map((tc: any, idx: number) => (
                 <div key={idx} className="flex items-center gap-3 p-2.5 bg-secondary rounded-md text-xs border border-border">
                   <div className="w-5 h-5 bg-card rounded flex items-center justify-center font-mono font-bold text-[9px] border border-border">{idx + 1}</div>
                   <p className="flex-1 text-muted-foreground">{tc.description}</p>
                 </div>
               ))}
-              {result.cases.length > 3 && (
-                <p className="text-[10px] text-center text-muted-foreground font-mono">+{result.cases.length - 3} more</p>
-              )}
             </div>
           </div>
         )}
