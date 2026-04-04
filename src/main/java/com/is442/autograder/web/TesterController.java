@@ -92,7 +92,8 @@ public class TesterController {
 
 	@PostMapping("/save")
 	public ResponseEntity<SaveResponse> save(@RequestBody SaveRequest request) {
-		Path testersDir = request.getTesterId() != null ? uploadRegistry.getTesterDirs().get(request.getTesterId())
+		Path testersDir = request.getTesterId() != null
+				? uploadRegistry.getTesterDirs().get(request.getTesterId())
 				: null;
 		Path outputDir = Paths.get(request.getOutputDir() != null ? request.getOutputDir() : "generated-testers");
 		Path configPath = Paths.get("src/main/resources/config.properties");

@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Shared registry of uploaded file paths, keyed by UUID. Injected into
- * controllers that need to resolve upload IDs to server-side paths. Replaces the
- * static maps previously held on ExamController.
+ * controllers that need to resolve upload IDs to server-side paths. Replaces
+ * the static maps previously held on ExamController.
  */
 @Component
 public class UploadRegistry {
