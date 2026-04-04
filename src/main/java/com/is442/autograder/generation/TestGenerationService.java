@@ -63,7 +63,8 @@ public class TestGenerationService {
 			throws IOException, InterruptedException {
 
 		String qid = question.getQuestionId();
-		logger.info("[GEN] Starting generation  questionId={} numCases={} conceptsToCover={} customSuggestions={}", qid, numCases, conceptsToCover, customSuggestions);
+		logger.info("[GEN] Starting generation  questionId={} numCases={} conceptsToCover={} customSuggestions={}", qid,
+				numCases, conceptsToCover, customSuggestions);
 
 		// Build context + prompt once (not per retry)
 		String existingCode = loadExistingTesterCode(question, existingTesterFile);
@@ -71,12 +72,13 @@ public class TestGenerationService {
 		String apiDocsContext = templateDir != null
 				? buildApiDocsContext(templateDir.resolve(question.getFolder()), existingCode)
 				: "";
-		logger.info("[GEN] Context sizes  questionId={}  additionalContext={}chars  apiDocsContext={}chars",
-				qid, additionalContext.length(), apiDocsContext.length());
+		logger.info("[GEN] Context sizes  questionId={}  additionalContext={}chars  apiDocsContext={}chars", qid,
+				additionalContext.length(), apiDocsContext.length());
 		if (!apiDocsContext.isBlank()) {
 			logger.info("[GEN] API docs included  questionId={}", qid);
 		} else {
-			logger.warn("[GEN] No API docs found  questionId={}  templateDir={}  folder={}", qid, templateDir, question.getFolder());
+			logger.warn("[GEN] No API docs found  questionId={}  templateDir={}  folder={}", qid, templateDir,
+					question.getFolder());
 		}
 
 		String prompt = buildGeneratePrompt(question, examContext, existingCode, numCases, additionalContext,
@@ -90,7 +92,8 @@ public class TestGenerationService {
 
 		// Retry loop: call AI → null guard → parse → empty guard
 		for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
-			if (attempt > 1) sleepBeforeRetry("GEN", qid, attempt - 1);
+			if (attempt > 1)
+				sleepBeforeRetry("GEN", qid, attempt - 1);
 			String rawJson;
 			try {
 				rawJson = svc.generateTestCasesJson(message);
@@ -154,7 +157,8 @@ public class TestGenerationService {
 		logAiCall("GEN][RECOMMEND", questionId, prompt, imageUris);
 
 		for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
-			if (attempt > 1) sleepBeforeRetry("GEN][RECOMMEND", questionId, attempt - 1);
+			if (attempt > 1)
+				sleepBeforeRetry("GEN][RECOMMEND", questionId, attempt - 1);
 			String rawJson;
 			try {
 				rawJson = svc.recommendJson(message);
