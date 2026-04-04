@@ -158,14 +158,13 @@ cd frontend && npm run generate:api
 
 Output: `frontend/src/generated/` — types, SDK functions, `useQuery`/`useMutation` hooks.
 
-**When you change backend endpoints, request/response types:** re-fetch the spec from the running backend, then regenerate:
+**When you change backend endpoints, request/response types:** re-fetch the spec from the running backend and regenerate in one step:
 
 ```bash
-curl -s http://localhost:8080/v3/api-docs -o frontend/src/generated/openapi-spec.json
-cd frontend && npm run generate:api
+./scripts/sync-api-types.sh
 ```
 
-Commit both `openapi-spec.json` and the regenerated files together.
+This fetches the spec from `localhost:8080`, writes `openapi-spec.json`, and reruns the generator. Commit both `openapi-spec.json` and the regenerated files together. Any frontend code that uses the updated types must be adjusted manually afterward.
 
 ## Documentation
 
