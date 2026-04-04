@@ -47,12 +47,6 @@ const PastRuns: React.FC = () => {
                     <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                       <Users size={11} /> {run.studentCount} students
                     </span>
-                    {run.hasPdf && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">PDF</span>
-                    )}
-                    {run.hasCsv && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-vsc-green/10 text-vsc-green rounded font-bold">CSV</span>
-                    )}
                   </div>
                 </div>
               </div>
