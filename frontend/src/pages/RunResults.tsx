@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Download, Eye, ChevronRight, ChevronDown, ChevronUp,
   FileCode2, Loader2, AlertCircle, User, CheckCircle2,
-  TriangleAlert, X, File as FileIcon, Plus, MessageSquare, ExternalLink, Clock,
+  TriangleAlert, X, File as FileIcon, ExternalLink, Clock, Folder,
 } from 'lucide-react';
-import { getStudentCode } from '../generated/sdk.gen';
+import { getStudentCode, getTesterFiles, downloadRun } from '../generated/sdk.gen';
 import { getResultsOptions, listRunsOptions } from '../generated/@tanstack/react-query.gen';
-import { formatRunTimestamp } from '../lib/utils';
+import { formatRunTimestamp, pdfUrl } from '../lib/utils';
 
 interface QResult {
   questionId: string;
@@ -20,16 +20,6 @@ interface QResult {
   errorMessage: string;
 }
 
-interface CompileError { line: number; message: string; }
-
-function parseCompileErrors(errorMessage: string): CompileError[] {
-  const errors: CompileError[] = [];
-  for (const line of (errorMessage ?? '').split('\n')) {
-    const m = line.match(/^[^:]+\.java:(\d+):\s*(?:error|warning):\s*(.+)/);
-    if (m) errors.push({ line: parseInt(m[1], 10), message: m[2].trim() });
-  }
-  return errors;
-}
 interface Anomaly { severity: string; description: string; questionId?: string; }
 interface Student {
   username: string; name: string; displayName: string;
@@ -37,22 +27,14 @@ interface Student {
   results: QResult[]; anomalies: Anomaly[];
 }
 interface OpenTab { key: string; label: string; content: string; }
-interface LineComment { text: string; timestamp: string; }
 
-// ── Inline code viewer with line numbers + professor comments ──────────────
+// ── Inline code viewer with line numbers ─────────────────────────────────
 interface CodeViewerProps {
   code: string;
-  comments: Record<number, LineComment[]>;
-  onCommentsChange: (updater: (prev: Record<number, LineComment[]>) => Record<number, LineComment[]>) => void;
-  compileErrors?: CompileError[];
 }
 
-const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChange, compileErrors = [] }) => {
+const CodeViewer: React.FC<CodeViewerProps> = ({ code }) => {
   const [htmlLines, setHtmlLines] = useState<string[]>([]);
-  const [addingComment, setAddingComment] = useState<number | null>(null);
-  const [draft, setDraft] = useState('');
-  const [hovered, setHovered] = useState<number | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,9 +46,6 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChang
           theme: 'github-dark',
         });
         if (cancelled) return;
-        // Extract per-line HTML: split on the line-open tag, then strip the
-        // line-closing </span> using lastIndexOf (non-greedy regex wrongly
-        // stops at the first inner token </span>).
         const rawSegments = html.split('<span class="line">').slice(1);
         const lines = rawSegments.length > 0
           ? rawSegments.map(seg => {
@@ -84,164 +63,26 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, comments, onCommentsChang
     return () => { cancelled = true; };
   }, [code]);
 
-  useEffect(() => {
-    if (addingComment !== null) textareaRef.current?.focus();
-  }, [addingComment]);
-
-  const submit = (line: number) => {
-    if (!draft.trim()) return;
-    onCommentsChange(prev => ({
-      ...prev,
-      [line]: [...(prev[line] ?? []), {
-        text: draft.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }],
-    }));
-    setDraft('');
-    setAddingComment(null);
-  };
-
-  const deleteComment = (line: number, idx: number) => {
-    onCommentsChange(prev => ({
-      ...prev,
-      [line]: (prev[line] ?? []).filter((_, j) => j !== idx),
-    }));
-  };
-
-  const totalComments = Object.values(comments).reduce((s, arr) => s + arr.length, 0);
-
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* mini status bar */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-1 bg-[#0d1117] border-t border-white/[0.06] text-[10px] text-[#4d5566]">
         <span>Java</span>
         <span>·</span>
         <span>{htmlLines.length} lines</span>
-        {totalComments > 0 && (
-          <>
-            <span>·</span>
-            <span className="flex items-center gap-1 text-vsc-yellow">
-              <MessageSquare size={9} /> {totalComments} comment{totalComments !== 1 ? 's' : ''}
-            </span>
-          </>
-        )}
-        <span className="ml-auto">Hover a line · click <span className="text-[#e8e3d5]">+</span> to annotate</span>
       </div>
 
-      {/* code lines */}
       <div className="flex-1 overflow-auto bg-[#0d1117]">
         {htmlLines.map((lineHtml, i) => {
           const ln = i + 1;
-          const lineComments = comments[ln] ?? [];
-          const isAdding = addingComment === ln;
-          const isHov = hovered === ln;
-          const errorForLine = compileErrors.find(e => e.line === ln);
-          const isErrorLine = !!errorForLine;
           return (
-            <div key={i}>
-              <div
-                className={`flex items-stretch group ${
-                  isErrorLine ? 'bg-vsc-red/[0.06]' : isHov || isAdding ? 'bg-white/[0.03]' : ''
-                }`}
-                onMouseEnter={() => setHovered(ln)}
-                onMouseLeave={() => setHovered(null)}
-              >
-                {/* Gutter */}
-                <div className={`w-14 shrink-0 flex items-center justify-end gap-1.5 pr-3 select-none ${isErrorLine ? 'border-l-2 border-vsc-red' : ''}`}>
-                  {isErrorLine ? (
-                    <AlertCircle size={10} className="text-vsc-red shrink-0" />
-                  ) : (
-                    <button
-                      onClick={() => { setAddingComment(ln); setDraft(''); }}
-                      className={`transition-all ${isHov || isAdding ? 'opacity-100' : 'opacity-0'} text-[#e8e3d5] hover:scale-110`}
-                      title="Add comment"
-                    >
-                      <Plus size={10} />
-                    </button>
-                  )}
-                  <span className={`text-right text-[12px] font-mono leading-6 min-w-[2ch] ${isErrorLine ? 'text-vsc-red/60' : 'text-[#3d4451]'}`}>{ln}</span>
-                </div>
-                {/* Line content */}
-                <div
-                  className="flex-1 pl-1 pr-8 leading-6 text-[13px] font-mono whitespace-pre"
-                  dangerouslySetInnerHTML={{ __html: lineHtml || '\u00a0' }}
-                />
-                {/* Comment indicator */}
-                {lineComments.length > 0 && !isAdding && (
-                  <div className="shrink-0 flex items-center pr-3">
-                    <span className="flex items-center gap-1 text-[10px] text-vsc-yellow/60">
-                      <MessageSquare size={9} /> {lineComments.length}
-                    </span>
-                  </div>
-                )}
+            <div key={i} className="flex items-stretch">
+              <div className="w-14 shrink-0 flex items-center justify-end pr-3 select-none">
+                <span className="text-right text-[12px] font-mono leading-6 min-w-[2ch] text-[#3d4451]">{ln}</span>
               </div>
-
-              {/* Compile error inline annotation */}
-              {isErrorLine && errorForLine && (
-                <div className="ml-14 mr-4 my-1 rounded border border-vsc-red/30 bg-vsc-red/10 px-3 py-1.5 text-[11px] font-mono text-vsc-red leading-relaxed">
-                  <span className="opacity-60">error: </span>{errorForLine.message}
-                </div>
-              )}
-
-              {/* Existing comments */}
-              {lineComments.map((c, ci) => (
-                <div
-                  key={ci}
-                  className="mx-4 my-1.5 rounded-lg border border-vsc-yellow/20 bg-vsc-yellow/5"
-                >
-                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-                    <span className="text-[10px] font-bold bg-vsc-yellow/20 text-vsc-yellow px-1.5 py-0.5 rounded-md tracking-wide">
-                      PROF
-                    </span>
-                    <span className="text-[10px] text-[#4d5566]">{c.timestamp}</span>
-                    <button
-                      onClick={() => deleteComment(ln, ci)}
-                      className="ml-auto text-[#4d5566] hover:text-[#8b949e] transition-colors"
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                  <p className="px-3 pb-2.5 text-xs text-[#c9d1d9] leading-relaxed">{c.text}</p>
-                </div>
-              ))}
-
-              {/* Add comment box */}
-              {isAdding && (
-                <div className="mx-4 my-1.5 rounded-lg border border-[#e8e3d5]/30 bg-[#e8e3d5]/5">
-                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-                    <span className="text-[10px] font-bold bg-[#e8e3d5]/20 text-[#e8e3d5] px-1.5 py-0.5 rounded-md tracking-wide">
-                      PROF
-                    </span>
-                    <span className="text-[10px] text-[#4d5566]">line {ln}</span>
-                  </div>
-                  <textarea
-                    ref={textareaRef}
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(ln);
-                      if (e.key === 'Escape') setAddingComment(null);
-                    }}
-                    placeholder="Leave a comment… (⌘↵ to submit, Esc to cancel)"
-                    className="w-full bg-transparent text-xs text-[#c9d1d9] placeholder:text-[#4d5566] resize-none outline-none min-h-[64px] px-3 pb-2 font-sans leading-relaxed"
-                  />
-                  <div className="flex justify-end gap-2 px-3 pb-2.5">
-                    <button
-                      onClick={() => setAddingComment(null)}
-                      className="text-[10px] text-[#4d5566] hover:text-[#8b949e] transition-colors px-2 py-1"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => submit(ln)}
-                      disabled={!draft.trim()}
-                      className="text-[10px] bg-[#e8e3d5] text-[#0d1117] px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 transition-opacity"
-                    >
-                      Comment
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div
+                className="flex-1 pl-1 pr-8 leading-6 text-[13px] font-mono whitespace-pre"
+                dangerouslySetInnerHTML={{ __html: lineHtml || '\u00a0' }}
+              />
             </div>
           );
         })}
@@ -390,8 +231,9 @@ const RunResults: React.FC = () => {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const [expandedScore, setExpandedScore] = useState<string | null>(null);
-  // comments keyed by tabKey → line number → comments array (survives tab switches)
-  const [allComments, setAllComments] = useState<Record<string, Record<number, LineComment[]>>>({});
+  const [expandedTesterFiles, setExpandedTesterFiles] = useState(false);
+  const [testerFiles, setTesterFiles] = useState<Array<{ name: string; content: string }>>([]);
+  const [loadingTesterFiles, setLoadingTesterFiles] = useState(false);
 
   const toggleStudent = useCallback(async (username: string) => {
     setExpandedStudents(prev => {
@@ -429,9 +271,48 @@ const RunResults: React.FC = () => {
     });
   };
 
+  const toggleTesterFiles = useCallback(async () => {
+    setExpandedTesterFiles(prev => !prev);
+    if (testerFiles.length === 0 && !loadingTesterFiles) {
+      setLoadingTesterFiles(true);
+      try {
+        const { data } = await getTesterFiles({ path: { id: runId! }, throwOnError: true }) as { data: Array<{ name: string; content: string }> };
+        setTesterFiles(data ?? []);
+      } catch {
+        setTesterFiles([]);
+      } finally {
+        setLoadingTesterFiles(false);
+      }
+    }
+  }, [runId, testerFiles.length, loadingTesterFiles]);
+
+  const openTesterFile = (file: { name: string; content: string }) => {
+    const key = `tester::${file.name}`;
+    if (!openTabs.find(t => t.key === key)) {
+      setOpenTabs(prev => [...prev, { key, label: `Tester / ${file.name}`, content: file.content }]);
+    }
+    setActiveTabKey(key);
+  };
+
+  const handleDownloadRun = async () => {
+    try {
+      const { data } = await downloadRun({ path: { id: runId! }, throwOnError: true }) as { data: Blob };
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `run-${runId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download run:', error);
+    }
+  };
+
   const activeTab = openTabs.find(t => t.key === activeTabKey) ?? null;
 
-  // Find the QResult that corresponds to the currently active tab (for annotations + test output panel)
+  // Find the QResult that corresponds to the currently active tab (for test output panel)
   const activeQResult = useMemo(() => {
     if (!activeTabKey) return null;
     const [username, filepath] = activeTabKey.split('::');
@@ -470,7 +351,7 @@ const RunResults: React.FC = () => {
   return (
     <div className="flex h-[calc(100dvh-57px)] min-h-[calc(100dvh-57px)] flex-col overflow-hidden bg-[#0d1117]">
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col gap-3 border-b border-white/[0.08] bg-[#161b22] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="shrink-0 flex flex-col gap-3 border-b border-white/[0.08] bg-[#161b22] px-4 py-3 sm:px-6 lg:px-8 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -490,7 +371,7 @@ const RunResults: React.FC = () => {
           {runId && (
             <>
               <button
-                onClick={() => window.open(`/api/reports/${runId}/pdf`, '_blank')}
+                onClick={() => window.open(pdfUrl(runId!, (runMeta as any)?.pdfFilename), '_blank')}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
               >
                 <Eye size={12} /> PDF Report
@@ -500,6 +381,12 @@ const RunResults: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
               >
                 <Download size={12} /> CSV
+              </button>
+              <button
+                onClick={handleDownloadRun}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-[#8b949e] hover:text-[#c9d1d9]"
+              >
+                <Download size={12} /> Download ZIP
               </button>
               {hasPlagiarism && (
                 <>
@@ -539,6 +426,43 @@ const RunResults: React.FC = () => {
             />
           </div>
           <div className="flex-1 overflow-auto py-1.5 font-mono text-xs">
+            {/* Tester Files folder */}
+            <div className="mb-1">
+              <button
+                onClick={toggleTesterFiles}
+                className="flex items-center gap-1.5 w-full text-left px-2 py-1 transition-colors text-[#8b949e] hover:text-[#c9d1d9] hover:bg-white/[0.04]"
+              >
+                {expandedTesterFiles
+                  ? <ChevronDown size={11} className="shrink-0 text-[#4d5566]" />
+                  : <ChevronRight size={11} className="shrink-0 text-[#4d5566]" />}
+                <Folder size={11} className="shrink-0 text-[#f78166]" />
+                <span className="truncate flex-1">Tester Files</span>
+                {loadingTesterFiles && <Loader2 size={10} className="animate-spin shrink-0 text-[#4d5566]" />}
+              </button>
+              {expandedTesterFiles && !loadingTesterFiles && testerFiles.length === 0 && (
+                <p className="pl-8 py-0.5 text-[10px] text-[#4d5566] italic">No tester files</p>
+              )}
+              {expandedTesterFiles && testerFiles.map((file) => {
+                const key = `tester::${file.name}`;
+                const isActive = activeTabKey === key;
+                return (
+                  <button
+                    key={file.name}
+                    onClick={() => openTesterFile(file)}
+                    className={`flex items-center gap-1.5 w-full text-left py-0.5 pl-8 pr-2 rounded-sm transition-colors ${
+                      isActive
+                        ? 'bg-[#e8e3d5]/10 text-[#e8e3d5]'
+                        : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <FileCode2 size={10} className="text-[#f78166] shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Student list */}
             {students.filter(s =>
               (s.displayName || s.username).toLowerCase().includes(studentSearch.toLowerCase())
             ).map(s => {
@@ -621,21 +545,7 @@ const RunResults: React.FC = () => {
           {/* Code viewer or empty state */}
           {activeTab ? (
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-              <CodeViewer
-                code={activeTab.content}
-                comments={allComments[activeTab.key] ?? {}}
-                onCommentsChange={updater =>
-                  setAllComments(prev => ({
-                    ...prev,
-                    [activeTab.key]: updater(prev[activeTab.key] ?? {}),
-                  }))
-                }
-                compileErrors={
-                  activeQResult?.compiled === false
-                    ? parseCompileErrors(activeQResult.errorMessage)
-                    : []
-                }
-              />
+              <CodeViewer code={activeTab.content} />
               {activeQResult && <TestOutputPanel qResult={activeQResult} />}
             </div>
           ) : (

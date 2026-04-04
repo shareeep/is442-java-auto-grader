@@ -41,7 +41,7 @@ const Wizard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto w-full px-8 py-6 pb-16">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 pb-16 sm:px-6 sm:py-6 lg:px-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">

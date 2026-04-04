@@ -12,6 +12,8 @@ import com.is442.autograder.model.InferredConfig;
 import com.is442.autograder.model.InferredQuestionConfig;
 import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.TestCaseRecommendation;
+
+import java.util.Collections;
 import com.is442.autograder.web.dto.AnalyzeSetupRequest;
 import com.is442.autograder.web.dto.ExecuteRequest;
 import com.is442.autograder.web.dto.GenerateQuestionRequest;
@@ -236,14 +238,24 @@ public class GenerationController {
 				? request.getCustomSuggestions()
 				: List.of();
 
+		// Convert InferredQuestionConfig → QuestionConfig
+		QuestionConfig qc = new QuestionConfig(iqc.getQuestionId(),
+				iqc.getFolder() != null ? iqc.getFolder() : iqc.getQuestionId(),
+				iqc.getTester() != null ? iqc.getTester() : iqc.getQuestionId() + "Tester", iqc.getMaxScore(),
+				iqc.getDependencyFolder(),
+				iqc.getDependencyFiles() != null ? iqc.getDependencyFiles() : Collections.emptyList());
+
 		try {
-			GenerationResult result = generationService.generateForInferredQuestion(iqc, examContext, existingTester,
-					numCases, templateDir, conceptsToCover, customSuggestions);
+			GenerationResult result = generationService.generateTestCases(qc, examContext, existingTester, numCases,
+					templateDir, conceptsToCover, customSuggestions);
+			if (!result.isCompiledOk()) {
+				return ResponseEntity.status(500).body(result);
+			}
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
 			String qid = iqc.getQuestionId() != null ? iqc.getQuestionId() : "unknown";
-			return ResponseEntity
-					.ok(new GenerationResult(qid, List.of(), false, "Generation failed: " + e.getMessage(), ""));
+			return ResponseEntity.status(500)
+					.body(new GenerationResult(qid, List.of(), false, "Generation failed: " + e.getMessage(), ""));
 		}
 	}
 
@@ -394,12 +406,17 @@ public class GenerationController {
 			}
 
 			try {
-				GenerationResult result = generationService.generateForQuestion(qc, examContext, existingTester,
+				GenerationResult result = generationService.generateTestCases(qc, examContext, existingTester,
 						sel.getNumCases(), templateDir, List.of(), List.of());
+				if (!result.isCompiledOk()) {
+					results.add(result);
+					return ResponseEntity.status(500).body(results);
+				}
 				results.add(result);
 			} catch (Exception e) {
 				results.add(new GenerationResult(sel.getQuestionId(), List.of(), false,
 						"Generation failed: " + e.getMessage(), ""));
+				return ResponseEntity.status(500).body(results);
 			}
 		}
 
@@ -444,12 +461,15 @@ public class GenerationController {
 		}
 
 		try {
-			GenerationResult result = generationService.generateForQuestion(qc, examContext, existingTester, numCases,
+			GenerationResult result = generationService.generateTestCases(qc, examContext, existingTester, numCases,
 					templateDir, List.of(), List.of());
+			if (!result.isCompiledOk()) {
+				return ResponseEntity.status(500).body(result);
+			}
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
-			return ResponseEntity
-					.ok(new GenerationResult(questionId, List.of(), false, "Generation failed: " + e.getMessage(), ""));
+			return ResponseEntity.status(500).body(
+					new GenerationResult(questionId, List.of(), false, "Generation failed: " + e.getMessage(), ""));
 		}
 	}
 

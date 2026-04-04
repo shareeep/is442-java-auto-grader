@@ -5,7 +5,7 @@ import {
   FileText, Download, Eye, Users, AlertCircle, Loader2, ArrowRight, ExternalLink,
 } from 'lucide-react';
 import { listRunsOptions } from '../generated/@tanstack/react-query.gen';
-import { formatRunTimestamp } from '@/lib/utils';
+import { formatRunTimestamp, pdfUrl } from '@/lib/utils';
 
 const PastRuns: React.FC = () => {
   const navigate = useNavigate();
@@ -69,7 +69,7 @@ const PastRuns: React.FC = () => {
                 )}
                 {run.hasPdf && (
                   <button
-                    onClick={() => window.open(`/api/reports/${run.id}/pdf`, '_blank')}
+                    onClick={() => window.open(pdfUrl(run.id, (run as any).pdfFilename), '_blank')}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:w-auto"
                   >
                     <Eye size={12} /> PDF
@@ -83,6 +83,17 @@ const PastRuns: React.FC = () => {
                     <Download size={12} /> CSV
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = `/api/reports/${run.id}/download`;
+                    a.download = `run-${run.id}.zip`;
+                    a.click();
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:w-auto"
+                >
+                  <Download size={12} /> ZIP
+                </button>
                 <button
                   onClick={() => navigate(`/past-runs/${run.id}`)}
                   className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"

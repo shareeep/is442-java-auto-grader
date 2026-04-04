@@ -10,11 +10,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.is442.autograder.config.AppConfig;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -27,6 +32,25 @@ public class ReportsController {
 
 	private static final Logger logger = LoggerFactory.getLogger(ReportsController.class);
 	private static final Path OUTPUT_DIR = Paths.get("output");
+	private static final DateTimeFormatter RUN_ID_FMT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+	private static final DateTimeFormatter PDF_NAME_FMT = DateTimeFormatter.ofPattern("dd-MM_HH-mm");
+
+	private final AppConfig appConfig;
+
+	public ReportsController(AppConfig appConfig) {
+		this.appConfig = appConfig;
+	}
+
+	private String buildPdfFilename(String id) {
+		try {
+			String sgtTime = LocalDateTime.parse(id, RUN_ID_FMT).atZone(ZoneOffset.UTC)
+					.withZoneSameInstant(ZoneId.of("Asia/Singapore")).format(PDF_NAME_FMT);
+			String name = appConfig.getAssessmentName().toLowerCase().replaceAll("\\s+", "-");
+			return name + "-results-" + sgtTime + ".pdf";
+		} catch (Exception e) {
+			return "grading-report-" + id + ".pdf";
+		}
+	}
 
 	private boolean isUnsafePathSegment(String segment) {
 		return segment.contains("..") || segment.contains("/") || segment.contains("\\");
@@ -40,12 +64,16 @@ public class ReportsController {
 
 		try (Stream<Path> stream = Files.list(OUTPUT_DIR)) {
 			List<Map<String, Object>> runs = stream.filter(Files::isDirectory).sorted(Comparator.reverseOrder())
+					.filter(dir -> !isRunCancelled(dir)) // Filter out cancelled runs
 					.map(dir -> {
 						Map<String, Object> run = new LinkedHashMap<>();
 						String id = dir.getFileName().toString();
 						run.put("id", id);
 						run.put("timestamp", id); // format: yyyyMMdd-HHmmss
-						run.put("hasPdf", Files.exists(dir.resolve("instructor-report.pdf")));
+						boolean hasPdf = Files.exists(dir.resolve("instructor-report.pdf"));
+						run.put("hasPdf", hasPdf);
+						if (hasPdf)
+							run.put("pdfFilename", buildPdfFilename(id));
 						run.put("hasCsv", Files.exists(dir.resolve("IS442-ScoreSheet-Graded.csv"))
 								|| Files.exists(dir.resolve("detailed-report.csv")));
 						run.put("hasPlagiarism", Files.exists(dir.resolve("plagiarism-report.jplag")));
@@ -72,6 +100,19 @@ public class ReportsController {
 		}
 	}
 
+	private boolean isRunCancelled(Path runDir) {
+		Path runJson = runDir.resolve("run.json");
+		if (!Files.exists(runJson)) {
+			return false; // No run.json means old run, include it
+		}
+		try {
+			Map<?, ?> meta = new ObjectMapper().readValue(runJson.toFile(), Map.class);
+			return "cancelled".equals(meta.get("status"));
+		} catch (Exception e) {
+			return false; // If we can't read it, include the run
+		}
+	}
+
 	private long countLogDirs(Path runDir) {
 		Path logsDir = runDir.resolve("logs");
 		if (!Files.isDirectory(logsDir))
@@ -92,8 +133,14 @@ public class ReportsController {
 			return ResponseEntity.notFound().build();
 		}
 		Resource resource = new FileSystemResource(pdf);
+		String displayFilename = buildPdfFilename(id);
 		return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
-				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"instructor-report.pdf\"").body(resource);
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + displayFilename + "\"").body(resource);
+	}
+
+	@GetMapping("/{id}/pdf/{filename:.+}")
+	public ResponseEntity<Resource> getPdfWithName(@PathVariable String id, @PathVariable String filename) {
+		return getPdf(id);
 	}
 
 	@GetMapping("/{id}/csv")
@@ -208,6 +255,77 @@ public class ReportsController {
 			return ResponseEntity.ok(result);
 		} catch (IOException e) {
 			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	@GetMapping("/{id}/testers")
+	public ResponseEntity<?> getTesterFiles(@PathVariable String id) {
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
+		Path testersDir = OUTPUT_DIR.resolve(id).resolve("testers");
+		if (!Files.isDirectory(testersDir)) {
+			return ResponseEntity.ok(List.of());
+		}
+		try {
+			List<Map<String, String>> files = new ArrayList<>();
+			try (Stream<Path> walk = Files.walk(testersDir)) {
+				walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).sorted().forEach(p -> {
+					try {
+						files.add(Map.of("name", p.getFileName().toString(), "content", Files.readString(p)));
+					} catch (IOException e) {
+						logger.warn("Could not read {}", p, e);
+					}
+				});
+			}
+			return ResponseEntity.ok(files);
+		} catch (IOException e) {
+			return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	@GetMapping("/{id}/testers/{filename}")
+	public ResponseEntity<Resource> getTesterFile(@PathVariable String id, @PathVariable String filename) {
+		if (isUnsafePathSegment(id) || isUnsafePathSegment(filename))
+			return ResponseEntity.badRequest().build();
+		Path testerFile = OUTPUT_DIR.resolve(id).resolve("testers").resolve(filename);
+		if (!Files.isRegularFile(testerFile)) {
+			return ResponseEntity.notFound().build();
+		}
+		Resource resource = new FileSystemResource(testerFile);
+		return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/x-java-source"))
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"").body(resource);
+	}
+
+	@GetMapping("/{id}/download")
+	public ResponseEntity<Resource> downloadRun(@PathVariable String id) {
+		if (isUnsafePathSegment(id))
+			return ResponseEntity.badRequest().build();
+		Path runDir = OUTPUT_DIR.resolve(id);
+		if (!Files.isDirectory(runDir)) {
+			return ResponseEntity.notFound().build();
+		}
+		try {
+			// Create a temporary zip file
+			Path tempZip = Files.createTempFile("run-" + id + "-", ".zip");
+			try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+					Files.newOutputStream(tempZip))) {
+				Files.walk(runDir).filter(Files::isRegularFile).forEach(file -> {
+					try {
+						String entryName = runDir.relativize(file).toString().replace("\\", "/");
+						zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+						Files.copy(file, zos);
+						zos.closeEntry();
+					} catch (IOException e) {
+						logger.warn("Failed to add {} to zip", file, e);
+					}
+				});
+			}
+			Resource resource = new FileSystemResource(tempZip);
+			return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"run-" + id + ".zip\"")
+					.body(resource);
+		} catch (IOException e) {
+			return ResponseEntity.internalServerError().body(null);
 		}
 	}
 }

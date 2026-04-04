@@ -3,7 +3,8 @@ package com.is442.autograder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,9 +58,25 @@ public class GradingPipeline {
 	private final ScoresheetEnricher scoresheetEnricher;
 	private List<QuestionConfig> inferredQuestionConfigs;
 	private final AtomicBoolean cancelled = new AtomicBoolean(false);
+	private Path testerFilesDir;
+	private volatile Path currentRunOutputDir;
 
 	public void cancel() {
 		cancelled.set(true);
+	}
+
+	public Path getCurrentRunOutputDir() {
+		return currentRunOutputDir;
+	}
+
+	public boolean isCancelled() {
+		return cancelled.get();
+	}
+
+	public void markAsCancelled() {
+		if (currentRunOutputDir != null) {
+			updateRunStatus(currentRunOutputDir, "cancelled", null);
+		}
 	}
 
 	public GradingPipeline(AppConfig config) {
@@ -110,10 +127,12 @@ public class GradingPipeline {
 	public List<StudentSubmission> run(Path submissionsDir, Path testerFilesDir, Path scoresheetPath, Path outputDir,
 			Consumer<StudentSubmission> onStudentGraded, Consumer<String> onStudentStarted) throws IOException {
 
+		this.testerFilesDir = testerFilesDir;
 		ConsoleLogCapture logCapture = null;
 		Path runOutputDir = outputDir;
 		if (outputDir != null) {
 			runOutputDir = createRunOutputDir(outputDir);
+			this.currentRunOutputDir = runOutputDir;
 			logCapture = ConsoleLogCapture.start(runOutputDir);
 		}
 
@@ -209,6 +228,8 @@ public class GradingPipeline {
 			if (stopped) {
 				System.out.println(
 						"\u001B[33mGrading stopped early by user. Results below reflect only graded students.\u001B[0m");
+				// Return early to prevent writing any output files when cancelled
+				return submissions;
 			}
 
 			// 4. Enrich from scoresheet (official names + OrgDefinedId) if provided
@@ -252,6 +273,11 @@ public class GradingPipeline {
 				System.out.println("Plagiarism report exported to: " + plagiarismReport + ".jplag");
 			}
 
+			// Update run.json with completed status
+			if (runOutputDir != null) {
+				updateRunStatus(runOutputDir, "completed", submissions.size());
+			}
+
 			return submissions;
 		} finally {
 			if (logCapture != null) {
@@ -264,10 +290,39 @@ public class GradingPipeline {
 		if (baseOutputDir == null) {
 			return null;
 		}
-		String runId = LocalDateTime.now().format(RUN_ID_FORMATTER);
+		String runId = Instant.now().atZone(ZoneOffset.UTC).format(RUN_ID_FORMATTER);
 		Path runDir = baseOutputDir.resolve(runId);
 		Files.createDirectories(runDir);
+
+		// Create run.json with initial status
+		Map<String, Object> runMeta = new LinkedHashMap<>();
+		runMeta.put("status", "running");
+		runMeta.put("startedAt", Instant.now().toString());
+		try {
+			String json = new ObjectMapper().writeValueAsString(runMeta);
+			Files.writeString(runDir.resolve("run.json"), json);
+		} catch (Exception e) {
+			LOGGER.warning("Failed to write run.json: " + e.getMessage());
+		}
+
 		return runDir;
+	}
+
+	private void updateRunStatus(Path runDir, String status, Integer studentCount) {
+		Path runJson = runDir.resolve("run.json");
+		try {
+			Map<String, Object> runMeta = new LinkedHashMap<>();
+			runMeta.put("status", status);
+			runMeta.put("startedAt", Instant.now().toString());
+			runMeta.put(status + "At", Instant.now().toString());
+			if (studentCount != null) {
+				runMeta.put("studentCount", studentCount);
+			}
+			String json = new ObjectMapper().writeValueAsString(runMeta);
+			Files.writeString(runJson, json);
+		} catch (Exception e) {
+			LOGGER.warning("Failed to update run.json: " + e.getMessage());
+		}
 	}
 
 	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
@@ -301,6 +356,27 @@ public class GradingPipeline {
 				}
 			} catch (IOException e) {
 				LOGGER.warning("Failed to copy code for " + safeUser + " : " + e.getMessage());
+			}
+		}
+
+		// Copy tester files to output directory
+		if (testerFilesDir != null && Files.isDirectory(testerFilesDir)) {
+			Path testersDir = runDir.resolve("testers");
+			try {
+				Files.createDirectories(testersDir);
+				try (Stream<Path> walk = Files.walk(testerFilesDir)) {
+					walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).forEach(src -> {
+						try {
+							Path dest = testersDir.resolve(src.getFileName());
+							Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+						} catch (IOException e) {
+							LOGGER.warning("Failed to copy tester file " + src + " : " + e.getMessage());
+						}
+					});
+				}
+				LOGGER.info("Copied tester files to " + testersDir);
+			} catch (IOException e) {
+				LOGGER.warning("Failed to copy tester files: " + e.getMessage());
 			}
 		}
 	}

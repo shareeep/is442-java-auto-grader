@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { AlertTriangle, Activity, CheckCircle2, ChevronRight, Code, ChevronsUpDown, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { AlertTriangle, Activity, CheckCircle2, ChevronRight, Code, ChevronsUpDown, ChevronUp, ChevronDown, Search, ArrowRight } from 'lucide-react';
 import SubmissionDetails, { Submission } from './SubmissionDetails';
 
 interface ResultsTableProps {
@@ -8,6 +8,7 @@ interface ResultsTableProps {
     submissions?: Submission[];
     message?: string;
   };
+  onViewFullResults?: () => void;
 }
 
 type SortField = 'name' | 'score';
@@ -44,7 +45,7 @@ const SubmissionStatusBadges: React.FC<{ submission: Submission }> = ({ submissi
   );
 };
 
-const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
+const ResultsTable: React.FC<ResultsTableProps> = ({ data, onViewFullResults }) => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -117,15 +118,26 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data }) => {
         />
       ) : (
         <>
-          <div className="relative w-full sm:max-w-sm">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
-              type="search"
-              placeholder="Search students..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
-            />
+          <div className="flex w-full items-center gap-3">
+            <div className="relative flex-1">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="search"
+                placeholder="Search students..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-8 pr-4 py-2 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
+              />
+            </div>
+            {onViewFullResults && (
+              <button
+                onClick={onViewFullResults}
+                className="ml-auto flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                View Full Results
+                <ArrowRight size={15} />
+              </button>
+            )}
           </div>
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="hidden grid-cols-12 border-b border-border bg-secondary/50 px-5 py-3 lg:grid">

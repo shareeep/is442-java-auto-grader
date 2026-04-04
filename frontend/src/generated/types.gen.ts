@@ -171,6 +171,26 @@ export type StreamGradingResponses = {
 
 export type StreamGradingResponse = StreamGradingResponses[keyof StreamGradingResponses];
 
+export type StopGradingData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/grade/stop/{sessionId}';
+};
+
+export type StopGradingResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type StopGradingResponse = StopGradingResponses[keyof StopGradingResponses];
+
 export type UploadTestersData = {
     body?: {
         files: Array<Blob | File>;
@@ -469,6 +489,25 @@ export type GetPdfResponses = {
 
 export type GetPdfResponse = GetPdfResponses[keyof GetPdfResponses];
 
+export type GetPdfWithNameData = {
+    body?: never;
+    path: {
+        id: string;
+        filename: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/pdf/{filename}';
+};
+
+export type GetPdfWithNameResponses = {
+    /**
+     * OK
+     */
+    200: Blob | File;
+};
+
+export type GetPdfWithNameResponse = GetPdfWithNameResponses[keyof GetPdfWithNameResponses];
+
 export type GetLogsData = {
     body?: never;
     path: {
@@ -624,3 +663,49 @@ export type GetAiSettingsResponses = {
 };
 
 export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+
+export type GetTesterFilesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/testers';
+};
+
+export type GetTesterFilesResponses = {
+    200: Array<{ name: string; content: string }>;
+};
+
+export type GetTesterFilesResponse = GetTesterFilesResponses[keyof GetTesterFilesResponses];
+
+export type GetTesterFileData = {
+    body?: never;
+    path: {
+        id: string;
+        filename: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/testers/{filename}';
+};
+
+export type GetTesterFileResponses = {
+    200: string;
+};
+
+export type GetTesterFileResponse = GetTesterFileResponses[keyof GetTesterFileResponses];
+
+export type DownloadRunData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/reports/{id}/download';
+};
+
+export type DownloadRunResponses = {
+    200: Blob;
+};
+
+export type DownloadRunResponse = DownloadRunResponses[keyof DownloadRunResponses];

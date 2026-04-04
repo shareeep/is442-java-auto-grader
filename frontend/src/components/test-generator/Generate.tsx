@@ -35,7 +35,7 @@ function useAnimatedText(active: boolean, msgs: string[], ms = 2000) {
   return msgs[idx];
 }
 
-function CustomSuggestionInput({ qid }: { qid: string }) {
+function CustomSuggestionInput({ qid, disabled }: { qid: string; disabled?: boolean }) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const addCustomSuggestion = useWizardStore((s) => s.addCustomSuggestion);
@@ -47,6 +47,8 @@ function CustomSuggestionInput({ qid }: { qid: string }) {
     setValue('');
     inputRef.current?.focus();
   };
+
+  if (disabled) return null;
 
   return (
     <div className="flex gap-2 mt-2">
@@ -161,22 +163,14 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     );
   };
 
-  const MAX_ATTEMPTS = 4; // 1 original + 3 retries
-
   const getRecommendation = async (qid: string, onDone?: () => void) => {
     setLoadingRec((prev) => ({ ...prev, [qid]: true }));
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
-        setRecommendation(qid, rec);
-        break;
-      } catch (err) {
-        if (handleStaleSession(err)) break;
-        if (attempt < MAX_ATTEMPTS) {
-          toast({ title: `Recommendation failed for ${qid} — retrying ${attempt}/3`, description: 'The AI returned an error, retrying automatically…', variant: 'destructive' });
-        } else {
-          toast({ title: `Recommendation failed for ${qid}`, description: 'AI failed after 3 retries. Please try again.', variant: 'destructive' });
-        }
+    try {
+      const { data: rec } = await recommend({ body: { examId: examId!, questionId: qid }, throwOnError: true });
+      setRecommendation(qid, rec);
+    } catch (err) {
+      if (!handleStaleSession(err)) {
+        toast({ title: `Recommendation failed for ${qid}`, description: 'Please try again.', variant: 'destructive' });
       }
     }
     setLoadingRec((prev) => { const next = { ...prev }; delete next[qid]; return next; });
@@ -193,31 +187,23 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
     const totalSuggestions = conceptsToCover.length + customs.length;
     const numCases = Math.min(5, totalSuggestions > 0 ? totalSuggestions : Math.max(3, rec?.recommendedCount || 3));
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      if (cancelledQids.current.has(qid)) break;
-      try {
-        const { data: result } = await execute({
-          body: {
-            examId: examId!,
-            testerId: testerId ?? undefined,
-            templateId: templateId ?? undefined,
-            numCases,
-            question: question!,
-            conceptsToCover,
-            customSuggestions: customs,
-          },
-          throwOnError: true,
-        });
-        if (!cancelledQids.current.has(qid)) setResult(qid, result);
-        break;
-      } catch (err) {
-        if (cancelledQids.current.has(qid)) break;
-        if (handleStaleSession(err)) break;
-        if (attempt < MAX_ATTEMPTS) {
-          toast({ title: `Generation failed for ${qid} — retrying ${attempt}/3`, description: 'The AI returned an error, retrying automatically…', variant: 'destructive' });
-        } else {
-          toast({ title: `Generation failed for ${qid}`, description: 'AI failed after 3 retries. Click Generate to try again.', variant: 'destructive' });
-        }
+    try {
+      const { data: result } = await execute({
+        body: {
+          examId: examId!,
+          testerId: testerId ?? undefined,
+          templateId: templateId ?? undefined,
+          numCases,
+          question: question!,
+          conceptsToCover,
+          customSuggestions: customs,
+        },
+        throwOnError: true,
+      });
+      if (!cancelledQids.current.has(qid)) setResult(qid, result);
+    } catch (err) {
+      if (!cancelledQids.current.has(qid) && !handleStaleSession(err)) {
+        toast({ title: `Generation failed for ${qid}`, description: 'Click Generate to try again.', variant: 'destructive' });
       }
     }
     cancelledQids.current.delete(qid);
@@ -310,7 +296,7 @@ const GenerationHub: React.FC<GenerationHubProps> = ({ onNext, onBack }) => {
 
       {recProgress && (
         <div className="space-y-1.5 px-4 py-3 rounded-md border border-accent/20 bg-accent/5 animate-in fade-in">
-          <div className="flex justify-between items-center text-xs font-mono text-accent">
+          <div className="flex justify-between items-center text-xs font-mono text-foreground">
             <span className="flex items-center gap-2">
               {recProgress.done < recProgress.total
                 ? <Loader2 size={12} className="animate-spin" />
@@ -533,10 +519,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       <CardContent className="p-4 space-y-3">
         {/* AI suggestions + custom suggestions */}
         {rec ? (
-          <div className="p-3 bg-accent/5 rounded-md border border-accent/10 animate-in slide-in-from-top-2">
+          <div className="p-3 bg-white/5 rounded-md border border-white/10 animate-in slide-in-from-top-2">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[9px] uppercase font-mono text-accent tracking-wider">AI Suggestions</p>
-              <span className="text-[9px] bg-accent/10 px-2 py-0.5 rounded font-mono text-accent">
+              <p className="text-[9px] uppercase font-mono text-white/80 tracking-wider">AI Suggestions</p>
+              <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded font-mono text-white/80">
                 {(rec.conceptsToCover?.length ?? 0) + customs.length} concepts
               </span>
             </div>
@@ -546,7 +532,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                   key={idx}
                   className="text-[10px] px-2 py-0.5 bg-card rounded border border-accent/10 text-muted-foreground font-mono flex items-center gap-1 group"
                 >
-                  <span className="w-1 h-1 bg-accent rounded-full shrink-0" />
+                  <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                   {c}
                   <button
                     onClick={() => onDeleteConcept(idx)}
@@ -561,7 +547,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                   key={`custom-${idx}`}
                   className="text-[10px] px-2 py-0.5 bg-primary/5 rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
                 >
-                  <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                  <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                   Custom #{idx + 1} — {c}
                   <button
                     onClick={() => onDeleteCustom(idx)}
@@ -572,7 +558,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 </span>
               ))}
             </div>
-            <CustomSuggestionInput qid={qid} />
+            <CustomSuggestionInput qid={qid} disabled={isGenerating || !!result} />
           </div>
         ) : (
           <div className="p-3 bg-secondary/50 rounded-md border border-border">
@@ -584,7 +570,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                     key={idx}
                     className="text-[10px] px-2 py-0.5 bg-card rounded border border-primary/20 text-primary font-mono flex items-center gap-1 group"
                   >
-                    <span className="w-1 h-1 bg-primary rounded-full shrink-0" />
+                    <span className="w-1 h-1 bg-white/50 rounded-full shrink-0" />
                     Custom #{idx + 1} — {c}
                     <button
                       onClick={() => onDeleteCustom(idx)}
@@ -596,7 +582,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 ))}
               </div>
             )}
-            <CustomSuggestionInput qid={qid} />
+            <CustomSuggestionInput qid={qid} disabled={isGenerating || !!result} />
           </div>
         )}
 
@@ -613,31 +599,35 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         {/* Result preview */}
         {result && (
           <div className="space-y-3 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
+            <div className="flex items-center p-2.5 bg-vsc-green/10 border border-vsc-green/20 rounded-md text-vsc-green">
               <div className="flex items-center gap-2 text-xs font-mono font-bold">
-                <CheckCircle2 size={14} /> Gen-Ready ({result.cases.length} cases)
+                <CheckCircle2 size={14} /> Generation Complete ({result.cases.length} cases)
               </div>
-              <div className="text-[9px] font-mono">Strict Schema: ON</div>
             </div>
             <div className="grid grid-cols-1 gap-1.5">
-              {result.cases.slice(0, 3).map((tc: any, idx: number) => (
+              {result.cases.map((tc: any, idx: number) => (
                 <div key={idx} className="flex items-center gap-3 p-2.5 bg-secondary rounded-md text-xs border border-border">
                   <div className="w-5 h-5 bg-card rounded flex items-center justify-center font-mono font-bold text-[9px] border border-border">{idx + 1}</div>
                   <p className="flex-1 text-muted-foreground">{tc.description}</p>
                 </div>
               ))}
-              {result.cases.length > 3 && (
-                <p className="text-[10px] text-center text-muted-foreground font-mono">+{result.cases.length - 3} more</p>
-              )}
             </div>
           </div>
         )}
 
         {/* Empty state */}
-        {!rec && !isGenerating && !result && customs.length === 0 && (
+        {!rec && !isGenerating && !isRecLoading && !result && customs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-6 opacity-30">
             <Code size={28} />
             <p className="text-xs mt-2 font-mono">Ready</p>
+          </div>
+        )}
+
+        {/* Loading recommendation state */}
+        {isRecLoading && !rec && !result && (
+          <div className="flex flex-col items-center justify-center py-6 opacity-30">
+            <Loader2 size={28} className="animate-spin" />
+            <p className="text-xs mt-2 font-mono">Recommending...</p>
           </div>
         )}
       </CardContent>

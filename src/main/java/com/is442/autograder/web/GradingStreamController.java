@@ -39,6 +39,7 @@ public class GradingStreamController {
 	// Stores emitters and pipelines for active grading sessions
 	private static final Map<String, SseEmitter> ACTIVE_SESSIONS = new java.util.concurrent.ConcurrentHashMap<>();
 	private static final Map<String, com.is442.autograder.GradingPipeline> ACTIVE_PIPELINES = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<String, Path> ACTIVE_OUTPUT_DIRS = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public GradingStreamController(AppConfig appConfig) {
 		this.appConfig = appConfig;
@@ -62,10 +63,12 @@ public class GradingStreamController {
 		emitter.onCompletion(() -> {
 			ACTIVE_SESSIONS.remove(sessionId);
 			ACTIVE_PIPELINES.remove(sessionId);
+			ACTIVE_OUTPUT_DIRS.remove(sessionId);
 		});
 		emitter.onTimeout(() -> {
 			ACTIVE_SESSIONS.remove(sessionId);
 			ACTIVE_PIPELINES.remove(sessionId);
+			ACTIVE_OUTPUT_DIRS.remove(sessionId);
 		});
 
 		// Save uploaded files to temp dirs
@@ -118,10 +121,31 @@ public class GradingStreamController {
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "grading", "message", "Starting grading...")));
 
+				// Track output directory for cleanup on cancellation
+				// Output dir is created at the start of run(), so poll briefly then give up
+				Thread outputDirTracker = new Thread(() -> {
+					for (int i = 0; i < 20; i++) {
+						Path outDir = pipeline.getCurrentRunOutputDir();
+						if (outDir != null) {
+							ACTIVE_OUTPUT_DIRS.put(sessionId, outDir);
+							return;
+						}
+						try {
+							Thread.sleep(250);
+						} catch (InterruptedException e) {
+							return;
+						}
+					}
+				});
+				outputDirTracker.setDaemon(true);
+				outputDirTracker.start();
+
 				List<StudentSubmission> submissions = pipeline.run(submissionsDir, testersDir, finalScoresheet,
 						outputDir, sub -> {
 							try {
 								emitter.send(SseEmitter.event().name("student").data(buildStudentPayload(sub)));
+							} catch (IllegalStateException e) {
+								// Emitter already completed (cancelled) - ignore
 							} catch (IOException e) {
 								logger.warn("Failed to stream student event for {}", sub.getUsername(), e);
 							}
@@ -129,6 +153,8 @@ public class GradingStreamController {
 							try {
 								emitter.send(SseEmitter.event().name("status")
 										.data(Map.of("phase", "grading", "message", "Grading " + displayName + "...")));
+							} catch (IllegalStateException e) {
+								// Emitter already completed (cancelled) - ignore
 							} catch (IOException e) {
 								logger.warn("Failed to stream start event for {}", displayName, e);
 							}
@@ -136,25 +162,32 @@ public class GradingStreamController {
 
 				// RunResults page can load them automatically because they are written by
 				// GradingPipeline
-				String runId = null;
-				if (Files.isDirectory(outputDir)) {
-					try (Stream<Path> ls = Files.list(outputDir)) {
-						Path runDir = ls.filter(Files::isDirectory).max(Comparator.naturalOrder()).orElse(null);
-						if (runDir != null) {
-							runId = runDir.getFileName().toString();
-							persistRunArtifacts(runDir, submissions);
+				// Skip if cancelled (output dir was deleted)
+				if (!pipeline.isCancelled()) {
+					String runId = null;
+					if (Files.isDirectory(outputDir)) {
+						try (Stream<Path> ls = Files.list(outputDir)) {
+							Path runDir = ls.filter(Files::isDirectory).max(Comparator.naturalOrder()).orElse(null);
+							if (runDir != null) {
+								runId = runDir.getFileName().toString();
+								persistRunArtifacts(runDir, submissions, testersDir);
+							}
+						} catch (IOException e) {
+							logger.warn("Could not locate run output directory", e);
 						}
-					} catch (IOException e) {
-						logger.warn("Could not locate run output directory", e);
+					}
+
+					Map<String, Object> completePayload = new LinkedHashMap<>();
+					completePayload.put("totalStudents", submissions.size());
+					completePayload.put("message", "Grading complete.");
+					if (runId != null)
+						completePayload.put("runId", runId);
+					try {
+						emitter.send(SseEmitter.event().name("complete").data(completePayload));
+					} catch (IllegalStateException e) {
+						// Emitter already completed (cancelled) - ignore
 					}
 				}
-
-				Map<String, Object> completePayload = new LinkedHashMap<>();
-				completePayload.put("totalStudents", submissions.size());
-				completePayload.put("message", "Grading complete.");
-				if (runId != null)
-					completePayload.put("runId", runId);
-				emitter.send(SseEmitter.event().name("complete").data(completePayload));
 				emitter.complete();
 
 			} catch (Exception e) {
@@ -162,6 +195,8 @@ public class GradingStreamController {
 				try {
 					emitter.send(SseEmitter.event().name("error").data(Map.of("message", e.getMessage())));
 					emitter.complete();
+				} catch (IllegalStateException ex) {
+					// Emitter already completed (cancelled) - ignore
 				} catch (IOException ex) {
 					emitter.completeWithError(ex);
 				}
@@ -178,11 +213,18 @@ public class GradingStreamController {
 			return org.springframework.http.ResponseEntity.notFound().build();
 		}
 		pipeline.cancel();
+
+		// Mark the run as cancelled in run.json (instead of deleting folder)
+		pipeline.markAsCancelled();
+		ACTIVE_OUTPUT_DIRS.remove(sessionId);
+
 		SseEmitter emitter = ACTIVE_SESSIONS.get(sessionId);
 		if (emitter != null) {
 			try {
 				emitter.send(SseEmitter.event().name("status")
 						.data(Map.of("phase", "cancelled", "message", "Grading cancelled.")));
+			} catch (IllegalStateException e) {
+				// Emitter already completed - ignore
 			} catch (IOException e) {
 				logger.warn("Could not send cancel event for session {}", sessionId);
 			}
@@ -191,7 +233,7 @@ public class GradingStreamController {
 		return org.springframework.http.ResponseEntity.ok(Map.of("cancelled", true));
 	}
 
-	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions) {
+	private void persistRunArtifacts(Path runDir, List<StudentSubmission> submissions, Path testersDir) {
 		try {
 			List<Map<String, Object>> payloads = submissions.stream().map(this::buildStudentPayload).toList();
 			String json = new ObjectMapper().writeValueAsString(payloads);
@@ -222,6 +264,27 @@ public class GradingStreamController {
 				}
 			} catch (IOException e) {
 				logger.warn("Failed to copy code for {}", safeUser, e);
+			}
+		}
+
+		// Copy tester files to output directory
+		if (testersDir != null && Files.isDirectory(testersDir)) {
+			Path testersOutputDir = runDir.resolve("testers");
+			try {
+				Files.createDirectories(testersOutputDir);
+				try (Stream<Path> walk = Files.walk(testersDir)) {
+					walk.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java")).forEach(src -> {
+						try {
+							Path dest = testersOutputDir.resolve(src.getFileName());
+							Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+						} catch (IOException e) {
+							logger.warn("Failed to copy tester file {}", src, e);
+						}
+					});
+				}
+				logger.info("Copied tester files to {}", testersOutputDir);
+			} catch (IOException e) {
+				logger.warn("Failed to copy tester files", e);
 			}
 		}
 	}

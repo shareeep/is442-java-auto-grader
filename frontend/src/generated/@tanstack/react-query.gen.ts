@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { analyzeSetup, execute, generate, generateQuestion, getAiSettings, getBootId, getCsv, getLogs, getPdf, getPlagiarismReport, getQuestions, getResults, getStudentCode, getTemplateSource, getTester, listRuns, type Options, preparsePdf, recommend, refine, runGrading, save, saveSetup, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponse, ExecuteData, ExecuteResponse, GenerateData, GenerateQuestionData, GenerateQuestionResponse, GenerateResponse, GetAiSettingsData, GetAiSettingsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetLogsData, GetLogsResponse, GetPdfData, GetPdfResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetQuestionsData, GetQuestionsResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTemplateSourceData, GetTemplateSourceResponse, GetTesterData, GetTesterResponse, ListRunsData, ListRunsResponse, PreparsePdfData, PreparsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, RunGradingData, RunGradingResponse, SaveData, SaveResponse2, SaveSetupData, SaveSetupResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
+import { analyzeSetup, execute, generate, generateQuestion, getAiSettings, getBootId, getCsv, getLogs, getPdf, getPdfWithName, getPlagiarismReport, getQuestions, getResults, getStudentCode, getTemplateSource, getTester, listRuns, type Options, preparsePdf, recommend, refine, runGrading, save, saveSetup, stopGrading, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponse, ExecuteData, ExecuteResponse, GenerateData, GenerateQuestionData, GenerateQuestionResponse, GenerateResponse, GetAiSettingsData, GetAiSettingsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetLogsData, GetLogsResponse, GetPdfData, GetPdfResponse, GetPdfWithNameData, GetPdfWithNameResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetQuestionsData, GetQuestionsResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTemplateSourceData, GetTemplateSourceResponse, GetTesterData, GetTesterResponse, ListRunsData, ListRunsResponse, PreparsePdfData, PreparsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, RunGradingData, RunGradingResponse, SaveData, SaveResponse2, SaveSetupData, SaveSetupResponse, StopGradingData, StopGradingResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
 
 export const runGradingMutation = (options?: Partial<Options<RunGradingData>>): UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> => {
     const mutationOptions: UseMutationOptions<RunGradingResponse, DefaultError, Options<RunGradingData>> = {
@@ -24,6 +24,20 @@ export const streamGradingMutation = (options?: Partial<Options<StreamGradingDat
     const mutationOptions: UseMutationOptions<StreamGradingResponse, DefaultError, Options<StreamGradingData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await streamGrading({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const stopGradingMutation = (options?: Partial<Options<StopGradingData>>): UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> => {
+    const mutationOptions: UseMutationOptions<StopGradingResponse, DefaultError, Options<StopGradingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await stopGrading({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -293,6 +307,21 @@ export const getPdfOptions = (options: Options<GetPdfData>) => queryOptions<GetP
         return data;
     },
     queryKey: getPdfQueryKey(options)
+});
+
+export const getPdfWithNameQueryKey = (options: Options<GetPdfWithNameData>) => createQueryKey('getPdfWithName', options);
+
+export const getPdfWithNameOptions = (options: Options<GetPdfWithNameData>) => queryOptions<GetPdfWithNameResponse, DefaultError, GetPdfWithNameResponse, ReturnType<typeof getPdfWithNameQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getPdfWithName({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getPdfWithNameQueryKey(options)
 });
 
 export const getLogsQueryKey = (options: Options<GetLogsData>) => createQueryKey('getLogs', options);

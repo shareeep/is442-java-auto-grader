@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,6 +78,7 @@ public class ExamController {
 		Path tempDir = Files.createTempDirectory("autograder-template-");
 
 		int saved = 0;
+		List<String> savedPaths = new ArrayList<>();
 		for (MultipartFile file : files) {
 			if (file.isEmpty() || file.getOriginalFilename() == null)
 				continue;
@@ -83,18 +86,21 @@ public class ExamController {
 				continue;
 
 			// Decode the path separator we encoded on the client side
-			String relativePath = file.getOriginalFilename().replace("__SEP__", File.separator);
+			String originalName = file.getOriginalFilename();
+			String relativePath = originalName.replace("__SEP__", File.separator);
 			Path dest = tempDir.resolve(relativePath);
 			Files.createDirectories(dest.getParent());
 			file.transferTo(dest.toFile());
 			dest.toFile().deleteOnExit();
 			saved++;
+			savedPaths.add(relativePath);
 		}
 
 		TEMPLATE_DIRS.put(templateId, tempDir);
 		tempDir.toFile().deleteOnExit();
 
 		logger.info("[UPLOAD] Template dir stored  templateId={} files={} path={}", templateId, saved, tempDir);
+		logger.info("[UPLOAD] Template files: {}", savedPaths);
 		return ResponseEntity.ok(Map.of("templateId", templateId, "fileCount", saved));
 	}
 

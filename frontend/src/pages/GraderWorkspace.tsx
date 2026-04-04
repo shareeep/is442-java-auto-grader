@@ -12,7 +12,7 @@ import GradingTerminal from '../components/auto-grader/GradingTerminal';
 import ResultsTable from '../components/auto-grader/ResultsTable';
 import type { Submission } from '../components/auto-grader/SubmissionDetails';
 import { listRunsOptions } from '../generated/@tanstack/react-query.gen';
-import { formatRunTimestamp } from '../lib/utils';
+import { formatRunTimestamp, pdfUrl } from '../lib/utils';
 import { useGraderStore } from '../store/graderStore';
 
 interface PastRun {
@@ -146,7 +146,7 @@ const RecentRunsPanel: React.FC<{ runs: PastRun[]; loading: boolean; onViewAll: 
               <div className="flex flex-wrap items-center gap-1.5">
                 {run.hasPdf && (
                   <button
-                    onClick={() => window.open(`/api/reports/${run.id}/pdf`, '_blank')}
+                    onClick={() => window.open(pdfUrl(run.id, (run as any).pdfFilename), '_blank')}
                     className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-border hover:bg-secondary transition-colors text-muted-foreground"
                   >
                     <Eye size={11} /> PDF
@@ -270,6 +270,7 @@ const GraderWorkspace: React.FC = () => {
     setTesterFiles([]);
     setScoresheetFiles([]);
     setTerminalOpen(true);
+    refetchRuns();
   };
 
   const handleReset = () => {
@@ -295,31 +296,31 @@ const GraderWorkspace: React.FC = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 pb-16 sm:px-6 sm:py-6 lg:px-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-outfit font-bold text-foreground tracking-tight">Auto-Grader</h1>
           <p className="text-muted-foreground mt-1">
             Compile, test, and grade student Java submissions automatically.
           </p>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 shrink-0">
-          {phase === 'results' && !terminalOpen && (
-            <button
-              onClick={() => setTerminalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <Terminal size={14} /> Show Log
-            </button>
-          )}
-          {(phase === 'results' || (phase === 'upload' && error)) && (
+        {(phase === 'results' || (phase === 'upload' && error)) && (
+          <div className="flex items-center gap-2">
+            {phase === 'results' && !terminalOpen && (
+              <button
+                onClick={() => setTerminalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <Terminal size={14} /> Show Log
+              </button>
+            )}
             <button
               onClick={handleReset}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
             >
               <RotateCcw size={14} /> {phase === 'results' ? 'New Run' : 'Clear'}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </header>
 
       {error && (
@@ -415,7 +416,15 @@ const GraderWorkspace: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional</span>
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed mt-1">
+                    If uploaded, scores will only be filled in for names that appear in the scoresheet.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed mt-1">
+                    If left empty, a new CSV file containing all graded results will be generated.
+                  </p>
+                </div>
                 <UploadCard
                   label="Grade Mapping (CSV)"
                   hint="IS442-ScoreSheet.csv — maps student IDs to names"
@@ -473,24 +482,11 @@ const GraderWorkspace: React.FC = () => {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <StatCard icon={<TrendingUp size={20} />} label="Avg Score" value={`${avgPct}%`} sub={`${submissions.length} students`} />
                 <StatCard icon={<BarChart2 size={20} />} label="Pass Rate" value={`${passCount}/${submissions.length}`} sub="scored ≥ 50%" />
-                <StatCard icon={<TriangleAlert size={20} />} label="Anomalies" value={String(anomalyCount)} sub="across all students" />
+                <StatCard icon={<TriangleAlert size={20} />} label="Issues" value={String(anomalyCount)} sub="across all students" />
               </div>
 
               {/* Score table */}
-              <ResultsTable data={result} />
-
-              {/* Deep-dive CTA */}
-              {runId && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => navigate(`/past-runs/${runId}`)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
-                  >
-                    View Full Results
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-              )}
+              <ResultsTable data={result} onViewFullResults={runId ? () => navigate(`/past-runs/${runId}`) : undefined} />
             </div>
           )}
         </div>
