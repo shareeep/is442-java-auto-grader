@@ -35,18 +35,10 @@ docker compose up
 |---------|-----|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui/index.html |
+| JPlag Viewer | http://localhost:1996 |
 | Docling (PDF OCR) | http://localhost:5001 |
-| Swagger UI | http://localhost:8080/swagger-ui |
 
----
-
-## Three Ways to Run
-
-| Mode | Command | Best for |
-|------|---------|----------|
-| **One-shot CLI** | `--submissions ... --testers ... --output ...` | Scripting, CI, quick runs |
-| **Interactive CLI** | `--cli` | Instructors at terminal |
-| **Web UI** | `docker compose up` | Full experience: wizard, live grading, reports, JPlag viewer |
 
 ---
 
@@ -79,7 +71,7 @@ docker compose up
 
 **Frontend:** React 19 · TypeScript · Vite · TanStack Query v5 · Zustand · HeyAPI · Tailwind CSS · shadcn/ui · Lucide icons
 
-**Infrastructure:** Docker Compose · Nginx · Docling Serve
+**Infrastructure:** Docker Compose · Nginx · Docling Serve · JPlag Report Viewer (git-cloned from github.com/jplag/JPlag)
 
 ---
 
@@ -173,17 +165,3 @@ See [docs/API.md](docs/API.md) for the full endpoint reference.
 | [docs/DEMO-GUIDE.md](docs/DEMO-GUIDE.md) | Demo presentation script (4 flows + tech highlights) |
 | [docs/diagrams/](docs/diagrams/) | Mermaid diagrams: class, sequence, deployment, flow |
 
----
-
-## Dev
-
-```bash
-# Build
-./gradlew fatJar
-
-# Lint
-./gradlew spotlessApply
-
-# Run backend only (no Docker)
-java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --web
-```
