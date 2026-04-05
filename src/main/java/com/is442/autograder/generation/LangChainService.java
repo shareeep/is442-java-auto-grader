@@ -66,13 +66,4 @@ public interface LangChainService {
 			Return ONLY valid JSON, no markdown.""")
 	String recommendJson(@UserMessage dev.langchain4j.data.message.UserMessage userMessage);
 
-	@SystemMessage("""
-			You are a Java test code refiner for an automated grading system.
-			You will be given existing generated tester code and a refinement request.
-			Apply the requested changes to the code and return the COMPLETE updated Java code.
-			Rules:
-			- Preserve the overall structure and class/method signatures
-			- Only modify what the refinement request asks for
-			- Return ONLY valid Java code — no markdown fences, no explanation""")
-	String refineCode(@UserMessage String prompt);
 }

@@ -10,7 +10,7 @@ import com.is442.autograder.model.QuestionConfig;
 import com.is442.autograder.model.TestCaseRecommendation;
 import com.is442.autograder.web.dto.ExecuteRequest;
 import com.is442.autograder.web.dto.RecommendRequest;
-import com.is442.autograder.web.dto.RefineRequest;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,33 +187,4 @@ public class GenerationController {
 		}
 	}
 
-	/**
-	 * Refine generated code based on user feedback.
-	 */
-	@PostMapping("/refinements")
-	public ResponseEntity<?> refine(@RequestBody RefineRequest request) {
-		String examId = request.getExamId();
-		String questionId = request.getQuestionId();
-		String currentCode = request.getCurrentCode();
-		String refinementPrompt = request.getRefinementPrompt();
-
-		if (currentCode == null || refinementPrompt == null) {
-			return ResponseEntity.badRequest().body(Map.of("error", "Missing currentCode or refinementPrompt."));
-		}
-
-		String examContext = "";
-		if (examId != null) {
-			String loaded = loadExamContext(examId, questionId);
-			if (loaded != null) {
-				examContext = loaded;
-			}
-		}
-
-		try {
-			String refinedCode = generationService.refineCode(questionId, currentCode, refinementPrompt, examContext);
-			return ResponseEntity.ok(Map.of("questionId", questionId, "refinedCode", refinedCode));
-		} catch (Exception e) {
-			return ResponseEntity.internalServerError().body(Map.of("error", "Refinement failed: " + e.getMessage()));
-		}
-	}
 }

@@ -59,13 +59,6 @@ export type InferredQuestionConfig = {
     implicitParent?: boolean;
 };
 
-export type RefineRequest = {
-    examId?: string;
-    questionId?: string;
-    currentCode?: string;
-    refinementPrompt?: string;
-};
-
 export type RecommendRequest = {
     examId?: string;
     questionId?: string;
@@ -195,24 +188,6 @@ export type GenerateTestsResponses = {
 };
 
 export type GenerateTestsResponse = GenerateTestsResponses[keyof GenerateTestsResponses];
-
-export type RefineData = {
-    body: RefineRequest;
-    path?: never;
-    query?: never;
-    url: '/api/generation/refinements';
-};
-
-export type RefineResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type RefineResponse = RefineResponses[keyof RefineResponses];
 
 export type RecommendData = {
     body: RecommendRequest;

@@ -59,10 +59,6 @@ public class AppConfig {
 		}
 	}
 
-	public void reload() throws IOException {
-		loadConfig();
-	}
-
 	public boolean hasQuestionsConfigured() {
 		String list = properties.getProperty("questions.list", "");
 		return !list.isEmpty();

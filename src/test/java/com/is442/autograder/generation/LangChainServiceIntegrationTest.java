@@ -112,30 +112,6 @@ class LangChainServiceIntegrationTest {
 		logger.info("[TEST] testRecommendJson_minimal PASSED — recommended {}", rec.get("recommendedCount"));
 	}
 
-	@Test
-	void testRefineCode_minimal() {
-		String prompt = """
-				Question ID: Q1a
-
-				Current code:
-				void testIsogram() { ArrayList<String> r = Q1a.getIsogramWords(null); }
-
-				Refinement: add @Test annotation and wrap in try-catch. Return the complete updated Java code only.
-				""";
-
-		logger.info("[TEST] Calling refineCode...");
-		String refined = langChainService.refineCode(prompt);
-
-		logger.info("[TEST] Refined response ({} chars): {}", refined.length(),
-				refined.length() > 300 ? refined.substring(0, 300) + "..." : refined);
-
-		assertNotNull(refined);
-		assertFalse(refined.isBlank());
-		assertFalse(refined.startsWith("```"), "Should not start with markdown fence");
-
-		logger.info("[TEST] testRefineCode_minimal PASSED");
-	}
-
 	// ── Parsing helpers ────────────────────────────────────────────────────
 
 	private List<Map<String, Object>> parseJson(String json) {

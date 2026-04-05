@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponses, DownloadRunData, DownloadRunResponses, GenerateTestsData, GenerateTestsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetPdfData, GetPdfResponses, GetPdfWithNameData, GetPdfWithNameResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTesterData, GetTesterFilesData, GetTesterFilesResponses, GetTesterResponses, ListRunsData, ListRunsResponses, ParsePdfData, ParsePdfResponses, RecommendData, RecommendResponses, RefineData, RefineResponses, SaveData, SaveResponses, StopGradingData, StopGradingResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponses, DownloadRunData, DownloadRunResponses, GenerateTestsData, GenerateTestsResponses, GetBootIdData, GetBootIdResponses, GetCsvData, GetCsvResponses, GetPdfData, GetPdfResponses, GetPdfWithNameData, GetPdfWithNameResponses, GetPlagiarismReportData, GetPlagiarismReportResponses, GetResultsData, GetResultsResponses, GetStudentCodeData, GetStudentCodeResponses, GetTesterData, GetTesterFilesData, GetTesterFilesResponses, GetTesterResponses, ListRunsData, ListRunsResponses, ParsePdfData, ParsePdfResponses, RecommendData, RecommendResponses, SaveData, SaveResponses, StopGradingData, StopGradingResponses, StreamGradingData, StreamGradingResponses, UploadExamData, UploadExamResponses, UploadTemplateData, UploadTemplateResponses, UploadTestersData, UploadTestersResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -60,15 +60,6 @@ export const streamGrading = <ThrowOnError extends boolean = false>(options: Opt
 
 export const generateTests = <ThrowOnError extends boolean = false>(options: Options<GenerateTestsData, ThrowOnError>) => (options.client ?? client).post<GenerateTestsResponses, unknown, ThrowOnError>({
     url: '/api/generation/tests',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const refine = <ThrowOnError extends boolean = false>(options: Options<RefineData, ThrowOnError>) => (options.client ?? client).post<RefineResponses, unknown, ThrowOnError>({
-    url: '/api/generation/refinements',
     ...options,
     headers: {
         'Content-Type': 'application/json',
