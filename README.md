@@ -165,11 +165,13 @@ See [docs/API.md](docs/API.md) for the full endpoint reference.
 |-------|----------------|
 | [docs/README.md](docs/README.md) | Docs index |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Package map, design decisions, Mermaid diagrams |
+| [docs/design-overview.md](docs/design-overview.md) | Comprehensive architecture & design deep-dive |
 | [docs/CLI-GUIDE.md](docs/CLI-GUIDE.md) | One-shot + interactive CLI usage |
 | [docs/AI-TEST-GENERATION.md](docs/AI-TEST-GENERATION.md) | Wizard walkthrough + system prompts + retry logic |
 | [docs/PARSING.md](docs/PARSING.md) | PDF parsing, question inference, file upload filtering |
 | [docs/API.md](docs/API.md) | REST endpoint reference |
-| [docs/diagrams/](docs/diagrams/) | Mermaid flow diagrams |
+| [docs/DEMO-GUIDE.md](docs/DEMO-GUIDE.md) | Demo presentation script (4 flows + tech highlights) |
+| [docs/diagrams/](docs/diagrams/) | Mermaid diagrams: class, sequence, deployment, flow |
 
 ---
 

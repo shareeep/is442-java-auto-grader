@@ -1,6 +1,7 @@
 # Combined Test Case Generator + Fixes for IS442 Auto-Grader
 # Generates realistic student submissions with common anomalies and applies necessary fixes
 # Generates student submissions that actually attempt to solve exam questions with realistic bugs/anomalies
+# Adjusted to be in scripts folder, so the paths are now nested. To use, run this script from the root directory of the project.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DIR="/tmp/autograder-realistic-tests"
@@ -1883,8 +1884,3 @@ echo
 echo "Final student submissions are ready in:"
 echo "  $OUTPUT_DIR"
 echo
-echo "You can now run the auto-grader:"
-echo "  ./gradlew clean build"
-echo "  java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar"
-echo
-

@@ -1,0 +1,40 @@
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant GSC as GradingStreamController
+    participant GP as GradingPipeline
+    participant ZE as ZipExtractor
+    participant SN as StructureNormalizer
+    participant IR as IdentityResolver
+    participant GE as GradingEngine
+    participant PR as ProcessRunner
+    participant REP as Reporters
+
+    FE->>GSC: POST /api/grading/stream (multipart: ZIPs + testers)
+    GSC-->>FE: SSE session event {sessionId}
+    GSC->>GP: run(submissionsDir, testersDir, scoresheet, outputDir)
+
+    GP->>ZE: scan + extract all ZIPs
+    GSC-->>FE: SSE status "Extracting submissions..."
+
+    loop For each student
+        GP->>SN: normalize folder structure
+        GP->>IR: resolve identity from Java headers
+        GP->>GE: grade(submissionRoot, testersDir, configs, submission)
+
+        loop For each question
+            GE->>PR: compile (javac)
+            GE->>PR: run (java tester)
+            PR-->>GE: ProcessResult (score, stdout, stderr)
+        end
+
+        GSC-->>FE: SSE student event {username, totalScore, results}
+    end
+
+    GP->>REP: ScoresheetEnricher.enrich(submissions, csv)
+    GP->>REP: PdfReportGenerator.generate()
+    GP->>REP: CSVExporter.export() + DetailedCsvExporter.export()
+    GP->>REP: PlagiarismChecker.runChecks()
+
+    GSC-->>FE: SSE complete event {runId, totalStudents}
+```
