@@ -4,6 +4,11 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 
 ## Quick Start
 
+### Setup
+```
+# Create `.env` file (Refer to .env.example)
+```
+
 ### CLI (no Docker needed)
 
 ```bash
