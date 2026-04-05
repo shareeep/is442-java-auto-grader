@@ -137,7 +137,6 @@ AI-powered test case generation. Managed by `GenerationController`.
 |--------|------|-------------|
 | `POST` | `/api/generation/tests` | Generate test cases for a question |
 | `POST` | `/api/generation/recommendations` | Get AI recommendations for a question |
-| `POST` | `/api/generation/refinements` | Refine existing generated code |
 
 ### `POST /api/generation/recommendations`
 
@@ -192,23 +191,6 @@ AI-powered test case generation. Managed by `GenerationController`.
   "generatedCode": "public class Q1aTester { ... }",
   "compiledOk": true
 }
-```
-
-### `POST /api/generation/refinements`
-
-**Request body:**
-```json
-{
-  "examId": "uuid",
-  "questionId": "Q1a",
-  "currentCode": "public class Q1aTester { ... }",
-  "refinementPrompt": "Change the boundary test to use Integer.MAX_VALUE"
-}
-```
-
-**Response:**
-```json
-{ "questionId": "Q1a", "refinedCode": "public class Q1aTester { ... }" }
 ```
 
 ---

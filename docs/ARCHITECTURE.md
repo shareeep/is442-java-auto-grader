@@ -67,7 +67,7 @@ All Java source lives under `src/main/java/com/is442/autograder/`.
 |-------|----------------|
 | `GradingStreamController` | REST endpoints for grading. Streams live progress via SSE (`SseEmitter` on a 4-thread executor). Handles cancellation. |
 | `ExamController` | Handles exam PDF upload, parsing, and analysis. |
-| `GenerationController` | Orchestrates the AI test generation wizard: setup → recommend → generate → refine. |
+| `GenerationController` | Orchestrates the AI test generation wizard: setup → recommend → generate. |
 | `ReportsController` | Serves past run artifacts: PDF, CSV, JPlag zip, per-student code, tester files. |
 | `UploadRegistry` | `ConcurrentHashMap<UUID, Path>` — holds uploaded file paths in memory across API calls within a session. |
 
@@ -147,7 +147,7 @@ Images are extracted from markdown as base64 data URIs and passed separately to 
 
 ---
 
-### Max 3 AI Retries with Exponential Backoff
+### Max 3 AI Retries with Linear Backoff
 
 `TestGenerationService` retries on:
 - Null or blank response
@@ -158,7 +158,7 @@ Images are extracted from markdown as base64 data URIs and passed separately to 
 for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
     // call AI
     if (success) break;
-    Thread.sleep(3000L * attempt); // 3s, 6s, 12s
+    Thread.sleep(3000L * attempt); // 3s, 6s, 9s
 }
 ```
 

@@ -32,12 +32,11 @@ Review each question and correct any misdetections. This config is passed to the
 For each question:
 1. **Recommendation** — the AI analyses the question text + existing testers and recommends up to 5 test concepts not yet covered
 2. **Generation** — based on those recommendations, test cases are generated (up to 3 retries on failure)
-3. **Review** — inspect the generated test cases, refine them with custom instructions if needed
+3. **Review** — inspect the generated test cases, add custom instructions if needed
 
 You can:
 - Accept the recommended count or override with a custom number (max 5)
 - Add custom suggestions per question (e.g., "include a boundary case with an empty list")
-- Refine individual test cases after generation
 
 ### Step 4 — Export
 
@@ -49,7 +48,7 @@ Review the final testers and export as a ZIP. Upload this ZIP in the **Auto-Grad
 
 ### System Prompts
 
-`LangChainService.java` defines three AI methods with detailed system prompts:
+`LangChainService.java` defines two AI methods with detailed system prompts:
 
 #### `generateTestCasesJson` — Test Case Generation
 
@@ -107,25 +106,11 @@ Return ONLY valid JSON, no markdown.
 String recommendJson(@UserMessage UserMessage userMessage);
 ```
 
-#### `refineCode` — Code Refinement
-
-```java
-@SystemMessage("""
-You are a Java test code refiner for an automated grading system.
-Apply the requested changes to the code and return the COMPLETE updated Java code.
-Rules:
-- Preserve overall structure and class/method signatures
-- Only modify what the refinement request asks for
-- Return ONLY valid Java code — no markdown fences
-""")
-String refineCode(@UserMessage String prompt);
-```
-
 ---
 
 ### Retry Mechanism
 
-`TestGenerationService` implements retry with exponential backoff:
+`TestGenerationService` implements retry with linear backoff:
 
 ```java
 private static final int MAX_AI_ATTEMPTS = 3;
@@ -138,7 +123,7 @@ for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
     } catch (Exception e) { /* retry */ }
     if (structured.isEmpty()) { /* retry */ }
     // success
-    Thread.sleep(3000L * attempt); // 3s, 6s, 12s
+    Thread.sleep(3000L * attempt); // 3s, 6s, 9s
 }
 ```
 
