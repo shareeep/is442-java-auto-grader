@@ -1,0 +1,14 @@
+```mermaid
+flowchart LR
+    A[Upload PDF + Template + Testers] --> B[Docling parse PDF]
+    B --> C[ConfigInference: infer Q structure from folders + text]
+    C --> D[Per question: recommend concepts]
+    D --> E{Max 5 recommendations}
+    E --> F[Generate test cases JSON]
+    F --> G{Retry up to 3x}
+    G -->|Blank/null| G
+    G -->|Parse error| G
+    G -->|Success| H[Assemble Java tester code]
+    H --> I[Refine if requested]
+    I --> J[Export testers as ZIP]
+```

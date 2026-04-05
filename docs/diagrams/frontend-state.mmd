@@ -1,0 +1,24 @@
+```mermaid
+flowchart TB
+    subgraph Backend["Backend"]
+        OAPI[Spring Boot<br/>OpenAPI at /v3/api-docs]
+    end
+
+    subgraph Frontend["Frontend"]
+        HEY[HeyAPI<br/>reads OpenAPI spec]
+        TQ[TanStack Query v5<br/>server state + caching]
+        ZU1[graderStore<br/>phase, result, runId]
+        ZU2[wizardStore<br/>step, examId, configs]
+        RE1[GraderWorkspace<br/>upload + grading]
+        RE2[TestGenerator Wizard<br/>4-step wizard]
+    end
+
+    OAPI -->|codegen| HEY
+    HEY -->|typed hooks| TQ
+    TQ -->|cache| ZU1
+    TQ -->|cache| ZU2
+    ZU1 --> RE1
+    ZU2 --> RE2
+    RE1 -->|formData| TQ
+    RE2 -->|formData| TQ
+```

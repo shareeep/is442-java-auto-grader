@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { analyzeSetup, downloadRun, generateTests, getBootId, getCsv, getPdf, getPdfWithName, getPlagiarismReport, getResults, getStudentCode, getTester, getTesterFiles, listRuns, type Options, parsePdf, recommend, refine, save, stopGrading, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
-import type { AnalyzeSetupData, AnalyzeSetupResponse, DownloadRunData, DownloadRunResponse, GenerateTestsData, GenerateTestsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetPdfData, GetPdfResponse, GetPdfWithNameData, GetPdfWithNameResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTesterData, GetTesterFilesData, GetTesterFilesResponse, GetTesterResponse, ListRunsData, ListRunsResponse, ParsePdfData, ParsePdfResponse, RecommendData, RecommendResponse, RefineData, RefineResponse, SaveData, SaveResponse2, StopGradingData, StopGradingResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
+import { analyzeSetup, downloadRun, generateTests, getBootId, getCsv, getPdf, getPdfWithName, getPlagiarismReport, getResults, getStudentCode, getTester, getTesterFiles, listRuns, type Options, parsePdf, recommend, save, stopGrading, streamGrading, uploadExam, uploadTemplate, uploadTesters } from '../sdk.gen';
+import type { AnalyzeSetupData, AnalyzeSetupResponse, DownloadRunData, DownloadRunResponse, GenerateTestsData, GenerateTestsResponse, GetBootIdData, GetBootIdResponse, GetCsvData, GetCsvResponse, GetPdfData, GetPdfResponse, GetPdfWithNameData, GetPdfWithNameResponse, GetPlagiarismReportData, GetPlagiarismReportResponse, GetResultsData, GetResultsResponse, GetStudentCodeData, GetStudentCodeResponse, GetTesterData, GetTesterFilesData, GetTesterFilesResponse, GetTesterResponse, ListRunsData, ListRunsResponse, ParsePdfData, ParsePdfResponse, RecommendData, RecommendResponse, SaveData, SaveResponse2, StopGradingData, StopGradingResponse, StreamGradingData, StreamGradingResponse, UploadExamData, UploadExamResponse, UploadTemplateData, UploadTemplateResponse, UploadTestersData, UploadTestersResponse } from '../types.gen';
 
 export const uploadTestersMutation = (options?: Partial<Options<UploadTestersData>>): UseMutationOptions<UploadTestersResponse, DefaultError, Options<UploadTestersData>> => {
     const mutationOptions: UseMutationOptions<UploadTestersResponse, DefaultError, Options<UploadTestersData>> = {
@@ -80,20 +80,6 @@ export const generateTestsMutation = (options?: Partial<Options<GenerateTestsDat
     const mutationOptions: UseMutationOptions<GenerateTestsResponse, DefaultError, Options<GenerateTestsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await generateTests({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const refineMutation = (options?: Partial<Options<RefineData>>): UseMutationOptions<RefineResponse, DefaultError, Options<RefineData>> => {
-    const mutationOptions: UseMutationOptions<RefineResponse, DefaultError, Options<RefineData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await refine({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

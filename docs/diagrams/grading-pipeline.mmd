@@ -1,0 +1,17 @@
+```mermaid
+flowchart TD
+    A[Find ZIP files in submissions dir] --> B[Extract each ZIP]
+    B --> C[Normalize folder structure]
+    C --> D[Resolve student identity from headers]
+    D --> E{For each question}
+    E -->|Copy tester| F[Compile javac]
+    F --> G[Run java tester]
+    G --> H[Parse score from stdout]
+    H --> I{More questions?}
+    I -->|Yes| E
+    I -->|No| J[Enrich from scoresheet CSV]
+    J --> K[Generate PDF instructor report]
+    K --> L[Generate CSV score sheets]
+    L --> M[Run JPlag plagiarism check]
+    M --> N[Save code + testers + logs]
+```

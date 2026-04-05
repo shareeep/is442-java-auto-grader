@@ -1,0 +1,24 @@
+```mermaid
+graph TB
+    subgraph Docker Compose
+        FE["<b>frontend</b><br/>React 19 + Vite + TypeScript<br/>Nginx serves built assets<br/><i>port 5173 &rarr; 80</i>"]
+        BE["<b>backend</b><br/>Spring Boot 3.5 (Java 25)<br/>REST API + SSE streaming<br/><i>port 8080</i>"]
+        DOC["<b>docling</b><br/>Docling Serve<br/>PDF OCR + Markdown extraction<br/><i>port 5001</i>"]
+        PV["<b>plagiarism-viewer</b><br/>JPlag Report Viewer (Vue.js)<br/>Renders .jplag reports<br/><i>port 1996 &rarr; 80</i>"]
+    end
+
+    USER((User / Browser))
+
+    USER -->|"HTTP :5173"| FE
+    USER -->|"HTTP :1996"| PV
+    FE -->|"REST + SSE :8080"| BE
+    BE -->|"HTTP :5001"| DOC
+    BE -.->|"writes"| VOL[("./output volume<br/>PDF, CSV, JPlag, logs")]
+    PV -.->|"reads .jplag"| VOL
+
+    style FE fill:#2563eb,color:#fff,stroke:#1d4ed8
+    style BE fill:#16a34a,color:#fff,stroke:#15803d
+    style DOC fill:#9333ea,color:#fff,stroke:#7e22ce
+    style PV fill:#ea580c,color:#fff,stroke:#c2410c
+    style VOL fill:#374151,color:#fff,stroke:#1f2937
+```

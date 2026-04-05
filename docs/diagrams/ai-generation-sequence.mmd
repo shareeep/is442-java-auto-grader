@@ -1,0 +1,63 @@
+```mermaid
+sequenceDiagram
+    participant FE as Frontend (Wizard)
+    participant EC as ExamController
+    participant TC as TemplateController
+    participant TsC as TesterController
+    participant PP as PdfParser
+    participant DOC as Docling Serve
+    participant DB as SessionDatabase
+    participant CIS as ConfigInferenceService
+    participant GC as GenerationController
+    participant TGS as TestGenerationService
+    participant LLM as LangChainService (AI)
+    participant TFW as TesterFileWriter
+
+    Note over FE: Step 1 — Upload
+    FE->>EC: POST /api/exams/upload (PDF)
+    EC-->>FE: {examId}
+    FE->>TC: POST /api/templates/upload (directory)
+    TC-->>FE: {templateId}
+    FE->>TsC: POST /api/testers/upload (.java files)
+    TsC-->>FE: {testerId}
+
+    FE->>EC: POST /api/exams/{examId}/parse
+    EC->>PP: parseToMarkdown(pdf)
+    PP->>DOC: HTTP POST (base64 PDF)
+    DOC-->>PP: Markdown + base64 images
+    PP-->>EC: markdown
+    EC->>DB: cache parsed markdown
+
+    Note over FE: Step 2 — Analyze & Review
+    FE->>EC: POST /api/exams/{examId}/analyze {templateId, testerId}
+    EC->>CIS: inferConfig(markdown, templateDir, testerDir)
+    CIS-->>EC: InferredConfig (questions, folders, testers, scores)
+    EC-->>FE: InferredConfig (user reviews & edits)
+
+    Note over FE: Step 3 — Recommend & Generate
+    loop For each question
+        FE->>GC: POST /api/generation/recommendations {examId, questionId, testerId}
+        GC->>TGS: recommend(questionContext, existingTesters)
+        TGS->>LLM: recommendJson(prompt)
+        LLM-->>TGS: {conceptsToCover, rationale}
+        TGS-->>GC: TestCaseRecommendation
+        GC-->>FE: recommendations (user reviews concepts)
+
+        FE->>GC: POST /api/generation/tests {question, concepts, suggestions}
+        GC->>TGS: generateForQuestion(...)
+
+        loop Retry up to 3x
+            TGS->>LLM: generateTestCasesJson(prompt)
+            LLM-->>TGS: JSON array of test cases
+        end
+
+        TGS->>TFW: assemble Java tester code
+        TGS-->>GC: GenerationResult {cases, generatedCode}
+        GC-->>FE: generated test cases
+    end
+
+    Note over FE: Step 4 — Export
+    FE->>TsC: POST /api/testers/save {results, outputDir}
+    TsC->>TFW: write tester files to disk
+    TsC-->>FE: {savedPaths, fileContents}
+```

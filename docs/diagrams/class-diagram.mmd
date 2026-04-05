@@ -1,0 +1,114 @@
+```mermaid
+classDiagram
+    direction TB
+
+    %% ─── Grading Pipeline ───
+    class GradingPipeline {
+        +run(submissionsDir, testersDir, scoresheet, outputDir) List~StudentSubmission~
+        +cancel()
+        +isCancelled() boolean
+    }
+    class ZipExtractor {
+        +extract(zipFile, targetDir) Path
+    }
+    class StructureNormalizer {
+        +normalize(extractedRoot, submission) Path
+    }
+    class IdentityResolver {
+        +resolve(submissionRoot) Optional~StudentIdentity~
+    }
+    class SubmissionValidator {
+        +validate(submission)
+    }
+    class GradingEngine {
+        +grade(submissionRoot, testersDir, configs, submission)
+    }
+    class ProcessRunner {
+        +compile(workDir) ProcessResult
+        +run(workDir, className) ProcessResult
+    }
+    class PlagiarismChecker {
+        +runChecks(codeDir, outputDir)
+    }
+    class PdfReportGenerator {
+        +generate(submissions, configs, outputDir)
+    }
+    class CSVExporter {
+        +export(submissions, outputPath)
+    }
+    class ScoresheetEnricher {
+        +enrich(submissions, scoresheetPath)
+    }
+
+    GradingPipeline --> ZipExtractor
+    GradingPipeline --> StructureNormalizer
+    GradingPipeline --> IdentityResolver
+    GradingPipeline --> SubmissionValidator
+    GradingPipeline --> GradingEngine
+    GradingPipeline --> PdfReportGenerator
+    GradingPipeline --> CSVExporter
+    GradingPipeline --> ScoresheetEnricher
+    GradingPipeline --> PlagiarismChecker
+    GradingEngine --> ProcessRunner
+    StructureNormalizer --> IdentityResolver
+
+    %% ─── AI Generation ───
+    class TestGenerationService {
+        +generateForQuestion(...) GenerationResult
+        +recommend(...) TestCaseRecommendation
+    }
+    class LangChainService {
+        <<interface>>
+        +generateTestCasesJson(message) String
+        +recommendJson(message) String
+        +refineCode(prompt) String
+    }
+    class TesterFileWriter {
+        +write(className, originalCode, generatedCode, cases, inputDir, outputDir)
+    }
+    class ConfigInferenceService {
+        +inferConfig(markdown, templateDir, testerDir) InferredConfig
+    }
+    class PdfParser {
+        +parseToMarkdown(pdfFile) String
+        +extractQuestionSection(markdown, qid) String
+    }
+
+    TestGenerationService --> LangChainService : vision
+    TestGenerationService --> LangChainService : text
+    TestGenerationService --> TesterFileWriter
+
+    %% ─── Models ───
+    class StudentSubmission {
+        +username String
+        +name String
+        +results List~QuestionResult~
+        +anomalies List~Anomaly~
+    }
+    class QuestionResult {
+        +questionId String
+        +score double
+        +maxScore double
+        +compiled boolean
+    }
+    class Anomaly {
+        +type Type
+        +severity Severity
+        +description String
+    }
+    class InferredConfig {
+        +assessmentName String
+        +questions List~InferredQuestionConfig~
+        +conflicts List~ConfigConflict~
+    }
+    class InferredQuestionConfig {
+        +questionId String
+        +folder String
+        +tester String
+        +maxScore double
+    }
+
+    StudentSubmission *-- QuestionResult
+    StudentSubmission *-- Anomaly
+    InferredConfig *-- InferredQuestionConfig
+```

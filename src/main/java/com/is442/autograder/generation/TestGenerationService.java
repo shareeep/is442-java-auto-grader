@@ -193,23 +193,6 @@ public class TestGenerationService {
 		throw new RuntimeException("Recommendation failed for " + questionId); // unreachable
 	}
 
-	/**
-	 * Delegate to the AI for code refinement (no retry — single-shot).
-	 */
-	public String refineCode(String questionId, String currentCode, String refinementPrompt, String examContext)
-			throws IOException, InterruptedException {
-
-		String prompt = buildRefinePrompt(questionId, currentCode, refinementPrompt, examContext);
-		logger.info("[GEN][REFINE] === PROMPT START ===  questionId={}\n{}\n[GEN][REFINE] === PROMPT END ===",
-				questionId, PdfParser.stripInlineImages(prompt));
-
-		String result = langChainServiceText.refineCode(prompt);
-		logger.info("[GEN][REFINE] === AI RESPONSE START ===  questionId={}\n{}\n[GEN][REFINE] === AI RESPONSE END ===",
-				questionId, result);
-
-		return result;
-	}
-
 	// ── Helpers ──────────────────────────────────────────────────────────────
 
 	private void sleepBeforeRetry(String tag, String questionId, int attempt) {
@@ -320,21 +303,6 @@ public class TestGenerationService {
 		sb.append("Identify the most important test concepts and edge cases for THIS SPECIFIC sub-question only. ")
 				.append("Return at most 5 concepts — pick the highest-value ones. ")
 				.append("Do NOT include concepts from other sub-questions.");
-		return sb.toString();
-	}
-
-	private String buildRefinePrompt(String questionId, String currentCode, String refinementPrompt,
-			String examContext) {
-		StringBuilder sb = new StringBuilder();
-		sb.append("Question ID: ").append(questionId).append("\n\n");
-
-		if (examContext != null && !examContext.isBlank()) {
-			sb.append("Exam context:\n").append(examContext).append("\n\n");
-		}
-
-		sb.append("Current generated code:\n").append(currentCode).append("\n\n");
-		sb.append("Refinement request: ").append(refinementPrompt).append("\n\n");
-		sb.append("Return the COMPLETE updated Java code with the refinement applied.");
 		return sb.toString();
 	}
 

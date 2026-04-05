@@ -103,7 +103,7 @@ For each student × question:
 
 ## AI test generation pipeline
 
-Flow: **Upload → Analyze → Generate → Review/Refine → Save**
+Flow: **Upload → Analyze → Generate → Review → Save**
 
 ```
 ExamController          → store file, return UUID
