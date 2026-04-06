@@ -11,6 +11,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useNavigate } from 'react-router-dom';
 import { save, getTester } from '@/generated/sdk.gen';
 import { useWizardStore } from '../../store/wizardStore';
+import { useGraderStore } from '../../store/graderStore';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '@/components/ui/toast';
 
@@ -296,7 +297,7 @@ const FinalizeExport: React.FC<FinalizeExportProps> = ({ onBack }) => {
           <Button
             size="sm"
             className="shrink-0 bg-vsc-green hover:bg-vsc-green/90 text-white rounded-md font-mono text-xs px-3"
-            onClick={() => navigate('/grader')}
+            onClick={() => { useGraderStore.getState().reset(); navigate('/grader'); }}
           >
             Proceed to Auto-Grader <ArrowRight size={13} className="ml-1" />
           </Button>
