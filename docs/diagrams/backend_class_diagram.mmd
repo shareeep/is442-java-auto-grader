@@ -1,0 +1,524 @@
+classDiagram
+    %% ===================== MODEL PACKAGE =====================
+    
+    class InferredConfig {
+        - assessmentName: String
+        - templateFolder: String
+        - questions: List~InferredQuestionConfig~
+        - conflicts: List~ConfigConflict~
+        + getQuestions() List~InferredQuestionConfig~
+        + addConflict(ConfigConflict) void
+    }
+    
+    class InferredQuestionConfig {
+        - questionId: String
+        - folder: String
+        - tester: String
+        - maxScore: double
+        - dependencyFolder: String
+        - dependencyFiles: List~String~
+        - implicitParent: boolean
+        - inferredFromPdf: boolean
+        + toQuestionConfig() QuestionConfig
+    }
+    
+    class QuestionConfig {
+        - questionId: String
+        - folder: String
+        - testerClassName: String
+        - maxScore: double
+        - dependencyFolder: String
+        - dependencyFiles: List~String~
+        + getQuestionId() String
+        + getFolder() String
+        + getDependencyFiles() List~String~
+    }
+    
+    class ConfigConflict {
+        - questionId: String
+        - conflictType: ConflictType
+        - message: String
+    }
+    
+    class ConflictType {
+        <<enumeration>>
+        MISSING_TESTER
+        MISSING_FOLDER
+        LIKELY_FALSE_POSITIVE
+    }
+    
+    class StudentSubmission {
+        - id: String
+        - folderName: String
+        - displayName: String
+        - questionResults: Map~String, QuestionResult~
+        - totalScore: double
+        - plagiarismScore: double
+        + addQuestionResult(String, QuestionResult) void
+        + getScore() double
+    }
+    
+    class QuestionResult {
+        - questionId: String
+        - score: double
+        - maxScore: double
+        - passed: boolean
+        - testCaseResults: List~TestCaseResult~
+        - compileResult: ProcessResult
+        - runResult: ProcessResult
+    }
+    
+    class TestCaseResult {
+        - description: String
+        - passed: boolean
+        - weight: double
+    }
+    
+    class ProcessResult {
+        - exitCode: int
+        - stdout: String
+        - stderr: String
+        - timedOut: boolean
+    }
+    
+    class GenerationResult {
+        - questionId: String
+        - testCases: List~GeneratedTestCase~
+        - compiledOk: boolean
+        - errorMessage: String
+        - generatedCode: String
+    }
+    
+    class GeneratedTestCase {
+        - description: String
+        - inputArgs: String
+        - expectedOutput: String
+        - weight: double
+    }
+    
+    class StructuredTestCase {
+        - description: String
+        - conceptCovered: String
+        - setup: String
+        - methodCall: String
+        - expected: String
+        - assertion: String
+        - weight: double
+        - expectsException: boolean
+        - exceptionType: String
+    }
+    
+    class TestCaseRecommendation {
+        - questionId: String
+        - recommendedCount: int
+        - conceptsToCover: List~String~
+        - existingCaseCount: int
+        - existingConcepts: List~String~
+        - rationale: String
+    }
+    
+    class Anomaly {
+        - studentId: String
+        - similarityScore: double
+        - matchedStudentIds: List~String~
+    }
+    
+    class StudentIdentity {
+        - studentName: String
+        - studentId: String
+        - studentEmail: String
+    }
+    
+    %% ===================== MODEL RELATIONSHIPS =====================
+    
+    InferredConfig --> InferredQuestionConfig : "1..* contains"
+    InferredConfig --> ConfigConflict : "0..* contains"
+    InferredQuestionConfig --> QuestionConfig : "converts to"
+    StudentSubmission --> QuestionResult : "1..* contains"
+    QuestionResult --> ProcessResult : "has compileResult"
+    QuestionResult --> ProcessResult : "has runResult"
+    QuestionResult --> TestCaseResult : "1..* contains"
+    ConfigConflict --> ConflictType : "of type"
+    
+    %% ===================== GENERATION PACKAGE =====================
+    
+    class LangChainService {
+        <<interface>>
+        + generateTestCasesJson(UserMessage) String
+        + recommendJson(UserMessage) String
+    }
+    
+    class TestGenerationService {
+        - langChainServiceVision: LangChainService
+        - langChainServiceText: LangChainService
+        - testerFileWriter: TesterFileWriter
+        - objectMapper: ObjectMapper
+        + generateTestCases(QuestionConfig, String, Path, int, Path, List~String~, List~String~) GenerationResult
+        + recommendTestCases(String, String, String, int) TestCaseRecommendation
+        - buildGeneratePrompt() String
+        - buildRecommendPrompt() String
+        - buildApiDocsContext() String
+        - buildAdditionalContext() String
+        - selectService() LangChainService
+    }
+    
+    class ConfigInferenceService {
+        + inferConfig(String, String, String) InferredConfig
+        + extractQuestionsFromMarkdown(String) List~String~
+        + collectAllFolders(Path, List~Path~) void
+        + getDependencies(Path) List~String~
+        + extractQuestionPrefix(String) String
+    }
+    
+    class PdfParser {
+        - doclingServeUrl: String
+        - api: DoclingServeApi
+        + extractAllText(Path) String
+        + extractQuestionSection(Path, String) String
+        + extractQuestionSectionFromMarkdown(String, String) String
+        + extractBase64Images(String) List~String~
+    }
+    
+    class TesterFileWriter {
+        + buildCodeFromStructured(List~StructuredTestCase~) String
+    }
+    
+    %% ===================== GENERATION RELATIONSHIPS =====================
+    
+    TestGenerationService --> LangChainService : "uses"
+    TestGenerationService --> TesterFileWriter : "uses"
+    TestGenerationService --> QuestionConfig : "uses"
+    TestGenerationService --> GenerationResult : "produces"
+    TestGenerationService --> TestCaseRecommendation : "produces"
+    TestGenerationService --> PdfParser : "uses"
+    ConfigInferenceService --> InferredConfig : "produces"
+    ConfigInferenceService --> InferredQuestionConfig : "creates"
+    LangChainService <|.. TestGenerationService : "implements"
+    TestGenerationService --> StructuredTestCase : "uses"
+    
+    %% ===================== EXECUTION PACKAGE =====================
+    
+    class GradingEngine {
+        - processRunner: ProcessRunner
+        - logWriter: QuestionLogWriter
+        - consoleReporter: ConsoleReporter
+        - templateFolderName: String
+        + grade(Path, Path, List~QuestionConfig~, StudentSubmission) void
+        - compileAndRun(Path, Path, QuestionConfig) void
+        - copyDependencies(Path, Path, QuestionConfig) void
+    }
+    
+    class ProcessRunner {
+        - workingDir: Path
+        + runProcess(String, long) ProcessResult
+    }
+    
+    class PlagiarismChecker {
+        + checkPlagiarism(List~StudentSubmission~, double) List~Anomaly~
+    }
+    
+    %% ===================== EXECUTION RELATIONSHIPS =====================
+    
+    GradingEngine --> ProcessRunner : "uses"
+    GradingEngine --> QuestionConfig : "uses"
+    GradingEngine --> StudentSubmission : "produces"
+    GradingEngine --> QuestionResult : "produces"
+    PlagiarismChecker --> StudentSubmission : "checks"
+    PlagiarismChecker --> Anomaly : "produces"
+    GradingEngine --> ProcessResult : "returns"
+    GradingEngine --> QuestionLogWriter : "uses"
+    GradingEngine --> ConsoleReporter : "uses"
+    
+    %% ===================== WEB PACKAGE =====================
+    
+    class ExamController {
+        - uploadRegistry: UploadRegistry
+        - appConfig: AppConfig
+        - sessionDb: SessionDatabase
+        - pdfParser: PdfParser
+        - configInferenceService: ConfigInferenceService
+        + uploadExam(MultipartFile) ResponseEntity
+        + parsePdf(String) ResponseEntity
+        + analyzeSetup(String, AnalyzeSetupRequest) ResponseEntity
+    }
+    
+    class GenerationController {
+        - appConfig: AppConfig
+        - generationService: TestGenerationService
+        - sessionDb: SessionDatabase
+        - pdfParser: PdfParser
+        - uploadRegistry: UploadRegistry
+        + generateTests(ExecuteRequest) ResponseEntity
+        + recommend(RecommendRequest) ResponseEntity
+    }
+    
+    class GradingStreamController {
+        - gradingPipeline: GradingPipeline
+        + streamGrading(String, ExecuteRequest) ResponseEntity
+    }
+    
+    class TesterController {
+        - uploadRegistry: UploadRegistry
+        + uploadTesters(MultipartFile) ResponseEntity
+        + getTesterFiles(String) ResponseEntity
+    }
+    
+    class TemplateController {
+        - uploadRegistry: UploadRegistry
+        + uploadTemplate(MultipartFile) ResponseEntity
+        + getTemplateFiles(String) ResponseEntity
+    }
+    
+    class ReportsController {
+        - appConfig: AppConfig
+        + getPdf(String) ResponseEntity
+        + getCsv(String) ResponseEntity
+        + getDetailedCsv(String) ResponseEntity
+    }
+    
+    class SystemController {
+        + healthCheck() ResponseEntity
+    }
+    
+    class WebConfig {
+        + appConfig() AppConfig
+        + sessionDatabase() SessionDatabase
+        + langChainServiceVision(ChatModel) LangChainService
+        + langChainServiceText(AppConfig) LangChainService
+        + testGenerationService(...) TestGenerationService
+        + testerFileWriter() TesterFileWriter
+        + pdfParser(AppConfig) PdfParser
+        + addCorsMappings(CorsRegistry) void
+    }
+    
+    class UploadRegistry {
+        - examFiles: ConcurrentMap~String, Path~
+        - templateDirs: ConcurrentMap~String, Path~
+        - testerDirs: ConcurrentMap~String, Path~
+    }
+    
+    class AnalyzeSetupRequest {
+        - templateId: String
+        - testerId: String
+    }
+    
+    class ExecuteRequest {
+        - examId: String
+        - testerId: String
+        - templateId: String
+        - numCases: int
+        - question: InferredQuestionConfig
+        - conceptsToCover: List~String~
+        - customSuggestions: List~String~
+    }
+    
+    class RecommendRequest {
+        - examId: String
+        - questionId: String
+        - testerId: String
+    }
+    
+    %% ===================== WEB RELATIONSHIPS =====================
+    
+    ExamController --> UploadRegistry : "uses"
+    ExamController --> SessionDatabase : "uses"
+    ExamController --> PdfParser : "uses"
+    ExamController --> ConfigInferenceService : "uses"
+    ExamController --> InferredConfig : "returns"
+    GenerationController --> TestGenerationService : "uses"
+    GenerationController --> SessionDatabase : "uses"
+    GenerationController --> GenerationResult : "returns"
+    GenerationController --> TestCaseRecommendation : "returns"
+    GradingStreamController --> GradingPipeline : "uses"
+    TesterController --> UploadRegistry : "uses"
+    TemplateController --> UploadRegistry : "uses"
+    ReportsController --> AppConfig : "uses"
+    WebConfig --> AppConfig : "creates"
+    WebConfig --> SessionDatabase : "creates"
+    WebConfig --> LangChainService : "creates via AiServices"
+    WebConfig --> TestGenerationService : "creates"
+    WebConfig --> TesterFileWriter : "creates"
+    WebConfig --> PdfParser : "creates"
+    WebConfig --|> WebMvcConfigurer : "implements"
+    UploadRegistry --> Path : "stores"
+    
+    %% ===================== EXTRACTION PACKAGE =====================
+    
+    class ZipExtractor {
+        + extract(Path, Path) void
+        + extractWithStructure(Path, Path) Path
+    }
+    
+    class StructureNormalizer {
+        - identityResolver: IdentityResolver
+        + normalize(Path) void
+        - findQuestionParent(Path) Path
+    }
+    
+    class IdentityResolver {
+        + resolve(Path) StudentIdentity
+        + extractNameFromFilename(String) String
+    }
+    
+    %% ===================== EXTRACTION RELATIONSHIPS =====================
+    
+    StructureNormalizer --> IdentityResolver : "uses"
+    ZipExtractor --> StructureNormalizer : "uses after extract"
+    
+    %% ===================== VALIDATION PACKAGE =====================
+    
+    class SubmissionValidator {
+        - identityResolver: IdentityResolver
+        + validate(Path, List~QuestionConfig~, StudentSubmission) void
+    }
+    
+    SubmissionValidator --> IdentityResolver : "uses"
+    SubmissionValidator --> StudentSubmission : "validates"
+    SubmissionValidator --> QuestionConfig : "uses"
+    
+    %% ===================== REPORTING PACKAGE =====================
+    
+    class PdfReportGenerator {
+        + generate(List~StudentSubmission~, List~QuestionConfig~, Path) void
+        - writeSectionQuestions() void
+        - writeSectionStudents() void
+    }
+    
+    class CSVExporter {
+        + export(Path, List~StudentSubmission~, List~QuestionConfig~) void
+    }
+    
+    class DetailedCsvExporter {
+        + exportDetailed(Path, List~StudentSubmission~) void
+    }
+    
+    class ChartGenerator {
+        + passRateChart(List~StudentSubmission~, List~QuestionConfig~) byte[]
+        + scoreDistributionChart(List~StudentSubmission~, List~QuestionConfig~) byte[]
+    }
+    
+    class ConsoleReporter {
+        + report(List~StudentSubmission~, List~QuestionConfig~) void
+        + startProgress(int) void
+    }
+    
+    class TesterOutputParser {
+        + parse(String) List~TestCaseResult~
+    }
+    
+    class ScoresheetEnricher {
+        + enrich(List~StudentSubmission~, Path) void
+    }
+    
+    class QuestionLogWriter {
+        + write(StudentSubmission, String, String, String) void
+    }
+    
+    %% ===================== REPORTING RELATIONSHIPS =====================
+    
+    PdfReportGenerator --> StudentSubmission : "uses"
+    PdfReportGenerator --> QuestionConfig : "uses"
+    CSVExporter --> StudentSubmission : "uses"
+    CSVExporter --> QuestionConfig : "uses"
+    DetailedCsvExporter --> StudentSubmission : "uses"
+    ChartGenerator --> StudentSubmission : "uses"
+    ChartGenerator --> QuestionConfig : "uses"
+    ConsoleReporter --> StudentSubmission : "uses"
+    ConsoleReporter --> QuestionConfig : "uses"
+    TesterOutputParser --> TestCaseResult : "produces"
+    ScoresheetEnricher --> StudentSubmission : "enriches"
+    QuestionLogWriter --> StudentSubmission : "writes"
+    
+    %% ===================== DATA PACKAGE =====================
+    
+    class SessionDatabase {
+        - dbPath: Path
+        - exams: Map~String, ExamEntry~
+        - questions: Map~String, QuestionEntry~
+        + saveParsedExam(String, String, String) void
+        + getParsedMarkdown(String) String
+        + saveQuestion(String, String, String, String, String, double, boolean) void
+        + getQuestion(String, String) QuestionEntry
+    }
+    
+    class ExamEntry {
+        examId: String
+        fileName: String
+        markdown: String
+        timestamp: Instant
+    }
+    
+    class QuestionEntry {
+        questionId: String
+        folder: String
+        tester: String
+        markdown: String
+        maxScore: double
+        inferredFromPdf: boolean
+    }
+    
+    SessionDatabase --> ExamEntry : "contains"
+    SessionDatabase --> QuestionEntry : "contains"
+    
+    %% ===================== CONFIG PACKAGE =====================
+    
+    class AppConfig {
+        - aiTextModel: String
+        - aiMaxTokens: int
+        - doclingServeUrl: String
+        - templateFolder: String
+        - timeoutSeconds: long
+        + getAiTextModel() String
+        + getQuestionConfigs() List~QuestionConfig~
+    }
+    
+    class EnvLoader {
+        + load() Map~String, String~
+    }
+    
+    AppConfig --> QuestionConfig : "provides"
+    
+    %% ===================== UTIL PACKAGE =====================
+    
+    class StringUtils {
+        + sanitizeFilename(String) String
+    }
+    
+    class FileUtils {
+        + createTempDir(String) Path
+        + copyDirectory(Path, Path) void
+    }
+    
+    %% ===================== GRADING PIPELINE =====================
+    
+    class GradingPipeline {
+        - config: AppConfig
+        - zipExtractor: ZipExtractor
+        - identityResolver: IdentityResolver
+        - structureNormalizer: StructureNormalizer
+        - submissionValidator: SubmissionValidator
+        - csvExporter: CSVExporter
+        - detailedCsvExporter: DetailedCsvExporter
+        - consoleReporter: ConsoleReporter
+        - scoresheetEnricher: ScoresheetEnricher
+        - inferredQuestionConfigs: List~QuestionConfig~
+        - testerFilesDir: Path
+        + run(Path, Path, Path, Path) List~StudentSubmission~
+        + run(Path, Path, Path, Path, Consumer~StudentSubmission~) List~StudentSubmission~
+        + setInferredQuestionConfigs(List~QuestionConfig~) void
+        + cancel() void
+    }
+    
+    GradingPipeline --> ZipExtractor : "uses"
+    GradingPipeline --> IdentityResolver : "uses"
+    GradingPipeline --> StructureNormalizer : "uses"
+    GradingPipeline --> SubmissionValidator : "uses"
+    GradingPipeline --> GradingEngine : "uses"
+    GradingPipeline --> PlagiarismChecker : "uses"
+    GradingPipeline --> CSVExporter : "uses"
+    GradingPipeline --> DetailedCsvExporter : "uses"
+    GradingPipeline --> ConsoleReporter : "uses"
+    GradingPipeline --> QuestionLogWriter : "uses"
+    GradingPipeline --> QuestionConfig : "uses"
+    GradingPipeline --> StudentSubmission : "produces"
+    GradingPipeline --> AppConfig : "uses"
