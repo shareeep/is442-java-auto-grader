@@ -17,9 +17,11 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 
 # One-shot
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
-  --submissions ./student-submissions \
-  --testers ./Tester-Files \
-  --output ./results
+  --submissions ./is442-project-materials/student-submission \
+  --testers ./is442-project-materials/Tester-Files \
+  --output ./output
+
+
 
 # Interactive CLI
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --cli
