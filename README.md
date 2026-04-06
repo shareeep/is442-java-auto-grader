@@ -4,9 +4,30 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 
 ## Quick Start
 
-### Setup
+### Project Materials Setup
+
+Place the `is442-project-materials/` folder in the root of the project repo with the following structure:
+
 ```
-# Create `.env` file (Refer to .env.example)
+is442-project-materials/
+├── student-submission/              # Student ZIP submissions
+│   ├── 2023-2024-alice.wong.2024.zip
+│   ├── 2023-2024-bob.smith.2024.zip
+│   └── ...
+├── Tester-Files/                   # Question tester .java files
+│   ├── Q1aTester.java
+│   ├── Q1bTester.java
+│   └── ...
+├── IS442-ScoreSheet.csv            # (optional) Official scoresheet for name/ID enrichment
+├── IS442-ExamSample.pdf            # Exam PDF for AI test generation
+└── RenameToYourUsername/           # Question files for students to code in
+```
+
+> **Note:** For AI test generation workflow, see [docs/AI-TEST-GENERATION.md](docs/AI-TEST-GENERATION.md).
+
+### Environment Setup
+```
+# Create `.env` file (refer to .env.example)
 ```
 
 ### CLI (no Docker needed)
@@ -15,13 +36,12 @@ Automated grading system for IS442 Java programming assignments. Extracts studen
 # Build
 ./gradlew fatJar
 
-# One-shot
+# One-shot grading
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar \
   --submissions ./is442-project-materials/student-submission \
   --testers ./is442-project-materials/Tester-Files \
+  --scoresheet ./is442-project-materials/IS442-ScoreSheet.csv \
   --output ./output
-
-
 
 # Interactive CLI
 java -jar build/libs/autograder-1.0-SNAPSHOT-all.jar --cli
